@@ -1,6 +1,9 @@
 {
   "name": "student-tuition-payment-portal",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "workspaces": [
     "frontend",
     "backend"
