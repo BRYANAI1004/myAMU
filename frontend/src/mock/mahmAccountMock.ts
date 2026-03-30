@@ -1,0 +1,194 @@
+import type { BillingLineItem } from '../types/billing'
+import type { ScheduleRow } from '../types/billing'
+
+export type MahmInstallmentScheduleEntry = {
+  dueDate: string
+  amount: number
+  status: string
+}
+
+export type MahmRecentActivityEntry = {
+  date: string
+  description: string
+  amount: number
+}
+
+export type MahmStatementEntry = {
+  statementDate: string
+  description: string
+  balance: number
+}
+
+export type MahmAccountMock = {
+  program: string
+  student: {
+    name: string
+    studentId: string
+    term: string
+    year: number
+  }
+  summary: {
+    tuitionTotal: number
+    clinicalTotal: number
+    feesTotal: number
+    totalCharges: number
+    payments: number
+    outstandingBalance: number
+    /** Optional; omitted when zero */
+    otherTotal?: number
+  }
+  lineItems: BillingLineItem[]
+  installmentPlan: {
+    enabled: boolean
+    installmentCount: number
+    installmentAmount: number
+    schedule: MahmInstallmentScheduleEntry[]
+  }
+  /** Bursar-facing copy for the payment plan page */
+  installmentPolicy: string[]
+  billingStatus: string
+  termChargeEffectiveDate: string
+  scheduleRows: ScheduleRow[]
+  recentActivity: MahmRecentActivityEntry[]
+  statements: MahmStatementEntry[]
+}
+
+/**
+ * Single source of truth for the MAHM frontend-only demo.
+ * Amounts and catalog-style descriptions match the MAHM program structure.
+ */
+export const mahmAccountMock: MahmAccountMock = {
+  program: 'Master of Acupuncture and Herbal Medicine (MAHM)',
+  student: {
+    name: 'Bingchen Li',
+    studentId: 'AMU123456',
+    term: 'Fall',
+    year: 2026,
+  },
+
+  summary: {
+    tuitionTotal: 2200,
+    clinicalTotal: 1530,
+    feesTotal: 270,
+    totalCharges: 4000,
+    payments: 1250,
+    outstandingBalance: 2750,
+  },
+
+  lineItems: [
+    {
+      description: 'TCM101 Foundations of Traditional Chinese Medicine (3 units)',
+      amount: 600,
+      category: 'tuition',
+    },
+    {
+      description: 'ACU201 Acupuncture Techniques I (4 units)',
+      amount: 800,
+      category: 'tuition',
+    },
+    {
+      description: 'HERB201 Chinese Herbal Medicine I (3 units)',
+      amount: 600,
+      category: 'tuition',
+    },
+    {
+      description: 'ACULAB1 Acupuncture Lab I (1 unit)',
+      amount: 200,
+      category: 'tuition',
+    },
+    {
+      description: 'CLN301 Clinical Internship Level 1 (90 hours)',
+      amount: 1530,
+      category: 'clinical',
+    },
+    { description: 'Student Services Fee', amount: 150, category: 'fees' },
+    { description: 'Facilities Fee', amount: 75, category: 'fees' },
+    { description: 'Installment Plan Fee', amount: 45, category: 'fees' },
+  ],
+
+  installmentPlan: {
+    enabled: true,
+    installmentCount: 3,
+    installmentAmount: 916.66,
+    schedule: [
+      { dueDate: '2026-09-05', amount: 916.66, status: 'Upcoming' },
+      { dueDate: '2026-10-05', amount: 916.66, status: 'Upcoming' },
+      { dueDate: '2026-11-05', amount: 916.68, status: 'Upcoming' },
+    ],
+  },
+
+  installmentPolicy: [
+    'Up to three installments per term, due on the 5th of each month.',
+    'A non-refundable installment plan fee is included in term charges.',
+    'Late payments may incur additional fees per bursar policy.',
+    'Confirm amounts and dates on official bursar communications.',
+  ],
+
+  billingStatus: 'Current — installment plan active',
+
+  termChargeEffectiveDate: '2026-08-15',
+
+  scheduleRows: [
+    {
+      courseCode: 'TCM101',
+      title: 'Foundations of Traditional Chinese Medicine',
+      type: 'Didactic',
+      units: 3,
+      hours: null,
+      charge: 600,
+    },
+    {
+      courseCode: 'ACU201',
+      title: 'Acupuncture Techniques I',
+      type: 'Didactic',
+      units: 4,
+      hours: null,
+      charge: 800,
+    },
+    {
+      courseCode: 'HERB201',
+      title: 'Chinese Herbal Medicine I',
+      type: 'Didactic',
+      units: 3,
+      hours: null,
+      charge: 600,
+    },
+    {
+      courseCode: 'ACULAB1',
+      title: 'Acupuncture Lab I',
+      type: 'Lab',
+      units: 1,
+      hours: null,
+      charge: 200,
+    },
+    {
+      courseCode: 'CLN301',
+      title: 'Clinical Internship Level 1',
+      type: 'Clinical',
+      units: null,
+      hours: 90,
+      charge: 1530,
+    },
+  ],
+
+  recentActivity: [
+    {
+      date: '2026-08-20',
+      description: 'Tuition payment — Fall 2026',
+      amount: -1250,
+    },
+    {
+      date: '2026-08-15',
+      description: 'Fall 2026 Tuition Charges Posted',
+      amount: 4000,
+    },
+  ],
+
+  statements: [
+    {
+      statementDate: '2026-08-15',
+      description: 'Fall 2026 Tuition Statement — MAHM Program',
+      balance: 2750,
+    },
+  ],
+}
