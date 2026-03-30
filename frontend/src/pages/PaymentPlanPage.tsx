@@ -79,7 +79,7 @@ export function PaymentPlanPage() {
         </section>
 
         <nav className="portal-actions portal-actions--spaced" aria-label="Page actions">
-          <Link className="portal-btn portal-btn--secondary" to="/">
+          <Link className="portal-btn portal-btn--secondary" to="/overview">
             Back to Overview
           </Link>
           <Link className="portal-btn portal-btn--primary" to="/payment">
