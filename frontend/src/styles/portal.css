@@ -78,25 +78,31 @@
 
 /* Dashboard main column: horizontal padding token (full-width layout, not a max-width island) */
 .portal-shell--dashboard-home {
-  /* Comfortable on phone/tablet; tapers on large desktop so the canvas feels like a real portal, not a narrow island */
-  --portal-dashboard-padding-x: clamp(1rem, 0.5rem + 1.15vw, 1.75rem);
+  /* Safe on small screens; desktop / widescreen use a tight app-shell gutter so the canvas fills the monitor */
+  --portal-dashboard-padding-x: clamp(1rem, 0.45rem + 1vw, 1.5rem);
 }
 
 @media (min-width: 1280px) {
   .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(1rem, 0.65rem + 0.55vw, 1.375rem);
+    --portal-dashboard-padding-x: clamp(0.875rem, 0.45rem + 0.38vw, 1.125rem);
+  }
+}
+
+@media (min-width: 1440px) {
+  .portal-shell--dashboard-home {
+    --portal-dashboard-padding-x: clamp(0.75rem, 0.4rem + 0.28vw, 1rem);
   }
 }
 
 @media (min-width: 1600px) {
   .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(1rem, 0.75rem + 0.4vw, 1.25rem);
+    --portal-dashboard-padding-x: clamp(0.75rem, 0.35rem + 0.22vw, 0.875rem);
   }
 }
 
 @media (min-width: 1920px) {
   .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(1rem, 0.7rem + 0.35vw, 1.125rem);
+    --portal-dashboard-padding-x: clamp(0.625rem, 0.28rem + 0.16vw, 0.75rem);
   }
 }
 
@@ -554,7 +560,7 @@
 }
 
 .portal-shell--no-sidebar .portal-main-body:has(.portal-dashboard) {
-  /* Full-width app canvas: side padding only (no max-width island; gutters stay modest on 1440–1920) */
+  /* Full-width app canvas: dashboard-only gutters (no max-width island; aggressive taper on large desktop) */
   padding-left: var(--portal-dashboard-padding-x);
   padding-right: var(--portal-dashboard-padding-x);
 }
@@ -2393,7 +2399,7 @@
 .portal-dashboard-home-grid {
   display: grid;
   width: 100%;
-  /* Tablet / small desktop: proportional split — calendar leads visually */
+  /* Fallback when not overridden: bias toward calendar (two-column layouts use fixed Services strip below) */
   grid-template-columns: minmax(0, 36fr) minmax(0, 64fr);
   gap: 1.5rem clamp(1.25rem, 2vw, 1.75rem);
   align-items: stretch;
@@ -2415,11 +2421,11 @@
   height: 100%;
 }
 
-/* Large desktop: Services ≈ 360–400px (narrow strip); My Calendar = dominant 1fr portal column */
+/* Large desktop: Services ≈ 22.5rem (360px); My Calendar = 1fr — portal main column dominates */
 @media (min-width: 1025px) {
   .portal-dashboard-home-grid {
-    grid-template-columns: 24rem minmax(0, 1fr);
-    gap: 1.75rem clamp(1.25rem, 1.5vw, 1.75rem);
+    grid-template-columns: minmax(0, 22.5rem) minmax(0, 1fr);
+    gap: 1.75rem clamp(1.25rem, 1.35vw, 1.75rem);
   }
 
   /* Slight horizontal bleed into the column gap: wider gold tiles */
