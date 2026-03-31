@@ -104,13 +104,6 @@ export const DASHBOARD_WEEKLY_TIMETABLE_MOCK: Record<
       endMinutes: 9 * 60 + 50,
       subtitle: 'BMS 145',
     },
-    {
-      code: 'ICM 501',
-      time: '11:00 AM – 12:15 PM',
-      startMinutes: 11 * 60,
-      endMinutes: 12 * 60 + 15,
-      subtitle: 'HSB 112',
-    },
   ],
   wednesday: [
     {
@@ -136,13 +129,6 @@ export const DASHBOARD_WEEKLY_TIMETABLE_MOCK: Record<
       endMinutes: 9 * 60 + 50,
       subtitle: 'BMS 145',
     },
-    {
-      code: 'ICM 501',
-      time: '11:00 AM – 12:15 PM',
-      startMinutes: 11 * 60,
-      endMinutes: 12 * 60 + 15,
-      subtitle: 'HSB 112',
-    },
   ],
   friday: [],
 }
@@ -163,7 +149,7 @@ export const DASHBOARD_COURSES_MOCK: DashboardCourse[] = [
     title: 'Introduction to Clinical Medicine',
     credits: 5,
     section: '002 — Lecture / Small group',
-    schedule: 'Mon, 11:00 AM – 12:15 PM; Thu, 11:00 AM – 12:15 PM',
+    schedule: 'Mon, 11:00 AM – 12:15 PM',
     location: 'Health Sciences Bldg 112',
   },
   {
