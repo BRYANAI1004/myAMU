@@ -3,7 +3,8 @@
   --amu-red: #8c1d2c;
   --amu-red-dark: #6e1622;
   --amu-gold: #f2c300;
-  --page-gray: #f5f7fa;
+  /* Single page canvas: matches authenticated shell + body (avoids two-tone band below short pages). */
+  --page-gray: #f2f4f8;
   --amu-card: #ffffff;
   --border-gray: #e5e5e5;
   --text-dark: #333333;
@@ -25,8 +26,9 @@
   --portal-radius: 6px;
   --portal-shadow: 0 1px 2px rgba(28, 35, 51, 0.06);
   --portal-max: 56rem;
+  --portal-module-max: 74rem;
   /* Matches .portal-main-body horizontal inset so student bar and page content align */
-  --portal-main-padding-x: clamp(1.5rem, 2.5vw, 2rem);
+  --portal-main-padding-x: clamp(1rem, 1.8vw, 1.5rem);
   --portal-space-lede-bottom: 1.5rem;
   --portal-space-section: 1.75rem;
   --portal-space-main-bottom: 3rem;
@@ -44,10 +46,20 @@
   --portal-sidebar-text-muted: rgba(255, 255, 255, 0.85);
   --portal-sidebar-active: var(--amu-red-dark);
   --portal-sidebar-hover: var(--amu-red-dark);
-  --portal-main-canvas-bg: #f2f4f8;
+  --portal-main-canvas-bg: var(--page-gray);
   min-height: 100vh;
   background: var(--portal-bg);
   color: var(--portal-text);
+}
+
+.portal-shell--with-banner {
+  --portal-portal-banner-height: 5rem;
+  --portal-header-height: calc(var(--portal-branding-bar-height) + var(--portal-portal-banner-height));
+}
+
+.portal-shell--without-banner {
+  --portal-portal-banner-height: 0rem;
+  --portal-header-height: var(--portal-branding-bar-height);
 }
 
 /* —— Authenticated shell: fixed app header + sidebar + main —— */
@@ -56,6 +68,27 @@
   flex-direction: column;
   min-height: 100vh;
   background: var(--portal-main-canvas-bg);
+}
+
+/* Dashboard homepage only: shell height follows content (avoids a tall empty canvas below the cards). */
+.portal-shell.portal-shell--dashboard-home.portal-shell--authenticated {
+  min-height: auto;
+  align-items: flex-start;
+}
+
+.portal-shell--dashboard-home .portal-main {
+  flex: 0 1 auto;
+  flex-grow: 0;
+  align-self: stretch;
+  width: 100%;
+  /* Drop 100vh floor from .portal-main so the homepage height follows content */
+  min-height: unset;
+  height: auto;
+}
+
+.portal-shell--dashboard-home .portal-main-body {
+  flex: 0 1 auto;
+  flex-grow: 0;
 }
 
 /* Full-width fixed header: gold school bar + myAMU banner (above sidebar) */
@@ -341,7 +374,8 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--portal-main-canvas-bg);
+  /* Canvas comes from .portal-shell--authenticated; avoid a second filled layer vs. body. */
+  background: transparent;
 }
 
 /* Homepage layout: full-width main column when the desktop sidebar is hidden */
@@ -491,6 +525,8 @@
 
 .portal-main-body:has(.portal-dashboard) {
   padding-top: 1rem;
+  /* ~24–32px below the two cards — homepage ends shortly after the row */
+  padding-bottom: clamp(1.5rem, 2.2vw, 2rem);
 }
 
 .portal-shell--no-sidebar .portal-main-body:has(.portal-dashboard) {
@@ -502,10 +538,18 @@
   .portal-shell--authenticated {
     flex-direction: column;
     --portal-main-padding-x: 1rem;
-    /* Two-row gold bar when user + logout stack; myAMU strip stays substantial on small screens */
+    /* Two-row gold bar when user + logout stack. */
     --portal-branding-bar-height: 4.75rem;
+  }
+
+  .portal-shell--with-banner {
     --portal-portal-banner-height: 4.5rem;
     --portal-header-height: calc(var(--portal-branding-bar-height) + var(--portal-portal-banner-height));
+  }
+
+  .portal-shell--without-banner {
+    --portal-portal-banner-height: 0rem;
+    --portal-header-height: var(--portal-branding-bar-height);
   }
 
   .portal-sidebar--desktop {
@@ -762,11 +806,36 @@
 
 /* —— Module placeholder pages (portal shell) —— */
 .portal-module-page {
-  max-width: 44rem;
+  max-width: min(var(--portal-module-max), 100%);
+  width: 100%;
 }
 
 .portal-module-header {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.portal-back-to-dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--portal-text-muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.portal-back-to-dashboard-link:hover {
+  color: var(--portal-accent);
+  border-bottom-color: rgba(140, 29, 44, 0.35);
+}
+
+.portal-back-to-dashboard-link:focus-visible {
+  outline: 2px solid var(--portal-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .portal-module-title {
@@ -783,7 +852,7 @@
   font-size: 0.9375rem;
   line-height: 1.55;
   color: var(--portal-text-muted);
-  max-width: 40rem;
+  max-width: 52rem;
 }
 
 /* —— Module layouts: local sub-navigation (Finances, Registration, Academics, Clinical, Documents) —— */
@@ -792,7 +861,7 @@
 .portal-academics-module,
 .portal-clinical-module,
 .portal-documents-module {
-  max-width: var(--portal-max);
+  max-width: min(var(--portal-module-max), 100%);
   margin: 0 auto;
   width: 100%;
 }
@@ -802,7 +871,7 @@
 .portal-academics-nav,
 .portal-clinical-nav,
 .portal-documents-nav {
-  margin-bottom: 1.75rem;
+  margin-bottom: 1.25rem;
 }
 
 .portal-finances-nav-list,
@@ -1316,7 +1385,7 @@
 /* —— Registration landing (action cards) —— */
 .portal-registration-action-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(15.5rem, 1fr));
   gap: 0.875rem;
   margin: 0;
   padding: 0;
@@ -1524,7 +1593,7 @@
   border: 1px solid var(--portal-border-subtle);
   border-radius: var(--portal-radius);
   box-shadow: var(--portal-shadow);
-  padding: 1.25rem 1.375rem;
+  padding: 1.375rem 1.5rem;
 }
 
 .portal-module-panel-heading {
@@ -2246,22 +2315,13 @@
 }
 
 .portal-dashboard-hero {
-  margin-bottom: 1.625rem;
-  padding-bottom: 1.25rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.875rem;
   border-bottom: 1px solid var(--portal-border-subtle);
 }
 
-.portal-dashboard-hero-context {
-  margin: 0 0 0.35rem;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--portal-text-faint);
-}
-
 .portal-dashboard-hero-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.025em;
@@ -2269,44 +2329,71 @@
   color: var(--portal-text);
 }
 
-.portal-dashboard-hero-sub {
-  margin: 0;
-  max-width: 44rem;
-  font-size: 0.9375rem;
-  line-height: 1.55;
-  color: var(--portal-text-muted);
-}
-
-.portal-dashboard-hero-sub strong {
-  color: var(--portal-text);
-  font-weight: 600;
-}
-
 .portal-dashboard-home-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 1.5rem 1.875rem;
-  align-items: start;
+  /* ~38% / ~62% of row after gap (golden-ratio–style portal split); gap 30px */
+  grid-template-columns: minmax(0, 38fr) minmax(0, 62fr);
+  gap: 1.5rem clamp(1.75rem, 2.5vw, 2rem);
+  align-items: stretch;
+}
+
+.portal-dashboard-home-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .portal-dashboard-home-primary,
 .portal-dashboard-home-aside {
   display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  align-self: stretch;
+  height: 100%;
 }
 
-.portal-dashboard-home-primary > .portal-dashboard-services,
+/* Slight horizontal bleed into the column gap: wider gold tiles without changing 38fr / 62fr */
+@media (min-width: 1025px) {
+  .portal-dashboard-home-primary {
+    margin-inline-end: -0.375rem;
+  }
+}
+
+.portal-dashboard-home-primary > .portal-dashboard-services {
+  width: 100%;
+  /* Grow with grid row so Services column matches My Calendar outer height */
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
 .portal-dashboard-home-aside > .portal-dashboard-courses {
   width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
-.portal-dashboard-section-title {
+.portal-dashboard-home-primary > .portal-dashboard-secondary-card,
+.portal-dashboard-home-aside > .portal-dashboard-secondary-card {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.portal-dashboard-card-panel-title {
   margin: 0;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
   text-transform: uppercase;
-  color: var(--portal-text);
+  color: #6e1622;
 }
 
 .portal-dashboard-section-lede {
@@ -2318,7 +2405,12 @@
 }
 
 .portal-dashboard-services {
-  padding: 1.5rem 1.625rem 1.625rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
   background: var(--portal-surface);
   border: 1px solid var(--portal-border-subtle);
   border-radius: var(--portal-radius);
@@ -2326,103 +2418,144 @@
 }
 
 .portal-dashboard-services-head {
-  margin-bottom: 1.125rem;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding: 1.25rem 1.5rem 1.125rem;
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: linear-gradient(180deg, #fbfbfc 0%, var(--portal-surface) 100%);
+  text-align: left;
 }
 
-.portal-dashboard-service-grid {
+.portal-dashboard-service-list {
   list-style: none;
   margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
+  padding: 1rem 1.5rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  /* Fill remaining column height; tiles stay stacked — extra space stays at bottom */
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 1.0625rem;
+  justify-content: flex-start;
+}
+
+.portal-dashboard-service-list > li {
+  width: 100%;
 }
 
 .portal-dashboard-service-tile {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: 0.75rem 0.875rem;
-  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  min-height: 4.5rem;
   margin: 0;
-  padding: 0.875rem 1rem 0.875rem 0.875rem;
+  padding: 0 1.375rem;
   text-decoration: none;
-  color: inherit;
-  background: linear-gradient(145deg, #fafbfc 0%, var(--portal-surface) 55%);
-  border: 1px solid var(--portal-border-subtle);
-  border-radius: var(--portal-radius);
+  color: #6e1622;
+  background: #f2c300;
+  border: 1px solid #e0b000;
+  border-radius: 0.5rem;
   transition:
     background 0.12s ease,
-    border-color 0.12s ease,
-    box-shadow 0.12s ease;
+    border-color 0.12s ease;
+}
+
+.portal-dashboard-service-tile-leading {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 0.75rem;
 }
 
 .portal-dashboard-service-tile:hover {
-  background: #f4f6f9;
-  border-color: var(--portal-border);
-  box-shadow: 0 2px 8px rgba(28, 35, 51, 0.07);
+  background: #e0b000;
+  border-color: #c99a00;
+}
+
+/* When using NavLink / aria-current for the current module */
+.portal-dashboard-service-tile[aria-current="page"] {
+  background: #c99a00;
+  border-color: #c99a00;
+}
+
+.portal-dashboard-service-tile[aria-current="page"] .portal-dashboard-service-tile-arrow {
+  color: #6e1622;
 }
 
 .portal-dashboard-service-tile:focus-visible {
-  outline: 2px solid var(--portal-accent);
+  outline: 2px solid color-mix(in srgb, var(--amu-gold) 72%, var(--amu-red));
   outline-offset: 2px;
+}
+
+.portal-dashboard-service-tile:active {
+  background: #c99a00;
+  border-color: #c99a00;
 }
 
 .portal-dashboard-service-tile-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  justify-content: flex-start;
   flex-shrink: 0;
-  border-radius: var(--portal-radius);
-  background: var(--portal-accent-soft);
-  color: var(--portal-accent);
+  width: 1.5rem;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.portal-dashboard-service-glyph {
-  width: 1.25rem;
-  height: 1.25rem;
+.portal-dashboard-service-icon-img {
+  width: 1.5rem;
+  height: 1.5rem;
   display: block;
+  object-fit: contain;
+  object-position: left center;
+  /* Optical alignment: icons read slightly high vs. cap height / baseline */
+  transform: translateY(0.0625rem);
 }
 
 .portal-dashboard-service-tile-body {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
   min-width: 0;
+  justify-content: center;
+  flex: 0 1 auto;
 }
 
 .portal-dashboard-service-tile-title {
-  font-size: 0.9375rem;
+  font-family: inherit;
+  font-size: 1.125rem;
   font-weight: 600;
   letter-spacing: -0.015em;
-  line-height: 1.3;
-  color: var(--portal-text);
+  line-height: 1.25;
+  color: #6e1622;
 }
 
-.portal-dashboard-service-tile-desc {
-  font-size: 0.78125rem;
-  line-height: 1.45;
-  color: var(--portal-text-muted);
-}
-
-.portal-dashboard-service-tile-cta {
-  align-self: center;
+.portal-dashboard-service-tile-arrow {
   flex-shrink: 0;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--portal-accent);
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  margin-left: 0.75rem;
+  font-size: 1.125rem;
+  line-height: 1.25;
+  color: #6e1622;
+  transition: transform 0.12s ease;
 }
 
-.portal-dashboard-service-tile:hover .portal-dashboard-service-tile-cta {
-  color: var(--portal-accent-hover);
+.portal-dashboard-service-tile:hover .portal-dashboard-service-tile-arrow {
+  color: #6e1622;
+  transform: translateX(2px);
 }
 
 .portal-dashboard-courses {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
   background: var(--portal-surface);
   border: 1px solid var(--portal-border-subtle);
   border-radius: var(--portal-radius);
@@ -2451,6 +2584,8 @@
 }
 
 .portal-dashboard-courses-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -2521,14 +2656,102 @@
   line-height: 1.4;
 }
 
-.portal-dashboard-courses-footnote {
+/* Secondary dashboard row — compact panels aligned with My Calendar styling */
+.portal-dashboard-secondary-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  box-shadow: var(--portal-shadow);
+  overflow: hidden;
+}
+
+.portal-dashboard-secondary-card-head {
+  flex-shrink: 0;
+  padding: 0.875rem 1.125rem 0.75rem;
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: linear-gradient(180deg, #fbfbfc 0%, var(--portal-surface) 100%);
+}
+
+.portal-dashboard-secondary-card-head .portal-dashboard-card-panel-title {
+  font-size: 1rem;
+}
+
+.portal-dashboard-dates-list {
+  list-style: none;
   margin: 0;
-  padding: 0.875rem 1.5rem 1.125rem;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  color: var(--portal-text-faint);
-  background: #fafbfc;
+  padding: 0.625rem 1.125rem 0.875rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.portal-dashboard-dates-item {
+  display: grid;
+  grid-template-columns: 4.25rem minmax(0, 1fr);
+  gap: 0.625rem;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.portal-dashboard-dates-when {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-accent);
+  white-space: nowrap;
+}
+
+.portal-dashboard-dates-label {
+  color: var(--portal-text);
+  font-weight: 500;
+}
+
+.portal-dashboard-account-dl {
+  margin: 0;
+  padding: 0.625rem 1.125rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4375rem;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.portal-dashboard-account-row {
+  display: grid;
+  grid-template-columns: minmax(0, 7.5rem) minmax(0, 1fr);
+  gap: 0.5rem 0.75rem;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.portal-dashboard-account-row dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.portal-dashboard-account-row dd {
+  margin: 0;
+  font-weight: 500;
+  color: var(--portal-text);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.portal-dashboard-account-footer {
+  flex-shrink: 0;
+  padding: 0.625rem 1.125rem 0.75rem;
+  margin-top: auto;
   border-top: 1px solid var(--portal-border-subtle);
+  background: #fafbfc;
+}
+
+.portal-dashboard-account-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 @media (max-width: 1024px) {
@@ -2536,8 +2759,15 @@
     grid-template-columns: 1fr;
   }
 
-  .portal-dashboard-service-grid {
-    grid-template-columns: 1fr;
+  .portal-dashboard-home-primary {
+    margin-inline-end: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-dashboard-home-primary > .portal-dashboard-services,
+  .portal-dashboard-home-aside > .portal-dashboard-courses {
+    min-height: 0;
   }
 }
 
@@ -2546,36 +2776,14 @@
     font-size: 1.3125rem;
   }
 
-  .portal-dashboard-hero-sub {
-    font-size: 0.875rem;
-  }
-
   .portal-dashboard-service-tile {
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-  }
-
-  .portal-dashboard-service-tile-cta {
-    grid-column: 2;
-    justify-self: end;
-    align-self: end;
+    min-height: 4.5rem;
+    padding: 0 1.25rem;
   }
 }
 
 @media (max-width: 520px) {
   .portal-dashboard-service-tile {
-    grid-template-columns: 1fr;
-    padding: 0.875rem 1rem;
-  }
-
-  .portal-dashboard-service-tile-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-  }
-
-  .portal-dashboard-service-tile-cta {
-    grid-column: 1;
-    justify-self: start;
-    margin-top: 0.25rem;
+    padding: 0 1.25rem;
   }
 }
