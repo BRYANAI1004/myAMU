@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { useAccount } from './context/AccountContext'
 import { LoginPage } from './pages/LoginPage'
 import { PaymentPlanPage } from './pages/PaymentPlanPage'
 import { PortalLayout } from './components/PortalLayout'
@@ -38,52 +39,62 @@ import { ProfilePage } from './pages/ProfilePage'
 import { DashboardPage } from './pages/DashboardPage'
 import './styles/portal.css'
 
+function RequireAuth() {
+  const { isAuthenticated } = useAccount()
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+  return <Outlet />
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route element={<PortalLayout />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/registration" element={<RegistrationLayout />}>
-          <Route index element={<Navigate to="search" replace />} />
-          <Route path="search" element={<CourseSearchPage />} />
-          <Route path="course-bin" element={<MyCourseBinPage />} />
-          <Route path="checkout" element={<CourseBinCheckoutPage />} />
-          <Route path="schedule" element={<SchedulePage />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<PortalLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/registration" element={<RegistrationLayout />}>
+            <Route index element={<Navigate to="search" replace />} />
+            <Route path="search" element={<CourseSearchPage />} />
+            <Route path="course-bin" element={<MyCourseBinPage />} />
+            <Route path="checkout" element={<CourseBinCheckoutPage />} />
+            <Route path="schedule" element={<SchedulePage />} />
+          </Route>
+          <Route path="/finances" element={<FinancesLayout />}>
+            <Route index element={<Navigate to="overview" replace />} />
+            <Route path="overview" element={<FinancesOverviewPage />} />
+            <Route path="payment" element={<FinancesPaymentPage />} />
+            <Route path="history" element={<FinancesHistoryPage />} />
+            <Route path="statements" element={<FinancesStatementsPage />} />
+            <Route path="late-fees" element={<FinancesLateFeesPage />} />
+          </Route>
+          <Route path="/academics" element={<AcademicsLayout />}>
+            <Route index element={<AcademicsHomePage />} />
+            <Route path="grades" element={<GradesPage />} />
+            <Route path="transcript" element={<TranscriptPage />} />
+            <Route path="gpa" element={<GpaPage />} />
+            <Route path="progress" element={<AcademicProgressPage />} />
+            <Route path="enrollment-verification" element={<EnrollmentVerificationPage />} />
+          </Route>
+          <Route path="/clinical" element={<ClinicalLayout />}>
+            <Route index element={<ClinicalHomePage />} />
+            <Route path="schedule" element={<ClinicalSchedulePage />} />
+            <Route path="add-drop" element={<ClinicalAddDropPage />} />
+            <Route path="exam-practice" element={<ClinicalExamPracticePage />} />
+            <Route path="evaluation" element={<ClinicalEvaluationPage />} />
+            <Route path="required-hours" element={<ClinicalRequiredHoursPage />} />
+            <Route path="compliance" element={<ClinicalCompliancePage />} />
+          </Route>
+          <Route path="/documents" element={<DocumentsLayout />}>
+            <Route index element={<DocumentsHomePage />} />
+            <Route path="policies" element={<DocumentsPoliciesPage />} />
+            <Route path="forms" element={<DocumentsFormsPage />} />
+            <Route path="handbook" element={<DocumentsHandbookPage />} />
+            <Route path="uploads" element={<DocumentsUploadsPage />} />
+          </Route>
+          <Route path="/profile" element={<ProfilePage />} />
         </Route>
-        <Route path="/finances" element={<FinancesLayout />}>
-          <Route index element={<Navigate to="overview" replace />} />
-          <Route path="overview" element={<FinancesOverviewPage />} />
-          <Route path="payment" element={<FinancesPaymentPage />} />
-          <Route path="history" element={<FinancesHistoryPage />} />
-          <Route path="statements" element={<FinancesStatementsPage />} />
-          <Route path="late-fees" element={<FinancesLateFeesPage />} />
-        </Route>
-        <Route path="/academics" element={<AcademicsLayout />}>
-          <Route index element={<AcademicsHomePage />} />
-          <Route path="grades" element={<GradesPage />} />
-          <Route path="transcript" element={<TranscriptPage />} />
-          <Route path="gpa" element={<GpaPage />} />
-          <Route path="progress" element={<AcademicProgressPage />} />
-          <Route path="enrollment-verification" element={<EnrollmentVerificationPage />} />
-        </Route>
-        <Route path="/clinical" element={<ClinicalLayout />}>
-          <Route index element={<ClinicalHomePage />} />
-          <Route path="schedule" element={<ClinicalSchedulePage />} />
-          <Route path="add-drop" element={<ClinicalAddDropPage />} />
-          <Route path="exam-practice" element={<ClinicalExamPracticePage />} />
-          <Route path="evaluation" element={<ClinicalEvaluationPage />} />
-          <Route path="required-hours" element={<ClinicalRequiredHoursPage />} />
-          <Route path="compliance" element={<ClinicalCompliancePage />} />
-        </Route>
-        <Route path="/documents" element={<DocumentsLayout />}>
-          <Route index element={<DocumentsHomePage />} />
-          <Route path="policies" element={<DocumentsPoliciesPage />} />
-          <Route path="forms" element={<DocumentsFormsPage />} />
-          <Route path="handbook" element={<DocumentsHandbookPage />} />
-          <Route path="uploads" element={<DocumentsUploadsPage />} />
-        </Route>
-        <Route path="/profile" element={<ProfilePage />} />
       </Route>
       <Route path="/overview" element={<Navigate to="/finances/overview" replace />} />
       <Route path="/payment" element={<Navigate to="/finances/payment" replace />} />

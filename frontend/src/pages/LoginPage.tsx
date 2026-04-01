@@ -1,8 +1,26 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PORTAL_BRANDING_TITLE, PORTAL_SHELL_SUBTITLE } from '../branding'
+import { useAccount } from '../context/AccountContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAccount()
+  const [studentId, setStudentId] = useState('')
+  const [password, setPassword] = useState('')
+  const [formError, setFormError] = useState<string | null>(null)
+
+  function handleSignIn() {
+    const id = studentId.trim()
+    const pw = password.trim()
+    if (!id || !pw) {
+      setFormError('Student ID and Password are required')
+      return
+    }
+    setFormError(null)
+    login(id)
+    navigate('/dashboard')
+  }
 
   return (
     <div className="portal-shell portal-shell--login">
@@ -27,6 +45,8 @@ export function LoginPage() {
                   type="text"
                   name="username"
                   autoComplete="username"
+                  value={studentId}
+                  onChange={(e) => setStudentId(e.target.value)}
                 />
               </div>
               <div className="portal-login-field">
@@ -39,13 +59,24 @@ export function LoginPage() {
                   type="password"
                   name="password"
                   autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
             </div>
+            {formError ? (
+              <p
+                className="portal-login-error"
+                role="alert"
+                style={{ color: '#6e1622', fontSize: '0.875rem', margin: '0 0 0.5rem' }}
+              >
+                {formError}
+              </p>
+            ) : null}
             <button
               type="button"
               className="portal-login-submit"
-              onClick={() => navigate('/dashboard')}
+              onClick={handleSignIn}
             >
               Sign In
             </button>
