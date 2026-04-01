@@ -6,14 +6,7 @@ function linkClass(isActive: boolean) {
     .join(' ')
 }
 
-/** Order: Overview → Make Payment → Statements → Payment History → Late Fees (matches App routes). */
-const ITEMS = [
-  { to: 'overview', label: 'Overview' },
-  { to: 'payment', label: 'Make Payment' },
-  { to: 'statements', label: 'Statements' },
-  { to: 'history', label: 'Payment History' },
-  { to: 'late-fees', label: 'Late Fees' },
-] as const
+const ITEMS = [{ to: 'overview', label: 'Overview' }] as const
 
 export function FinancesNav() {
   return (

@@ -10,10 +10,6 @@ import { CourseBinCheckoutPage } from './pages/registration/CourseBinCheckoutPag
 import { SchedulePage } from './pages/registration/SchedulePage'
 import { FinancesLayout } from './pages/finances/FinancesLayout'
 import { FinancesOverviewPage } from './pages/finances/FinancesOverviewPage'
-import { FinancesPaymentPage } from './pages/finances/FinancesPaymentPage'
-import { FinancesHistoryPage } from './pages/finances/FinancesHistoryPage'
-import { FinancesStatementsPage } from './pages/finances/FinancesStatementsPage'
-import { FinancesLateFeesPage } from './pages/finances/FinancesLateFeesPage'
 import { AcademicsLayout } from './pages/academics/AcademicsLayout'
 import { AcademicsHomePage } from './pages/academics/AcademicsHomePage'
 import { GradesPage } from './pages/academics/GradesPage'
@@ -64,10 +60,10 @@ export default function App() {
           <Route path="/finances" element={<FinancesLayout />}>
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<FinancesOverviewPage />} />
-            <Route path="payment" element={<FinancesPaymentPage />} />
-            <Route path="history" element={<FinancesHistoryPage />} />
-            <Route path="statements" element={<FinancesStatementsPage />} />
-            <Route path="late-fees" element={<FinancesLateFeesPage />} />
+            <Route path="payment" element={<Navigate to="/finances/overview" replace />} />
+            <Route path="history" element={<Navigate to="/finances/overview" replace />} />
+            <Route path="statements" element={<Navigate to="/finances/overview" replace />} />
+            <Route path="late-fees" element={<Navigate to="/finances/overview" replace />} />
           </Route>
           <Route path="/academics" element={<AcademicsLayout />}>
             <Route index element={<AcademicsHomePage />} />
@@ -97,9 +93,9 @@ export default function App() {
         </Route>
       </Route>
       <Route path="/overview" element={<Navigate to="/finances/overview" replace />} />
-      <Route path="/payment" element={<Navigate to="/finances/payment" replace />} />
-      <Route path="/activity" element={<Navigate to="/finances/history" replace />} />
-      <Route path="/statements" element={<Navigate to="/finances/statements" replace />} />
+      <Route path="/payment" element={<Navigate to="/finances/overview" replace />} />
+      <Route path="/activity" element={<Navigate to="/finances/overview" replace />} />
+      <Route path="/statements" element={<Navigate to="/finances/overview" replace />} />
       <Route path="/plan" element={<PaymentPlanPage />} />
       <Route path="/" element={<Navigate to="/login" replace />} />
     </Routes>

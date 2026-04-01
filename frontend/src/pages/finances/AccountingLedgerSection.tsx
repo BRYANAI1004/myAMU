@@ -69,8 +69,9 @@ export function AccountingLedgerSection() {
         const res = await fetchAccountingQuarters(studentId, { signal: ac.signal })
         if (ac.signal.aborted) return
         setQuarters(res.quarters)
-        const first = res.quarters[0]
-        setSelectedKey(first ? quarterKey(first) : null)
+        // API returns quarters newest-first; default selection is the latest term/year.
+        const newest = res.quarters[0]
+        setSelectedKey(newest ? quarterKey(newest) : null)
         setLedger(null)
       } catch (e) {
         if (ac.signal.aborted) return
