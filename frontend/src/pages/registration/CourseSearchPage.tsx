@@ -1,13 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fetchApiJson } from '../../lib/api'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
-
-const COURSES_API_URL = 'http://127.0.0.1:3001/api/courses'
-
-function sectionsUrlForCourseCode(code: string): string {
-  const trimmed = code.trim()
-  const encoded = encodeURIComponent(trimmed)
-  return `${COURSES_API_URL}/${encoded}/sections`
-}
 
 /** Courses with no leading alphabetic prefix share this grouping key so none are dropped. */
 const NO_PREFIX_KEY = '__NO_PREFIX__'
@@ -328,14 +321,7 @@ export function CourseSearchPage() {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(COURSES_API_URL)
-        const data: unknown = await res.json()
-        if (!res.ok) {
-          const body = data as { error?: string; message?: string }
-          throw new Error(
-            body.message ?? body.error ?? `Could not load courses (HTTP ${res.status}).`,
-          )
-        }
+        const data: unknown = await fetchApiJson('/api/courses')
         if (!Array.isArray(data)) {
           throw new Error('Unexpected response from the catalog.')
         }
@@ -440,14 +426,10 @@ export function CourseSearchPage() {
       return next
     })
     try {
-      const res = await fetch(sectionsUrlForCourseCode(code))
-      const data: unknown = await res.json()
-      if (!res.ok) {
-        const body = data as { error?: string; message?: string }
-        throw new Error(
-          body.message ?? body.error ?? `Could not load sections (HTTP ${res.status}).`,
-        )
-      }
+      const encoded = encodeURIComponent(code)
+      const data: unknown = await fetchApiJson(
+        `/api/courses/${encoded}/sections`,
+      )
       if (!Array.isArray(data)) {
         throw new Error('Unexpected sections response.')
       }
