@@ -1741,52 +1741,6 @@
   max-width: 100%;
 }
 
-.portal-course-detail-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 0.35rem;
-}
-
-.portal-course-detail-card {
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--portal-border-subtle);
-  border-radius: var(--portal-radius);
-  background: var(--portal-surface);
-}
-
-.portal-course-detail-card-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--portal-text);
-  letter-spacing: 0.02em;
-}
-
-.portal-course-detail-dl {
-  display: grid;
-  grid-template-columns: minmax(7.5rem, 9.5rem) 1fr;
-  gap: 0.35rem 1rem;
-  margin: 0;
-  font-size: 0.8125rem;
-}
-
-.portal-course-detail-dl-row {
-  display: contents;
-}
-
-.portal-course-detail-dl dt {
-  margin: 0;
-  font-weight: 600;
-  color: var(--portal-text-muted);
-}
-
-.portal-course-detail-dl dd {
-  margin: 0;
-  color: var(--portal-text);
-  word-break: break-word;
-}
-
 .portal-course-search-sections-status {
   margin: 0;
   padding: 0.35rem 0 0.15rem;
@@ -1802,6 +1756,15 @@
   overflow: hidden;
 }
 
+.portal-course-search-sections-table-wrap--schedule {
+  margin-top: 0.25rem;
+}
+
+.portal-course-search-sections-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .portal-table--course-sections {
   font-size: 0.8125rem;
 }
@@ -1813,6 +1776,75 @@
 
 .portal-table--course-sections th {
   font-size: 0.625rem;
+}
+
+/* USC-style compact one-row section schedule (expanded course row) */
+.portal-table--course-section-schedule {
+  width: 100%;
+  min-width: 52rem;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.portal-table--course-section-schedule thead th {
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+  background: rgba(110, 22, 34, 0.04);
+  border-bottom: 1px solid var(--portal-border-subtle);
+}
+
+.portal-table--course-section-schedule tbody td {
+  font-size: 0.8125rem;
+  color: var(--portal-text);
+  border-bottom: 1px solid var(--portal-border-subtle);
+  vertical-align: middle;
+}
+
+.portal-table--course-section-schedule tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* CourseBin page: extra Course column (USC-style compact schedule) */
+.portal-table--course-bin {
+  min-width: 58rem;
+}
+
+.portal-course-bin-page .portal-course-bin-lede {
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+  max-width: 40rem;
+}
+
+.portal-course-bin-course-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  min-width: 0;
+  max-width: 14rem;
+}
+
+.portal-course-bin-course-code {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--portal-text);
+}
+
+.portal-course-bin-course-title {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: var(--portal-text-muted);
+}
+
+.portal-course-section-schedule-col-action {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+  padding-left: 1rem !important;
 }
 
 .portal-table-wrap--nested {
