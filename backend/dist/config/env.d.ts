@@ -1,6 +1,7 @@
 export declare const env: {
     readonly nodeEnv: string;
     readonly port: number;
+    readonly corsOrigins: string[] | null;
     readonly db: {
         readonly host: string;
         readonly port: number;

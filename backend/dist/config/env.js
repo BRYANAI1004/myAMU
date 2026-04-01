@@ -30,9 +30,18 @@ function parseDbPort(raw, fallback) {
     }
     return n;
 }
+/** Comma-separated browser origins allowed for CORS. If unset, reflects any Origin (dev-friendly). */
+function parseCorsOrigins() {
+    const raw = process.env.CORS_ORIGINS?.trim() ?? process.env.CORS_ORIGIN?.trim() ?? "";
+    if (!raw)
+        return null;
+    const list = raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+    return list.length > 0 ? list : null;
+}
 export const env = {
     nodeEnv: process.env.NODE_ENV ?? "development",
     port: parsePort(process.env.PORT, 3001),
+    corsOrigins: parseCorsOrigins(),
     db: {
         host: required("DB_HOST"),
         port: parseDbPort(process.env.DB_PORT, 3306),
