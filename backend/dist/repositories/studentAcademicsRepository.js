@@ -5,7 +5,7 @@
  * - `code`, `course_title`, `days`, `time_from`, `time_to`, `instructor`, `term`, `year`, `grade`, `grade2`
  */
 /** Same term ordering as registration/accounting: Winter < Spring < Summer < Fall within a year. */
-const MARKS_ORDER_BY_NEWEST = `year DESC,
+export const MARKS_ORDER_BY_NEWEST = `year DESC,
   CASE UPPER(TRIM(term))
     WHEN 'FALL' THEN 4
     WHEN 'SUMMER' THEN 3
