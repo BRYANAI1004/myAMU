@@ -1,0 +1,38 @@
+/** GET /api/students/:studentId/academics — Phase 1, sourced from legacy `marks` only. */
+export type StudentAcademicsCurrentTerm = {
+    term: string;
+    year: number;
+};
+export type StudentAcademicsScheduleItem = {
+    courseCode: string;
+    courseTitle: string;
+    days: string | null;
+    timeFrom: string | null;
+    timeTo: string | null;
+    instructor: string | null;
+    term: string;
+    year: number;
+};
+export type StudentAcademicsTranscriptItem = {
+    courseCode: string;
+    courseTitle: string;
+    term: string;
+    year: number;
+    grade: string | null;
+    numericGrade: number | null;
+};
+export type StudentAcademicsEnrollmentItem = {
+    courseCode: string;
+    courseTitle: string;
+    term: string;
+    year: number;
+};
+export type StudentAcademicsResponse = {
+    studentId: string;
+    studentName: string;
+    currentTerm: StudentAcademicsCurrentTerm | null;
+    currentSchedule: StudentAcademicsScheduleItem[];
+    transcript: StudentAcademicsTranscriptItem[];
+    enrollmentHistory: StudentAcademicsEnrollmentItem[];
+};
+//# sourceMappingURL=studentAcademics.d.ts.map

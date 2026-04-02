@@ -15,6 +15,7 @@ import {
   getAccountingLedger,
   getAccountingQuarters,
 } from "../controllers/studentLedgerController.js";
+import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
 import {
   getDemoAccount,
   getDemoActivity,
@@ -50,6 +51,7 @@ adminRouter.delete("/course-sections/:id", deleteAdminCourseSection);
 apiRouter.use("/admin", adminRouter);
 
 apiRouter.get("/students/:studentId/profile", getStudentProfile);
+apiRouter.get("/students/:studentId/academics", getStudentAcademics);
 apiRouter.get("/students/:studentId/account", getStudentAccount);
 apiRouter.get("/students/:studentId/activity", getStudentActivity);
 apiRouter.get(

@@ -4,6 +4,7 @@ import { deleteCourseBinItemHandler, getCourseBin, postCourseBin, } from "../con
 import { getCourseSections, getCourses } from "../controllers/courseController.js";
 import { getHealth, getHealthDb } from "../controllers/healthController.js";
 import { getAccountingLedger, getAccountingQuarters, } from "../controllers/studentLedgerController.js";
+import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
 import { getDemoAccount, getDemoActivity, getStudentAccount, getStudentActivity, getStudentProfile, } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
 export const apiRouter = Router();
@@ -23,6 +24,7 @@ adminRouter.patch("/course-sections/:id", patchAdminCourseSection);
 adminRouter.delete("/course-sections/:id", deleteAdminCourseSection);
 apiRouter.use("/admin", adminRouter);
 apiRouter.get("/students/:studentId/profile", getStudentProfile);
+apiRouter.get("/students/:studentId/academics", getStudentAcademics);
 apiRouter.get("/students/:studentId/account", getStudentAccount);
 apiRouter.get("/students/:studentId/activity", getStudentActivity);
 apiRouter.get("/students/:studentId/accounting/quarters", getAccountingQuarters);
