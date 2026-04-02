@@ -29,12 +29,50 @@ function transcriptGrade(grade) {
 function termsMatch(a, b) {
     return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
+/** Matches legacy `marks` ORDER BY term weight: Fall > Summer > Spring > Winter > other. */
+function termSortOrder(term) {
+    switch (term.trim().toUpperCase()) {
+        case "FALL":
+            return 4;
+        case "SUMMER":
+            return 3;
+        case "SPRING":
+            return 2;
+        case "WINTER":
+            return 1;
+        default:
+            return 0;
+    }
+}
+function buildAvailableTerms(rows) {
+    const byKey = new Map();
+    for (const r of rows) {
+        const term = r.term.trim();
+        const year = r.year;
+        const key = `${term.toLowerCase()}|${year}`;
+        if (!byKey.has(key)) {
+            byKey.set(key, { term, year });
+        }
+    }
+    const list = [...byKey.values()];
+    list.sort((a, b) => {
+        if (b.year !== a.year)
+            return b.year - a.year;
+        return termSortOrder(b.term) - termSortOrder(a.term);
+    });
+    return list.map(({ term, year }) => ({
+        term,
+        year,
+        label: `${term} ${year}`,
+    }));
+}
 function buildPayload(studentId, rows) {
     if (rows.length === 0) {
         return {
             studentId,
             studentName: studentId,
             currentTerm: null,
+            availableTerms: [],
             currentSchedule: [],
             transcript: [],
             enrollmentHistory: [],
@@ -77,6 +115,7 @@ function buildPayload(studentId, rows) {
         studentId,
         studentName,
         currentTerm,
+        availableTerms: buildAvailableTerms(rows),
         currentSchedule,
         transcript,
         enrollmentHistory,
@@ -89,6 +128,7 @@ export async function getStudentAcademicsPayload(studentId) {
             studentId: "",
             studentName: "",
             currentTerm: null,
+            availableTerms: [],
             currentSchedule: [],
             transcript: [],
             enrollmentHistory: [],
@@ -99,6 +139,7 @@ export async function getStudentAcademicsPayload(studentId) {
             studentId: trimmed,
             studentName: trimmed,
             currentTerm: null,
+            availableTerms: [],
             currentSchedule: [],
             transcript: [],
             enrollmentHistory: [],

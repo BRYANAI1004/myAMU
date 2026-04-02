@@ -5,6 +5,12 @@ export type StudentAcademicsCurrentTerm = {
   year: number;
 };
 
+export type StudentAcademicsAvailableTerm = {
+  term: string;
+  year: number;
+  label: string;
+};
+
 export type StudentAcademicsScheduleItem = {
   courseCode: string;
   courseTitle: string;
@@ -36,6 +42,7 @@ export type StudentAcademicsResponse = {
   studentId: string;
   studentName: string;
   currentTerm: StudentAcademicsCurrentTerm | null;
+  availableTerms: StudentAcademicsAvailableTerm[];
   currentSchedule: StudentAcademicsScheduleItem[];
   transcript: StudentAcademicsTranscriptItem[];
   enrollmentHistory: StudentAcademicsEnrollmentItem[];

@@ -4,7 +4,10 @@ import {
   listMarksForStudent,
   type MarksRow,
 } from "../repositories/studentAcademicsRepository.js";
-import type { StudentAcademicsResponse } from "../types/studentAcademics.js";
+import type {
+  StudentAcademicsAvailableTerm,
+  StudentAcademicsResponse,
+} from "../types/studentAcademics.js";
 
 function formatMysqlTime(v: unknown): string | null {
   if (v == null) return null;
@@ -36,6 +39,44 @@ function termsMatch(a: string, b: string): boolean {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+/** Matches legacy `marks` ORDER BY term weight: Fall > Summer > Spring > Winter > other. */
+function termSortOrder(term: string): number {
+  switch (term.trim().toUpperCase()) {
+    case "FALL":
+      return 4;
+    case "SUMMER":
+      return 3;
+    case "SPRING":
+      return 2;
+    case "WINTER":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function buildAvailableTerms(rows: MarksRow[]): StudentAcademicsAvailableTerm[] {
+  const byKey = new Map<string, { term: string; year: number }>();
+  for (const r of rows) {
+    const term = r.term.trim();
+    const year = r.year;
+    const key = `${term.toLowerCase()}|${year}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, { term, year });
+    }
+  }
+  const list = [...byKey.values()];
+  list.sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    return termSortOrder(b.term) - termSortOrder(a.term);
+  });
+  return list.map(({ term, year }) => ({
+    term,
+    year,
+    label: `${term} ${year}`,
+  }));
+}
+
 function buildPayload(
   studentId: string,
   rows: MarksRow[],
@@ -45,6 +86,7 @@ function buildPayload(
       studentId,
       studentName: studentId,
       currentTerm: null,
+      availableTerms: [],
       currentSchedule: [],
       transcript: [],
       enrollmentHistory: [],
@@ -94,6 +136,7 @@ function buildPayload(
     studentId,
     studentName,
     currentTerm,
+    availableTerms: buildAvailableTerms(rows),
     currentSchedule,
     transcript,
     enrollmentHistory,
@@ -109,6 +152,7 @@ export async function getStudentAcademicsPayload(
       studentId: "",
       studentName: "",
       currentTerm: null,
+      availableTerms: [],
       currentSchedule: [],
       transcript: [],
       enrollmentHistory: [],
@@ -120,6 +164,7 @@ export async function getStudentAcademicsPayload(
       studentId: trimmed,
       studentName: trimmed,
       currentTerm: null,
+      availableTerms: [],
       currentSchedule: [],
       transcript: [],
       enrollmentHistory: [],
