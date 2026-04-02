@@ -3,6 +3,7 @@ export type MarksRow = {
     name: string;
     code: string;
     course_title: string;
+    units: number;
     days: string | null;
     time_from: unknown;
     time_to: unknown;

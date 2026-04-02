@@ -21,10 +21,13 @@ function str(v) {
 }
 function mapMarksRow(r) {
     const row = r;
+    const unitsRaw = Number(row.units);
+    const units = Number.isFinite(unitsRaw) ? unitsRaw : 0;
     return {
         name: str(row.name),
         code: str(row.code),
         course_title: str(row.course_title),
+        units,
         days: row.days == null || str(row.days) === "" ? null : str(row.days),
         time_from: row.time_from,
         time_to: row.time_to,
@@ -42,6 +45,7 @@ export async function listMarksForStudent(pool, studentId) {
     const [rows] = await pool.query(`SELECT TRIM(name) AS name,
             TRIM(code) AS code,
             course_title,
+            units,
             days,
             time_from,
             time_to,

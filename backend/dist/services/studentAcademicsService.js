@@ -44,11 +44,19 @@ function termSortOrder(term) {
             return 0;
     }
 }
+const MIN_TERM_YEAR = 1900;
+const MAX_TERM_YEAR = 2100;
 function buildAvailableTerms(rows) {
     const byKey = new Map();
     for (const r of rows) {
         const term = r.term.trim();
         const year = r.year;
+        if (term.length === 0 ||
+            !Number.isFinite(year) ||
+            year < MIN_TERM_YEAR ||
+            year > MAX_TERM_YEAR) {
+            continue;
+        }
         const key = `${term.toLowerCase()}|${year}`;
         if (!byKey.has(key)) {
             byKey.set(key, { term, year });
@@ -104,6 +112,7 @@ function buildPayload(studentId, rows) {
         year: r.year,
         grade: transcriptGrade(r.grade),
         numericGrade: numericGradeFromDb(r.grade2),
+        credits: Number.isFinite(r.units) ? r.units : null,
     }));
     const enrollmentHistory = rows.map((r) => ({
         courseCode: r.code,
