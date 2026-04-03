@@ -54,6 +54,10 @@ function toIsoDate(v) {
     const day = String(d.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
 }
+/** Normalize a legacy DB date column to ISO `YYYY-MM-DD`, or null if zero/invalid. */
+export function legacyDbDateToIso(v) {
+    return toIsoDate(v);
+}
 /**
  * Prefer `signed_date` when it is a real calendar date; otherwise `EnrollStartDate`.
  */

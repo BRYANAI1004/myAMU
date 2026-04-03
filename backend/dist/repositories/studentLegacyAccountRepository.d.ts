@@ -68,24 +68,42 @@ export type LegacyStudentProfileRow = RowDataPacket;
  */
 export declare function loadLegacyStudentProfileRow(pool: Pool, studentId: string): Promise<LegacyStudentProfileRow | null>;
 export declare function loadLegacyAccountingRows(pool: Pool, studentId: string, term: string, year: number): Promise<LegacyAccountingRow[]>;
-/** Raw row for admin student list: legacy `students` + latest `registration` + optional `accounting` rollup. */
+/** Raw row for admin student list: legacy `students` + latest `registration` term/year. */
 export type LegacyAdminStudentListRow = RowDataPacket & {
     id: string;
     name: unknown;
     email: unknown;
     background: unknown;
     requirements_id: unknown;
+    tertiary: unknown;
+    signed_date: unknown;
+    enroll_start_date: unknown;
     latest_term: unknown;
     latest_year: unknown;
-    total_fees: unknown;
-    sum_debit: unknown;
-    sum_credit: unknown;
-    acct_rows: unknown;
 };
 /**
- * All legacy `students` rows with latest registration term (same ordering as `findLatestLegacyTermYear`)
- * and matching `accounting` aggregates when present. Used for admin roster + balance aligned with
- * `assembleLegacyStudentAccountPayload` (no accounting → `total_fees`; else `sum(debit) - sum(credit)`).
+ * All legacy `students` rows with latest registration term/year (same ordering as
+ * `findLatestLegacyTermYear`). Used for the admin student roster.
  */
 export declare function listLegacyAdminStudentRows(pool: Pool): Promise<LegacyAdminStudentListRow[]>;
+export type LegacyStudentMasterUpdate = {
+    name: string;
+    email: string;
+    gender: string;
+    background: string;
+    tertiary: string;
+    requirements_id: number | null;
+    address: string;
+    address2: string;
+    city: string;
+    state: string;
+    zip: number;
+    signed_date_sql: string;
+    enroll_start_sql: string;
+};
+/**
+ * Update safe legacy `students` master columns only. Returns whether a row was updated.
+ * Date strings must already be validated SQL `YYYY-MM-DD` or `0000-00-00` for NOT NULL legacy columns.
+ */
+export declare function updateLegacyStudentMasterRow(pool: Pool, studentId: string, patch: LegacyStudentMasterUpdate): Promise<boolean>;
 //# sourceMappingURL=studentLegacyAccountRepository.d.ts.map

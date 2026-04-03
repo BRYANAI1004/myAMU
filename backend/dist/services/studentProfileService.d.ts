@@ -1,5 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import type { StudentProfilePayload } from "../types/studentProfile.js";
+/** Normalize a legacy DB date column to ISO `YYYY-MM-DD`, or null if zero/invalid. */
+export declare function legacyDbDateToIso(v: unknown): string | null;
 /**
  * Prefer `signed_date` when it is a real calendar date; otherwise `EnrollStartDate`.
  */
