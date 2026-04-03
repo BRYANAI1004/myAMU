@@ -9,6 +9,7 @@ import {
 import {
   bilingualCourseTitleParts,
   buildTranscriptTermOptions,
+  computeQuarterTermSummary,
   defaultTermKeyFromTranscript,
   formatCreditCell,
   groupTranscriptByTermYear,
@@ -32,6 +33,10 @@ function formatIssueDate(): string {
   } catch {
     return new Date().toISOString().slice(0, 10)
   }
+}
+
+function formatSummaryDecimal(n: number): string {
+  return (Math.round(n * 100) / 100).toFixed(2)
 }
 
 function CourseTitleCell({ row }: { row: TranscriptRow }) {
@@ -167,26 +172,22 @@ export function AcademicsPortalPage() {
     [transcriptPreview],
   )
 
+  const quarterRows = useMemo(() => {
+    if (!academics || !selectedKey) return []
+    const parts = selectedKey.split('\t')
+    const selectedTerm = parts[0] ?? ''
+    const selectedYear = Number(parts[1])
+    return rowsForSelectedTerm(academics.transcript, selectedTerm, selectedYear)
+  }, [academics, selectedKey])
+
+  const termSummary = useMemo(
+    () => computeQuarterTermSummary(quarterRows),
+    [quarterRows],
+  )
+
   const id = currentStudentId?.trim()
   const showEmpty = !id
   const sectionLoading = loading && academics === null && error === null
-
-  let selectedTerm = ''
-  let selectedYear = NaN
-  if (selectedKey) {
-    const parts = selectedKey.split('\t')
-    selectedTerm = parts[0] ?? ''
-    selectedYear = Number(parts[1])
-  }
-
-  const quarterRows =
-    academics && selectedKey
-      ? rowsForSelectedTerm(
-          academics.transcript,
-          selectedTerm,
-          selectedYear,
-        )
-      : []
 
   const issueDate = formatIssueDate()
 
@@ -345,6 +346,44 @@ export function AcademicsPortalPage() {
               </tbody>
             </table>
           </div>
+
+          <section
+            className="portal-academics-quarter-term-summary"
+            aria-labelledby="quarter-term-summary-heading"
+          >
+            <h3
+              id="quarter-term-summary-heading"
+              className="portal-academics-quarter-term-summary__title"
+            >
+              Term Summary
+            </h3>
+            <dl className="portal-academics-quarter-term-summary__dl">
+              <div className="portal-academics-quarter-term-summary__row">
+                <dt>Course Count</dt>
+                <dd>{termSummary.courseCount}</dd>
+              </div>
+              <div className="portal-academics-quarter-term-summary__row">
+                <dt>Units Attempted</dt>
+                <dd>{formatSummaryDecimal(termSummary.unitsAttempted)}</dd>
+              </div>
+              <div className="portal-academics-quarter-term-summary__row">
+                <dt>Units Completed</dt>
+                <dd>{formatSummaryDecimal(termSummary.unitsCompleted)}</dd>
+              </div>
+              <div className="portal-academics-quarter-term-summary__row">
+                <dt>Grade Points</dt>
+                <dd>{formatSummaryDecimal(termSummary.gradePoints)}</dd>
+              </div>
+              <div className="portal-academics-quarter-term-summary__row">
+                <dt>Term GPA</dt>
+                <dd>
+                  {termSummary.termGpa == null
+                    ? '—'
+                    : formatSummaryDecimal(termSummary.termGpa)}
+                </dd>
+              </div>
+            </dl>
+          </section>
         </section>
       ) : null}
 

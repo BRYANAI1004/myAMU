@@ -1626,6 +1626,71 @@ table.portal-academics-portal-grades-table.portal-table--grades td {
   color: var(--portal-accent);
 }
 
+/* Quarter Grades: term totals (selected term only; document-style, compact) */
+.portal-academics-quarter-term-summary {
+  box-sizing: border-box;
+  max-width: 22rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface);
+}
+
+.portal-academics-quarter-term-summary__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.3;
+  color: var(--portal-text);
+}
+
+.portal-academics-quarter-term-summary__dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.portal-academics-quarter-term-summary__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.portal-academics-quarter-term-summary__row dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.portal-academics-quarter-term-summary__row dd {
+  margin: 0;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .portal-academics-quarter-term-summary {
+    max-width: none;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .portal-academics-quarter-term-summary__title {
+    font-size: 0.78125rem;
+  }
+
+  .portal-academics-quarter-term-summary__row {
+    font-size: 0.78125rem;
+  }
+}
+
 .portal-academics-transcript-preview__actions {
   margin-bottom: 1rem;
 }

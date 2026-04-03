@@ -162,30 +162,100 @@ export function bilingualCourseTitleParts(row: TranscriptRow): {
   return { primary: legacy || '—', secondary: null }
 }
 
-export function formatCreditCell(row: TranscriptRow): string {
+const CREDIT_FIELD_KEYS = [
+  'credits',
+  'credit',
+  'units',
+  'creditHours',
+  'credit_hours',
+  'unit',
+] as const
+
+/** Finite numeric credits for a transcript row, or null if not parseable as a number. */
+export function transcriptRowCredits(row: TranscriptRow): number | null {
   const ex = rowRecord(row)
-  const keys = [
-    'credits',
-    'credit',
-    'units',
-    'creditHours',
-    'credit_hours',
-    'unit',
-  ] as const
-  for (const k of keys) {
+  for (const k of CREDIT_FIELD_KEYS) {
     const v = ex[k]
     if (v == null || v === '') continue
-    if (typeof v === 'number' && Number.isFinite(v)) {
-      if (v === Math.floor(v)) return String(v)
-      return String(v)
-    }
+    if (typeof v === 'number' && Number.isFinite(v)) return v
     const n = Number(v)
-    if (Number.isFinite(n)) {
-      if (n === Math.floor(n)) return String(n)
-      return String(n)
-    }
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+
+export function formatCreditCell(row: TranscriptRow): string {
+  const parsed = transcriptRowCredits(row)
+  if (parsed != null) {
+    return parsed === Math.floor(parsed) ? String(parsed) : String(parsed)
+  }
+  const ex = rowRecord(row)
+  for (const k of CREDIT_FIELD_KEYS) {
+    const v = ex[k]
+    if (v == null || v === '') continue
     const s = String(v).trim()
     if (s.length > 0) return s
   }
   return '—'
+}
+
+function normalizedLetterGrade(grade: string | null | undefined): string | null {
+  const t = grade?.trim()
+  if (!t) return null
+  return t.toUpperCase()
+}
+
+/**
+ * Quarter Grades term totals from displayed rows only.
+ *
+ * Units completed: institutional placeholder — only `W` and `F` withhold completed credit; refine later.
+ * Term GPA: excludes `P`, `W`, `AUD`, `T` and rows without finite numericGrade + finite credits.
+ */
+export function computeQuarterTermSummary(rows: TranscriptRow[]): {
+  courseCount: number
+  unitsAttempted: number
+  unitsCompleted: number
+  gradePoints: number
+  termGpa: number | null
+} {
+  const GRADES_NO_COMPLETED_UNITS = new Set(['W', 'F'])
+  const GRADES_EXCLUDED_FROM_GPA = new Set(['P', 'W', 'AUD', 'T'])
+
+  let unitsAttempted = 0
+  let unitsCompleted = 0
+  let gradePoints = 0
+  let gpaEligibleUnits = 0
+
+  for (const row of rows) {
+    const credits = transcriptRowCredits(row)
+    const g = normalizedLetterGrade(row.grade)
+
+    if (credits != null) {
+      unitsAttempted += credits
+      const withholdsCompleted = g != null && GRADES_NO_COMPLETED_UNITS.has(g)
+      if (!withholdsCompleted) {
+        unitsCompleted += credits
+      }
+    }
+
+    const excludedFromGpa = g != null && GRADES_EXCLUDED_FROM_GPA.has(g)
+    const ng = row.numericGrade
+    const numericOk =
+      ng != null && typeof ng === 'number' && Number.isFinite(ng)
+    if (!excludedFromGpa && numericOk && credits != null) {
+      gradePoints += ng * credits
+      gpaEligibleUnits += credits
+    }
+  }
+
+  const termGpa =
+    gpaEligibleUnits > 0 ? gradePoints / gpaEligibleUnits : null
+
+  return {
+    courseCount: rows.length,
+    unitsAttempted,
+    unitsCompleted,
+    gradePoints,
+    termGpa,
+  }
 }
