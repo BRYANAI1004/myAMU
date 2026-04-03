@@ -9,6 +9,7 @@ export declare function resolveEnrollmentDate(signedDate: unknown, enrollStartDa
  */
 export declare function ageFromDob(dobRaw: unknown, now?: Date): number | null;
 export declare function combineAddressLine(address: unknown, address2: unknown): string | null;
+export declare function trackFromRequirementsId(v: unknown): string | null;
 export declare function mapLegacyStudentRowToProfile(row: RowDataPacket): StudentProfilePayload;
 export declare function getLegacyStudentProfile(studentId: string): Promise<StudentProfilePayload | null>;
 //# sourceMappingURL=studentProfileService.d.ts.map
