@@ -21,11 +21,6 @@ function formatTableDate(iso: string | null): string {
   return displayCell(iso)
 }
 
-function formatEntryYear(y: number | null): string {
-  if (y == null || !Number.isFinite(y)) return '—'
-  return String(Math.trunc(y))
-}
-
 export function AdminStudentsPage() {
   const [q, setQ] = useState('')
   const [rows, setRows] = useState<AdminStudentListItem[] | null>(null)
@@ -86,9 +81,12 @@ export function AdminStudentsPage() {
             aria-label="Search students"
             disabled={sectionLoading || Boolean(error)}
           />
-          <button type="button" className="portal-btn portal-btn--primary">
+          <Link
+            to="/admin/students/new"
+            className="portal-btn portal-btn--primary"
+          >
             Add Student
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -127,20 +125,14 @@ export function AdminStudentsPage() {
 
       {!sectionLoading && !error && rows != null ? (
         <div className="portal-table-wrap admin-table-wrap">
-          <table className="portal-table">
+          <table className="portal-table portal-data-table">
             <thead>
               <tr>
                 <th scope="col">Student ID</th>
                 <th scope="col">Division</th>
                 <th scope="col">Name</th>
                 <th scope="col">Email</th>
-                <th scope="col">Requirements ID</th>
-                <th scope="col">Highest Degree</th>
-                <th scope="col">Background School</th>
                 <th scope="col">Signed Date</th>
-                <th scope="col">Enroll Start Date</th>
-                <th scope="col">Resolved Entry Date</th>
-                <th scope="col">Entry Year</th>
                 <th scope="col">Latest Registration Term</th>
                 <th scope="col">Action</th>
               </tr>
@@ -148,7 +140,7 @@ export function AdminStudentsPage() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="portal-card-note">
+                  <td colSpan={7} className="portal-card-note">
                     {rows.length === 0
                       ? 'No students on file.'
                       : 'No students match your search.'}
@@ -161,13 +153,7 @@ export function AdminStudentsPage() {
                     <td>{r.division}</td>
                     <td>{r.name}</td>
                     <td>{displayCell(r.email)}</td>
-                    <td>{displayCell(r.requirementsId)}</td>
-                    <td>{displayCell(r.highestDegree)}</td>
-                    <td>{displayCell(r.backgroundSchool)}</td>
                     <td>{formatTableDate(r.signedDate)}</td>
-                    <td>{formatTableDate(r.enrollStartDate)}</td>
-                    <td>{formatTableDate(r.resolvedEntryDate)}</td>
-                    <td>{formatEntryYear(r.entryYear)}</td>
                     <td>{displayCell(r.latestRegistrationTerm)}</td>
                     <td>
                       <div className="admin-table-actions">
