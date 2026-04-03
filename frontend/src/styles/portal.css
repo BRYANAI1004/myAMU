@@ -921,8 +921,18 @@
   border-radius: 2px;
 }
 
-/* System page header: slightly above body, calm weight (not marketing-scale). */
-.portal-page-title,
+/* Main module page titles (Registration, Finances, etc.): university brand only here — not body, tables, or nav. */
+.portal-page-title {
+  margin: 0 0 0.75rem;
+  font-family: 'Cinzel', ui-serif, Georgia, serif;
+  font-size: 1.375rem; /* ~22px */
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 1.3;
+  color: #a6192e;
+}
+
+/* In-module section titles: same scale as before; system stack — not Cinzel. */
 .portal-module-title {
   margin: 0 0 0.5rem;
   font-size: var(--portal-page-title-size);
@@ -932,8 +942,7 @@
   color: var(--portal-text);
 }
 
-/* No module subtitle: title is last in header — avoid extra gap before content */
-.portal-module-header > .portal-page-title:last-child,
+/* No module subtitle: module title is last in header — avoid extra gap before content */
 .portal-module-header > .portal-module-title:last-child {
   margin-bottom: 0;
 }
@@ -1596,6 +1605,12 @@ table.portal-academics-portal-grades-table.portal-table--grades td {
 
 .portal-academics-portal-tabs {
   margin-bottom: 1.25rem;
+}
+
+/* Quarter grades: term dropdown only (no visible label); align with tab row. */
+.portal-academics-term-toolbar {
+  justify-content: flex-start;
+  align-items: center;
 }
 
 /* Quarter Grades: term totals (selected term only; document-style, compact) */
@@ -2556,7 +2571,10 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 }
 
 @media (max-width: 768px) {
-  .portal-page-title,
+  .portal-page-title {
+    font-size: 1.25rem;
+  }
+
   .portal-module-title {
     font-size: 0.9375rem;
   }

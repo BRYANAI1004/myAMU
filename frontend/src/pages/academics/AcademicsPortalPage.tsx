@@ -240,12 +240,12 @@ export function AcademicsPortalPage() {
 
       {!showEmpty && !sectionLoading && !loadError && transcriptPreview && mode === 'quarter' ? (
         <section className="portal-stack" aria-label="Quarter grades">
-          <div className="portal-account-ledger__toolbar portal-academics-print-hide">
+          <div className="portal-account-ledger__toolbar portal-academics-print-hide portal-academics-term-toolbar">
             <label
               className="portal-account-ledger__quarter-label"
               htmlFor="academics-term-select"
             >
-              <span className="portal-card-note">Term</span>
+              <span className="visually-hidden">Term</span>
               <select
                 id="academics-term-select"
                 className="portal-account-ledger__select"
