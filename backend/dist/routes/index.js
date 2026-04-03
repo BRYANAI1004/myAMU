@@ -5,6 +5,7 @@ import { getCourseSections, getCourses } from "../controllers/courseController.j
 import { getHealth, getHealthDb } from "../controllers/healthController.js";
 import { getAccountingLedger, getAccountingQuarters, } from "../controllers/studentLedgerController.js";
 import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
+import { getStudentCourseFeedback, postStudentCourseFeedback, } from "../controllers/studentCourseFeedbackController.js";
 import { getStudentTranscriptPreview } from "../controllers/studentTranscriptController.js";
 import { getDemoAccount, getDemoActivity, getStudentAccount, getStudentActivity, getStudentProfile, } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
@@ -26,6 +27,8 @@ adminRouter.delete("/course-sections/:id", deleteAdminCourseSection);
 apiRouter.use("/admin", adminRouter);
 apiRouter.get("/students/:studentId/profile", getStudentProfile);
 apiRouter.get("/students/:studentId/academics", getStudentAcademics);
+apiRouter.get("/students/:studentId/course-feedback", getStudentCourseFeedback);
+apiRouter.post("/students/:studentId/course-feedback", postStudentCourseFeedback);
 apiRouter.get("/students/:studentId/transcript-preview", getStudentTranscriptPreview);
 apiRouter.get("/students/:studentId/account", getStudentAccount);
 apiRouter.get("/students/:studentId/activity", getStudentActivity);

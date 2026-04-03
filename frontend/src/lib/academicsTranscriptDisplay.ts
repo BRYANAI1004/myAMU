@@ -57,6 +57,25 @@ function strOpt(v: unknown): string | null {
   return s.length > 0 ? s : null
 }
 
+/**
+ * Single portal rule for course title cells: prefer explicit English fields when present,
+ * otherwise the API-normalized `courseTitle` / legacy `course_title`.
+ */
+export function courseRowDisplayTitle(
+  row: { courseTitle?: string | null } & Record<string, unknown>,
+): string {
+  const ex = row as Record<string, unknown>
+  const en =
+    strOpt(ex.titleEn) ??
+    strOpt(ex.courseTitleEn) ??
+    strOpt(ex.course_title_en) ??
+    strOpt(ex.eng_name)
+  if (en) return en
+  const legacy =
+    strOpt(row.courseTitle) ?? strOpt(ex.course_title)
+  return legacy || '—'
+}
+
 /** Safe key for select value: tab cannot appear in normalized academic terms from DB. */
 export function termYearKey(term: string, year: number): string {
   return `${term.trim().replace(/\t/g, ' ')}\t${year}`
@@ -201,27 +220,22 @@ function rowRecord(row: TranscriptRow): Record<string, unknown> {
 }
 
 /**
- * Prefers explicit EN/ZH fields when present; otherwise single courseTitle (and legacy course_title).
+ * Primary title follows `courseRowDisplayTitle` (English-first). Secondary is Chinese only when
+ * present and different from the primary line.
  */
 export function bilingualCourseTitleParts(row: TranscriptRow): {
   primary: string
   secondary: string | null
 } {
   const ex = rowRecord(row)
-  const en =
-    strOpt(ex.titleEn) ??
-    strOpt(ex.courseTitleEn) ??
-    strOpt(ex.course_title_en)
+  const primary = courseRowDisplayTitle(row)
   const zh =
     strOpt(ex.titleZh) ??
     strOpt(ex.courseTitleZh) ??
-    strOpt(ex.course_title_zh)
-  const legacy = strOpt(row.courseTitle) ?? strOpt(ex.course_title) ?? ''
-
-  if (en && zh && en !== zh) return { primary: en, secondary: zh }
-  if (en) return { primary: en, secondary: zh && zh !== en ? zh : null }
-  if (zh) return { primary: zh, secondary: null }
-  return { primary: legacy || '—', secondary: null }
+    strOpt(ex.course_title_zh) ??
+    strOpt(ex.chi_name)
+  if (zh && zh !== primary) return { primary, secondary: zh }
+  return { primary, secondary: null }
 }
 
 const CREDIT_FIELD_KEYS = [

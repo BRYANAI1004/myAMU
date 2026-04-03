@@ -1,8 +1,9 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
-import { listMarksForStudentTerm } from "../repositories/studentAcademicsRepository.js";
+import { listMarksForStudent } from "../repositories/studentAcademicsRepository.js";
 import { findLatestLegacyTermYear, loadLegacyAccountSnapshot, loadLegacyAccountingRows, } from "../repositories/studentLegacyAccountRepository.js";
 import { findLatestTermYearForStudent, loadAccountContext, } from "../repositories/studentAccountRepository.js";
+import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
 import { getCatalogDemoAccountPayload } from "./demoAccountService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
 import { assembleStudentAccountPayload } from "./studentAccountAssembler.js";
@@ -54,9 +55,12 @@ async function getRealStudentAccountPayload(studentId, termYear) {
     if (!snap) {
         return null;
     }
-    const accountingRows = await loadLegacyAccountingRows(pool, studentId, term, year);
-    const marksRows = await listMarksForStudentTerm(pool, studentId, term, year);
-    return assembleLegacyStudentAccountPayload(snap, accountingRows, marksRows);
+    const [accountingRows, allMarksRows, courseLookup] = await Promise.all([
+        loadLegacyAccountingRows(pool, studentId, term, year),
+        listMarksForStudent(pool, studentId),
+        loadCoursesTranscriptLookup(pool),
+    ]);
+    return assembleLegacyStudentAccountPayload(snap, accountingRows, allMarksRows, courseLookup);
 }
 export async function getStudentAccountPayload(studentId, termYear) {
     if (studentId === DEMO_STUDENT_ID) {

@@ -16,6 +16,8 @@ export type StudentTranscriptRow = {
     source: "marks" | "clinic";
     /** Present when rows are built via unified academic course records (same semantics as academics API). */
     status?: StudentAcademicCourseStatus;
+    /** True only when `status === "completed"`; feedback UI not implemented yet. */
+    feedbackEligible?: boolean;
 };
 export type StudentTranscriptPreviewResponse = {
     studentId: string;

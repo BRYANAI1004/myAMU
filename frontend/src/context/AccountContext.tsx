@@ -121,7 +121,14 @@ function parseCurrentTermFromApi(
   raw: unknown,
   student: MahmAccountMock['student'],
 ): MahmCurrentTerm {
-  if (raw != null && typeof raw === 'object') {
+  if (raw === null) {
+    return {
+      term: '',
+      year: 0,
+      label: 'No active enrollment',
+    }
+  }
+  if (typeof raw === 'object' && raw !== null) {
     const t = raw as Record<string, unknown>
     const term = String(t.term ?? student.term ?? '').trim()
     const year = Number(t.year ?? student.year) || 0
@@ -244,6 +251,7 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
   const scheduleRowsRaw = Array.isArray(o.scheduleRows) ? o.scheduleRows : []
   const scheduleRows = scheduleRowsRaw.map((row) => {
     const r = row as Record<string, unknown>
+    const instructorRaw = r.instructor
     return {
       courseCode: String(r.courseCode ?? ''),
       title: String(r.title ?? ''),
@@ -259,6 +267,10 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
         r.location == null || String(r.location).trim() === ''
           ? null
           : String(r.location),
+      instructor:
+        instructorRaw == null || String(instructorRaw).trim() === ''
+          ? null
+          : String(instructorRaw),
     }
   })
 

@@ -3,33 +3,13 @@ import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
 import {
   currentTermLabel,
+  formatPortalCourseInstructor,
+  formatPortalCourseLocation,
   noCurrentCoursesMessage,
 } from '../../lib/academicCourseRecordsDisplay'
 import type { ScheduleRow } from '../../types/billing'
 
 type CalendarView = 'list' | 'week'
-
-const WEEKDAY_ORDER = [
-  { key: 'monday' as const, label: 'Monday' },
-  { key: 'tuesday' as const, label: 'Tuesday' },
-  { key: 'wednesday' as const, label: 'Wednesday' },
-  { key: 'thursday' as const, label: 'Thursday' },
-  { key: 'friday' as const, label: 'Friday' },
-]
-
-const TIMETABLE_TIME_LABELS = [
-  '8:00 AM',
-  '9:00 AM',
-  '10:00 AM',
-  '11:00 AM',
-  '12:00 PM',
-  '1:00 PM',
-  '2:00 PM',
-  '3:00 PM',
-  '4:00 PM',
-  '5:00 PM',
-  '6:00 PM',
-] as const
 
 /**
  * Split free-text location into building/place (line 1) and room/suite/virtual detail (line 2).
@@ -168,6 +148,9 @@ export function DashboardCoursesWidget() {
     registration.status === 'registered' &&
     scheduleRows.length > 0
 
+  const showWeekTimetableMessage =
+    !isLoadingAccount && showCourseTable && view === 'week'
+
   const showEmptyState =
     !isLoadingAccount && (registration.status !== 'registered' || scheduleRows.length === 0)
 
@@ -243,6 +226,7 @@ export function DashboardCoursesWidget() {
               <col className="portal-dashboard-courses-col-course" />
               <col className="portal-dashboard-courses-col-title" />
               <col className="portal-dashboard-courses-col-schedule" />
+              <col className="portal-dashboard-courses-col-instructor" />
               <col className="portal-dashboard-courses-col-location" />
             </colgroup>
             <thead>
@@ -250,6 +234,7 @@ export function DashboardCoursesWidget() {
                 <th scope="col">Course</th>
                 <th scope="col">Title</th>
                 <th scope="col">Schedule</th>
+                <th scope="col">Instructor</th>
                 <th scope="col">Location</th>
               </tr>
             </thead>
@@ -259,21 +244,22 @@ export function DashboardCoursesWidget() {
                   c.schedule != null && String(c.schedule).trim() !== ''
                     ? String(c.schedule)
                     : '—'
-                const loc =
-                  c.location != null && String(c.location).trim() !== ''
-                    ? String(c.location)
-                    : '—'
+                const loc = formatPortalCourseLocation(c.location)
+                const inst = formatPortalCourseInstructor(c.instructor)
                 return (
                   <tr key={scheduleRowKey(c, i)}>
                     <td className="portal-dashboard-courses-code">
                       <span className="portal-dashboard-courses-course-code">{c.courseCode}</span>
                     </td>
                     <td className="portal-dashboard-courses-title-cell">
-                      <span className="portal-dashboard-courses-title-text">{c.title}</span>
+                      <span className="portal-dashboard-courses-title-text">
+                        {c.title?.trim() ? c.title.trim() : '—'}
+                      </span>
                     </td>
                     <td className="portal-dashboard-courses-schedule">
                       <ScheduleCell schedule={sched} />
                     </td>
+                    <td className="portal-dashboard-courses-instructor">{inst}</td>
                     <td className="portal-dashboard-courses-location">
                       <LocationCell location={loc} />
                     </td>
@@ -285,36 +271,16 @@ export function DashboardCoursesWidget() {
         </div>
       ) : null}
 
-      {!isLoadingAccount && showCourseTable && view === 'week' ? (
+      {showWeekTimetableMessage ? (
         <div
           className="portal-dashboard-courses-timetable-wrap"
           role="region"
           aria-label="Weekly timetable"
         >
           <p className="portal-dashboard-courses-week-placeholder">
-            Week view will use your official meeting times when timetable data is available. No sample
-            classes are shown.
+            Official weekly timetable is not available for this term. Use the Courses tab for meeting
+            days and times from your schedule of record.
           </p>
-          <div className="portal-dashboard-courses-timetable">
-            <div className="portal-dashboard-courses-timetable-corner" aria-hidden />
-            {WEEKDAY_ORDER.map(({ key, label }) => (
-              <div key={key} className="portal-dashboard-courses-timetable-dayhead">
-                {label}
-              </div>
-            ))}
-            <div className="portal-dashboard-courses-timetable-timecol" aria-hidden>
-              {TIMETABLE_TIME_LABELS.map((t) => (
-                <span key={t} className="portal-dashboard-courses-timetable-time-label">
-                  {t}
-                </span>
-              ))}
-            </div>
-            {WEEKDAY_ORDER.map(({ key }) => (
-              <div key={key} className="portal-dashboard-courses-timetable-daycol">
-                <div className="portal-dashboard-courses-timetable-track" />
-              </div>
-            ))}
-          </div>
         </div>
       ) : null}
 

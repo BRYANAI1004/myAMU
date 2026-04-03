@@ -1,5 +1,6 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
+import { findLatestLegacyTermYear } from "../repositories/studentLegacyAccountRepository.js";
 import {
   listClinicRowsForStudent,
   loadCoursesTranscriptLookup,
@@ -15,7 +16,7 @@ import {
   buildAcademicCourseRecordsFromClinicWithLookupAndActiveTerm,
   buildAcademicCourseRecordsFromMarksWithLookup,
   buildAvailableTermsFromCourseRecords,
-  resolveActiveTermFromMarksOrder,
+  resolveRegistrationAnchoredAcademicTerm,
   sortTranscriptPreviewRecords,
 } from "./studentAcademicCourseRecords.js";
 
@@ -53,13 +54,17 @@ export async function getStudentTranscriptPreviewPayload(
     };
   }
 
-  const [marksRows, clinicRows, courseLookup] = await Promise.all([
+  const [marksRows, clinicRows, courseLookup, latestReg] = await Promise.all([
     listMarksForStudent(pool, trimmed),
     listClinicRowsForStudent(pool, trimmed),
     loadCoursesTranscriptLookup(pool),
+    findLatestLegacyTermYear(pool, trimmed),
   ]);
 
-  const activeTerm = resolveActiveTermFromMarksOrder(marksRows);
+  const activeTerm = resolveRegistrationAnchoredAcademicTerm(
+    latestReg,
+    marksRows,
+  );
   const fromMarks = buildAcademicCourseRecordsFromMarksWithLookup(
     trimmed,
     marksRows,

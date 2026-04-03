@@ -75,13 +75,13 @@ export function inferAcademicCourseStatus(args) {
     const letter = gradeDisplay?.trim() ?? "";
     if (isLegacyWithdrawalGrade(letter))
         return "withdrawn";
+    if (hasCompletedSignal(gradeDisplay, numericGrade))
+        return "completed";
     if (activeTerm != null &&
         year === activeTerm.year &&
         termsMatch(term, activeTerm.term)) {
         return "active";
     }
-    if (hasCompletedSignal(gradeDisplay, numericGrade))
-        return "completed";
     return "unknown";
 }
 export function resolveActiveTermFromMarksOrder(rows) {
@@ -113,6 +113,40 @@ export function resolveActiveTermFromCourseRecords(records) {
     }
     return { term: first.term, year };
 }
+/** True when this legacy `marks` row has a final recorded outcome (grade) or a withdrawal. */
+export function marksRowAcademicallyClosed(m) {
+    const letter = m.grade?.trim() ?? "";
+    if (isLegacyWithdrawalGrade(letter))
+        return true;
+    const gradeDisplay = transcriptGrade(m.grade);
+    const numericGrade = numericGradeFromDb(m.grade2);
+    return hasCompletedSignal(gradeDisplay, numericGrade);
+}
+/**
+ * Academic “current” quarter: the legacy registration term only while it is not fully concluded on
+ * `marks`. If there are no rows yet for that term, the term is still treated as active (schedule may
+ * be empty). If every row for that term is closed, returns null (e.g. graduated / term complete).
+ */
+export function resolveRegistrationAnchoredAcademicTerm(registrationTerm, marks) {
+    if (registrationTerm == null)
+        return null;
+    const term = registrationTerm.term.trim();
+    const year = Math.trunc(Number(registrationTerm.year));
+    if (term.length === 0 ||
+        !Number.isFinite(year) ||
+        year < MIN_TERM_YEAR ||
+        year > MAX_TERM_YEAR) {
+        return null;
+    }
+    const inTerm = marks.filter((m) => m.year === year && termsMatch(m.term, term));
+    if (inTerm.length === 0) {
+        return { term: registrationTerm.term, year };
+    }
+    const allClosed = inTerm.every((m) => marksRowAcademicallyClosed(m));
+    if (allClosed)
+        return null;
+    return { term: registrationTerm.term, year };
+}
 export function normalizeEnglishTitle(code, rawTitle, lookup) {
     const key = code.trim();
     if (key === "")
@@ -122,6 +156,10 @@ export function normalizeEnglishTitle(code, rawTitle, lookup) {
     if (eng && eng.length > 0)
         return eng;
     return rawTitle.trim();
+}
+/** Prefer English catalog title; otherwise legacy `marks.course_title` / `clinic.course_title`. */
+export function resolveCourseDisplayTitle(code, legacyTitle, lookup) {
+    return normalizeEnglishTitle(code, legacyTitle, lookup);
 }
 export function isClinicalCourse(courseCode, courseTitle) {
     return (/clinic|clinical|internship/i.test(courseTitle) || /^CLIN/i.test(courseCode));
@@ -192,11 +230,11 @@ export function buildAcademicCourseRecordsFromMarks(studentId, rows, activeTerm)
  */
 export function buildAcademicCourseRecordsFromMarksWithLookup(studentId, rows, lookup, activeTerm) {
     const resolved = activeTerm === undefined ? resolveActiveTermFromMarksOrder(rows) : activeTerm;
-    return rows.map((r) => marksRowToAcademicCourseRecord(studentId, r, resolved, normalizeEnglishTitle(r.code, r.course_title, lookup)));
+    return rows.map((r) => marksRowToAcademicCourseRecord(studentId, r, resolved, resolveCourseDisplayTitle(r.code, r.course_title, lookup)));
 }
 /** When clinic rows are merged with marks, reuse marks-derived active term for status on both sources. */
 export function buildAcademicCourseRecordsFromClinicWithLookupAndActiveTerm(studentId, rows, lookup, activeTerm) {
-    return rows.map((r) => clinicRowToAcademicCourseRecord(studentId, r, normalizeEnglishTitle(r.code, r.course_title, lookup), activeTerm));
+    return rows.map((r) => clinicRowToAcademicCourseRecord(studentId, r, resolveCourseDisplayTitle(r.code, r.course_title, lookup), activeTerm));
 }
 export function buildAvailableTermsFromCourseRecords(records) {
     const byKey = new Map();
@@ -236,6 +274,8 @@ export function courseRecordToScheduleItem(r) {
         instructor: r.instructor,
         term: r.term,
         year: r.year,
+        credits: r.credits,
+        status: r.status,
     };
 }
 export function courseRecordToTranscriptItem(r) {
@@ -249,12 +289,19 @@ export function courseRecordToTranscriptItem(r) {
         credits: r.credits,
     };
 }
-export function courseRecordToEnrollmentItem(r) {
+export function courseRecordToEnrollmentItem(r, feedback) {
     return {
         courseCode: r.courseCode,
         courseTitle: r.courseTitle,
         term: r.term,
         year: r.year,
+        credits: r.credits,
+        grade: r.grade,
+        status: r.status,
+        instructor: r.instructor,
+        feedbackEligible: r.status === "completed",
+        feedbackSubmitted: feedback?.submitted ?? false,
+        feedbackSubmittedAt: feedback?.submittedAt ?? null,
     };
 }
 export function academicCourseRecordToTranscriptPreviewRow(r) {
@@ -268,6 +315,7 @@ export function academicCourseRecordToTranscriptPreviewRow(r) {
         credits: r.credits,
         source: r.source,
         status: r.status,
+        feedbackEligible: r.status === "completed",
     };
 }
 export function sortTranscriptPreviewRecords(rows) {
@@ -310,7 +358,8 @@ export function scheduleRowFromAcademicCourseRecord(r) {
         hours: clinical ? (units != null && units > 0 ? units : null) : null,
         charge: 0,
         schedule: scheduleText || null,
-        location: instructor.length > 0 ? instructor : null,
+        location: null,
+        instructor: instructor.length > 0 ? instructor : null,
     };
 }
 export function scheduleRowsFromAcademicCourseRecords(records) {

@@ -3,10 +3,11 @@ import type {
   LegacyAccountingRow,
   LegacyAccountSnapshot,
 } from "../repositories/studentLegacyAccountRepository.js";
+import type { CourseTranscriptLookupEntry } from "../repositories/studentTranscriptRepository.js";
 import type { PaymentRecord, StudentAccountPayload } from "../types/studentAccount.js";
 import {
-  buildAcademicCourseRecordsFromMarks,
-  resolveActiveTermFromCourseRecords,
+  buildAcademicCourseRecordsFromMarksWithLookup,
+  resolveRegistrationAnchoredAcademicTerm,
   scheduleRowsFromAcademicCourseRecords,
   termsMatch,
 } from "./studentAcademicCourseRecords.js";
@@ -45,6 +46,7 @@ export function assembleLegacyStudentAccountPayload(
   accountingRows: LegacyAccountingRow[],
   /** All `marks` rows for the student (newest term first), same source as `/academics`. */
   allMarksRows: MarksRow[],
+  courseLookup: Map<string, CourseTranscriptLookupEntry>,
 ): StudentAccountPayload {
   const regFees = roundMoney(snap.totalFees);
 
@@ -96,28 +98,41 @@ export function assembleLegacyStudentAccountPayload(
       }));
   }
 
-  const courseRecords = buildAcademicCourseRecordsFromMarks(
-    snap.studentId,
+  const registrationTerm = { term: snap.term, year: snap.year };
+  const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
+    registrationTerm,
     allMarksRows,
   );
-  const activeTerm = resolveActiveTermFromCourseRecords(courseRecords);
+  const marksRowsForReg = allMarksRows.filter(
+    (m) =>
+      m.year === registrationTerm.year &&
+      termsMatch(m.term, registrationTerm.term),
+  );
+  const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(
+    snap.studentId,
+    allMarksRows,
+    courseLookup,
+    resolvedActive,
+  );
   const currentTermMarks =
-    activeTerm != null
+    resolvedActive != null
       ? courseRecords.filter(
           (r) =>
-            r.year === activeTerm.year && termsMatch(r.term, activeTerm.term),
+            r.year === resolvedActive.year &&
+            termsMatch(r.term, resolvedActive.term),
         )
       : [];
   const scheduleRows = scheduleRowsFromAcademicCourseRecords(currentTermMarks);
   const currentTerm =
-    activeTerm != null
-      ? buildAccountCurrentTerm(activeTerm.term, activeTerm.year)
-      : buildAccountCurrentTerm(snap.term, snap.year);
+    resolvedActive != null
+      ? buildAccountCurrentTerm(resolvedActive.term, resolvedActive.year)
+      : null;
+  const billingTermLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
   const registration = deriveAccountRegistration({
     scheduleRows,
-    enrollmentSourceCount:
-      currentTermMarks.length > 0 ? currentTermMarks.length : allMarksRows.length,
-    termLabel: currentTerm.label,
+    termLabel: currentTerm?.label ?? billingTermLabel,
+    academicEnrollmentActive: resolvedActive != null,
+    marksRowsForRegistrationTerm: marksRowsForReg.length,
   });
 
   return {
@@ -128,8 +143,8 @@ export function assembleLegacyStudentAccountPayload(
     student: {
       name: snap.displayName,
       studentId: snap.studentId,
-      term: currentTerm.term,
-      year: currentTerm.year,
+      term: snap.term,
+      year: snap.year,
     },
     preference: null,
     lineItems: [],

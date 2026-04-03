@@ -1,13 +1,28 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
 import { listMarksForStudent, } from "../repositories/studentAcademicsRepository.js";
-import { buildAcademicCourseRecordsFromMarks, buildAvailableTermsFromCourseRecords, courseRecordToEnrollmentItem, courseRecordToScheduleItem, courseRecordToTranscriptItem, resolveActiveTermFromCourseRecords, } from "./studentAcademicCourseRecords.js";
-function buildPayload(studentId, rows) {
+import { findLatestLegacyTermYear } from "../repositories/studentLegacyAccountRepository.js";
+import { loadCoursesTranscriptLookup, } from "../repositories/studentTranscriptRepository.js";
+import { buildAcademicCourseRecordsFromMarksWithLookup, buildAvailableTermsFromCourseRecords, courseRecordToEnrollmentItem, courseRecordToScheduleItem, courseRecordToTranscriptItem, resolveRegistrationAnchoredAcademicTerm, termsMatch, } from "./studentAcademicCourseRecords.js";
+import { courseFeedbackLookupKey, getFeedbackSubmittedAtMapForStudent, } from "./studentCourseFeedbackService.js";
+function mergeEnrollmentFeedbackIntoPayload(payload, submittedAtByKey) {
+    const enrollmentHistory = payload.courseRecords.map((r) => {
+        const k = courseFeedbackLookupKey(r.courseCode, r.term, r.year);
+        const at = submittedAtByKey.get(k) ?? null;
+        return courseRecordToEnrollmentItem(r, {
+            submitted: at != null,
+            submittedAt: at,
+        });
+    });
+    return { ...payload, enrollmentHistory };
+}
+function buildPayload(studentId, rows, courseLookup, latestRegistration) {
     if (rows.length === 0) {
+        const resolvedActive = resolveRegistrationAnchoredAcademicTerm(latestRegistration, []);
         return {
             studentId,
             studentName: studentId,
-            currentTerm: null,
+            currentTerm: resolvedActive,
             availableTerms: [],
             currentSchedule: [],
             transcript: [],
@@ -17,11 +32,15 @@ function buildPayload(studentId, rows) {
     }
     const nameFromMarks = rows[0].name.trim();
     const studentName = nameFromMarks.length > 0 ? nameFromMarks : studentId;
-    const courseRecords = buildAcademicCourseRecordsFromMarks(studentId, rows);
-    const currentTerm = resolveActiveTermFromCourseRecords(courseRecords);
-    const currentSchedule = courseRecords
-        .filter((r) => r.status === "active")
-        .map(courseRecordToScheduleItem);
+    const resolvedActive = resolveRegistrationAnchoredAcademicTerm(latestRegistration, rows);
+    const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(studentId, rows, courseLookup, resolvedActive);
+    const currentTerm = resolvedActive;
+    const currentSchedule = currentTerm == null
+        ? []
+        : courseRecords
+            .filter((r) => r.year === currentTerm.year &&
+            termsMatch(r.term, currentTerm.term))
+            .map(courseRecordToScheduleItem);
     return {
         studentId,
         studentName,
@@ -29,7 +48,7 @@ function buildPayload(studentId, rows) {
         availableTerms: buildAvailableTermsFromCourseRecords(courseRecords),
         currentSchedule,
         transcript: courseRecords.map(courseRecordToTranscriptItem),
-        enrollmentHistory: courseRecords.map(courseRecordToEnrollmentItem),
+        enrollmentHistory: courseRecords.map((r) => courseRecordToEnrollmentItem(r)),
         courseRecords,
     };
 }
@@ -59,7 +78,26 @@ export async function getStudentAcademicsPayload(studentId) {
             courseRecords: [],
         };
     }
-    const rows = await listMarksForStudent(pool, trimmed);
-    return buildPayload(trimmed, rows);
+    const [rows, latestRegistration, courseLookup] = await Promise.all([
+        listMarksForStudent(pool, trimmed),
+        findLatestLegacyTermYear(pool, trimmed),
+        loadCoursesTranscriptLookup(pool),
+    ]);
+    const payload = buildPayload(trimmed, rows, courseLookup, latestRegistration);
+    if (payload.courseRecords.length === 0) {
+        return payload;
+    }
+    try {
+        const submittedAtByKey = await getFeedbackSubmittedAtMapForStudent(trimmed);
+        return mergeEnrollmentFeedbackIntoPayload(payload, submittedAtByKey);
+    }
+    catch (e) {
+        const code = e.code;
+        if (code === "ER_NO_SUCH_TABLE") {
+            console.warn("[academics] student_course_feedback missing; enrollment feedback flags omitted");
+            return payload;
+        }
+        throw e;
+    }
 }
 //# sourceMappingURL=studentAcademicsService.js.map

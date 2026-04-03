@@ -1,4 +1,5 @@
-import { buildAccountCurrentTerm, deriveAccountRegistration, scheduleRowsFromLegacyMarks, } from "./studentAccountDashboard.js";
+import { buildAcademicCourseRecordsFromMarksWithLookup, resolveRegistrationAnchoredAcademicTerm, scheduleRowsFromAcademicCourseRecords, termsMatch, } from "./studentAcademicCourseRecords.js";
+import { buildAccountCurrentTerm, deriveAccountRegistration, } from "./studentAccountDashboard.js";
 function roundMoney(n) {
     return Math.round(n * 100) / 100;
 }
@@ -21,7 +22,9 @@ function typeNorm(type) {
  * Real-student payload: legacy `students` + `registration` + `accounting` (Step 3B).
  * Category splits are minimal; `lineItems` and portal-only fields stay empty until later steps.
  */
-export function assembleLegacyStudentAccountPayload(snap, accountingRows, marksRows) {
+export function assembleLegacyStudentAccountPayload(snap, accountingRows, 
+/** All `marks` rows for the student (newest term first), same source as `/academics`. */
+allMarksRows, courseLookup) {
     const regFees = roundMoney(snap.totalFees);
     let totalCharges;
     let paymentsTotal;
@@ -67,12 +70,25 @@ export function assembleLegacyStudentAccountPayload(snap, accountingRows, marksR
             description: r.memo.length > 0 ? r.memo : undefined,
         }));
     }
-    const scheduleRows = scheduleRowsFromLegacyMarks(marksRows, snap.studentId);
-    const currentTerm = buildAccountCurrentTerm(snap.term, snap.year);
+    const registrationTerm = { term: snap.term, year: snap.year };
+    const resolvedActive = resolveRegistrationAnchoredAcademicTerm(registrationTerm, allMarksRows);
+    const marksRowsForReg = allMarksRows.filter((m) => m.year === registrationTerm.year &&
+        termsMatch(m.term, registrationTerm.term));
+    const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(snap.studentId, allMarksRows, courseLookup, resolvedActive);
+    const currentTermMarks = resolvedActive != null
+        ? courseRecords.filter((r) => r.year === resolvedActive.year &&
+            termsMatch(r.term, resolvedActive.term))
+        : [];
+    const scheduleRows = scheduleRowsFromAcademicCourseRecords(currentTermMarks);
+    const currentTerm = resolvedActive != null
+        ? buildAccountCurrentTerm(resolvedActive.term, resolvedActive.year)
+        : null;
+    const billingTermLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
     const registration = deriveAccountRegistration({
         scheduleRows,
-        enrollmentSourceCount: marksRows.length,
-        termLabel: currentTerm.label,
+        termLabel: currentTerm?.label ?? billingTermLabel,
+        academicEnrollmentActive: resolvedActive != null,
+        marksRowsForRegistrationTerm: marksRowsForReg.length,
     });
     return {
         program: null,

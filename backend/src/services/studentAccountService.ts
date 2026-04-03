@@ -10,6 +10,7 @@ import {
   findLatestTermYearForStudent,
   loadAccountContext,
 } from "../repositories/studentAccountRepository.js";
+import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
 import type { StudentAccountPayload } from "../types/studentAccount.js";
 import { getCatalogDemoAccountPayload } from "./demoAccountService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
@@ -89,14 +90,17 @@ async function getRealStudentAccountPayload(
   if (!snap) {
     return null;
   }
-  const accountingRows = await loadLegacyAccountingRows(
-    pool,
-    studentId,
-    term,
-    year,
+  const [accountingRows, allMarksRows, courseLookup] = await Promise.all([
+    loadLegacyAccountingRows(pool, studentId, term, year),
+    listMarksForStudent(pool, studentId),
+    loadCoursesTranscriptLookup(pool),
+  ]);
+  return assembleLegacyStudentAccountPayload(
+    snap,
+    accountingRows,
+    allMarksRows,
+    courseLookup,
   );
-  const allMarksRows = await listMarksForStudent(pool, studentId);
-  return assembleLegacyStudentAccountPayload(snap, accountingRows, allMarksRows);
 }
 
 export async function getStudentAccountPayload(

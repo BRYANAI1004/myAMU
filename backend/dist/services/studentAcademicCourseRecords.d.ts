@@ -34,7 +34,23 @@ export declare function resolveActiveTermFromCourseRecords(records: Pick<Student
     term: string;
     year: number;
 } | null;
+/** True when this legacy `marks` row has a final recorded outcome (grade) or a withdrawal. */
+export declare function marksRowAcademicallyClosed(m: MarksRow): boolean;
+/**
+ * Academic “current” quarter: the legacy registration term only while it is not fully concluded on
+ * `marks`. If there are no rows yet for that term, the term is still treated as active (schedule may
+ * be empty). If every row for that term is closed, returns null (e.g. graduated / term complete).
+ */
+export declare function resolveRegistrationAnchoredAcademicTerm(registrationTerm: {
+    term: string;
+    year: number;
+} | null, marks: MarksRow[]): {
+    term: string;
+    year: number;
+} | null;
 export declare function normalizeEnglishTitle(code: string, rawTitle: string, lookup: Map<string, CourseTranscriptLookupEntry>): string;
+/** Prefer English catalog title; otherwise legacy `marks.course_title` / `clinic.course_title`. */
+export declare function resolveCourseDisplayTitle(code: string, legacyTitle: string, lookup: Map<string, CourseTranscriptLookupEntry>): string;
 export declare function isClinicalCourse(courseCode: string, courseTitle: string): boolean;
 export declare function isClinicalMarksRow(r: MarksRow): boolean;
 export declare function marksRowToAcademicCourseRecord(studentId: string, r: MarksRow, activeTerm: {
@@ -64,7 +80,10 @@ export declare function buildAcademicCourseRecordsFromClinicWithLookupAndActiveT
 export declare function buildAvailableTermsFromCourseRecords(records: Pick<StudentAcademicCourseRecord, "term" | "year">[]): StudentAcademicsAvailableTerm[];
 export declare function courseRecordToScheduleItem(r: StudentAcademicCourseRecord): StudentAcademicsScheduleItem;
 export declare function courseRecordToTranscriptItem(r: StudentAcademicCourseRecord): StudentAcademicsTranscriptItem;
-export declare function courseRecordToEnrollmentItem(r: StudentAcademicCourseRecord): StudentAcademicsEnrollmentItem;
+export declare function courseRecordToEnrollmentItem(r: StudentAcademicCourseRecord, feedback?: {
+    submitted: boolean;
+    submittedAt: string | null;
+}): StudentAcademicsEnrollmentItem;
 export declare function academicCourseRecordToTranscriptPreviewRow(r: StudentAcademicCourseRecord): StudentTranscriptRow;
 export declare function sortTranscriptPreviewRecords(rows: StudentAcademicCourseRecord[]): void;
 /** Legacy account `scheduleRows` from normalized academic records (marks-sourced rows). */

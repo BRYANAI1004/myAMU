@@ -67,3 +67,20 @@ export function currentTermLabel(
 export function noCurrentCoursesMessage(termLabel: string): string {
   return `You have no courses scheduled for ${termLabel}.`
 }
+
+/** Room/building line only; never substitute instructor. Empty source → TBD. */
+export function formatPortalCourseLocation(
+  location: string | null | undefined,
+): string {
+  const s = location?.trim()
+  if (s && s.length > 0) return s
+  return 'TBD'
+}
+
+export function formatPortalCourseInstructor(
+  instructor: string | null | undefined,
+): string {
+  const s = instructor?.trim()
+  if (s && s.length > 0) return s
+  return '—'
+}

@@ -4,6 +4,7 @@ import {
   fetchStudentAcademics,
   type StudentAcademicsResponse,
 } from '../../lib/api'
+import { courseRowDisplayTitle } from '../../lib/academicsTranscriptDisplay'
 
 function termYearKey(term: string, year: number): string {
   return `${term}\t${year}`
@@ -190,7 +191,7 @@ export function GradesPage() {
                       key={`${row.courseCode}-${row.term}-${row.year}-${idx}`}
                     >
                       <td>{row.courseCode}</td>
-                      <td>{row.courseTitle}</td>
+                      <td>{courseRowDisplayTitle(row)}</td>
                       <td>
                         {row.term} {row.year}
                       </td>

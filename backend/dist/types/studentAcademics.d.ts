@@ -38,6 +38,8 @@ export type StudentAcademicsScheduleItem = {
     instructor: string | null;
     term: string;
     year: number;
+    credits: number | null;
+    status: StudentAcademicCourseStatus;
 };
 export type StudentAcademicsTranscriptItem = {
     courseCode: string;
@@ -54,6 +56,16 @@ export type StudentAcademicsEnrollmentItem = {
     courseTitle: string;
     term: string;
     year: number;
+    credits: number | null;
+    grade: string | null;
+    status: StudentAcademicCourseStatus;
+    instructor: string | null;
+    /** True only for `completed`; reserved for future course feedback. */
+    feedbackEligible: boolean;
+    /** True when a row exists in `student_course_feedback` for this enrollment key. */
+    feedbackSubmitted: boolean;
+    /** ISO-8601 timestamp of submission, when `feedbackSubmitted` is true. */
+    feedbackSubmittedAt: string | null;
 };
 export type StudentAcademicsResponse = {
     studentId: string;

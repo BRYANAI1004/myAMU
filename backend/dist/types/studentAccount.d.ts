@@ -25,8 +25,10 @@ export type ScheduleRow = {
     charge: number;
     /** Meeting pattern when available (e.g. legacy `marks` days/times). */
     schedule?: string | null;
-    /** Location or instructor line when available. */
+    /** Room / building / virtual label when available from source data (never the instructor). */
     location?: string | null;
+    /** Instructor of record when available (legacy `marks.instructor`). */
+    instructor?: string | null;
 };
 /** Resolved academic quarter for dashboard / current-term views. */
 export type AccountCurrentTerm = {
@@ -77,7 +79,8 @@ export type StudentAccountPayload = {
     lineItems: BillingLineItem[];
     summary: StudentAccountSummary;
     scheduleRows: ScheduleRow[];
-    currentTerm: AccountCurrentTerm;
+    /** Academic “current” quarter for schedule/dashboard; null when the registration term has concluded or there is no registration anchor. */
+    currentTerm: AccountCurrentTerm | null;
     registration: AccountRegistration;
     payments: PaymentRecord[];
     installmentSchedule: InstallmentScheduleEntry[];

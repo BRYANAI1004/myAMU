@@ -1,8 +1,9 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
+import { findLatestLegacyTermYear } from "../repositories/studentLegacyAccountRepository.js";
 import { listClinicRowsForStudent, loadCoursesTranscriptLookup, } from "../repositories/studentTranscriptRepository.js";
 import { listMarksForStudent, } from "../repositories/studentAcademicsRepository.js";
-import { academicCourseRecordToTranscriptPreviewRow, buildAcademicCourseRecordsFromClinicWithLookupAndActiveTerm, buildAcademicCourseRecordsFromMarksWithLookup, buildAvailableTermsFromCourseRecords, resolveActiveTermFromMarksOrder, sortTranscriptPreviewRecords, } from "./studentAcademicCourseRecords.js";
+import { academicCourseRecordToTranscriptPreviewRow, buildAcademicCourseRecordsFromClinicWithLookupAndActiveTerm, buildAcademicCourseRecordsFromMarksWithLookup, buildAvailableTermsFromCourseRecords, resolveRegistrationAnchoredAcademicTerm, sortTranscriptPreviewRecords, } from "./studentAcademicCourseRecords.js";
 function resolveStudentName(studentId, marksRows, clinicRows) {
     const fromMarks = marksRows[0]?.name.trim() ?? "";
     if (fromMarks.length > 0)
@@ -30,12 +31,13 @@ export async function getStudentTranscriptPreviewPayload(studentId) {
             transcript: [],
         };
     }
-    const [marksRows, clinicRows, courseLookup] = await Promise.all([
+    const [marksRows, clinicRows, courseLookup, latestReg] = await Promise.all([
         listMarksForStudent(pool, trimmed),
         listClinicRowsForStudent(pool, trimmed),
         loadCoursesTranscriptLookup(pool),
+        findLatestLegacyTermYear(pool, trimmed),
     ]);
-    const activeTerm = resolveActiveTermFromMarksOrder(marksRows);
+    const activeTerm = resolveRegistrationAnchoredAcademicTerm(latestReg, marksRows);
     const fromMarks = buildAcademicCourseRecordsFromMarksWithLookup(trimmed, marksRows, courseLookup, activeTerm);
     const fromClinic = buildAcademicCourseRecordsFromClinicWithLookupAndActiveTerm(trimmed, clinicRows, courseLookup, activeTerm);
     const merged = [...fromMarks, ...fromClinic];

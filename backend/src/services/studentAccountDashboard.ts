@@ -61,10 +61,15 @@ function sumScheduleUnits(rows: ScheduleRow[]): number | null {
 
 export function deriveAccountRegistration(args: {
   scheduleRows: ScheduleRow[];
-  enrollmentSourceCount: number;
   termLabel: string;
+  /** Legacy portal path: count of enrollments when schedule rows are empty. */
+  enrollmentSourceCount?: number;
+  /** Legacy real-student path: true while the registration term is still academically open on `marks`. */
+  academicEnrollmentActive?: boolean;
+  /** Count of `marks` rows for the billing/registration term (messaging only). */
+  marksRowsForRegistrationTerm?: number;
 }): AccountRegistration {
-  const { scheduleRows, enrollmentSourceCount, termLabel } = args;
+  const { scheduleRows, termLabel } = args;
   if (scheduleRows.length > 0) {
     return {
       status: "registered",
@@ -73,6 +78,56 @@ export function deriveAccountRegistration(args: {
       totalUnits: sumScheduleUnits(scheduleRows),
     };
   }
+
+  if (
+    args.academicEnrollmentActive != null &&
+    args.marksRowsForRegistrationTerm != null
+  ) {
+    const active = args.academicEnrollmentActive;
+    const marksCount = args.marksRowsForRegistrationTerm;
+    if (active && marksCount === 0) {
+      return {
+        status: "in_progress",
+        hasActiveCourses: false,
+        courseCount: 0,
+        totalUnits: null,
+        emptyReason:
+          "Your course schedule for this term is not posted yet. Check back after registration is processed.",
+      };
+    }
+    if (!active && marksCount > 0) {
+      return {
+        status: "not_registered",
+        hasActiveCourses: false,
+        courseCount: 0,
+        totalUnits: null,
+        emptyReason: termLabel
+          ? `No active enrollment for ${termLabel}. Your courses for this period are complete.`
+          : "No active enrollment for the current term. Your courses for this period are complete.",
+      };
+    }
+    if (active && marksCount > 0) {
+      return {
+        status: "unknown",
+        hasActiveCourses: false,
+        courseCount: 0,
+        totalUnits: null,
+        emptyReason:
+          "Course meeting details could not be built for your posted enrollments.",
+      };
+    }
+    return {
+      status: "not_registered",
+      hasActiveCourses: false,
+      courseCount: 0,
+      totalUnits: null,
+      emptyReason: termLabel
+        ? `No courses on file for ${termLabel}.`
+        : "No courses on file for the current term.",
+    };
+  }
+
+  const enrollmentSourceCount = args.enrollmentSourceCount ?? 0;
   if (enrollmentSourceCount > 0) {
     return {
       status: "unknown",

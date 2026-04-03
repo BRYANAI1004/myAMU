@@ -25,4 +25,5 @@ export type ScheduleRow = {
   charge: number
   schedule?: string | null
   location?: string | null
+  instructor?: string | null
 }
