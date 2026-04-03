@@ -138,12 +138,15 @@ export type StudentProfileResponse = {
   email: string | null
 }
 
+export type AdminStudentProgramCode = 'MAHM' | 'DAHM'
+
 /** GET /api/admin/students — legacy `students` roster (admin UI). */
 export type AdminStudentListItem = {
   studentId: string
   division: 'Chinese' | 'English' | 'Unknown'
   name: string
   email: string | null
+  program: AdminStudentProgramCode | null
   requirementsId: string | null
   highestDegree: string | null
   backgroundSchool: string | null
@@ -160,6 +163,7 @@ export type AdminStudentDetail = {
   division: 'Chinese' | 'English' | 'Unknown'
   name: string
   email: string | null
+  program: AdminStudentProgramCode | null
   requirementsId: string | null
   highestDegree: string | null
   backgroundSchool: string | null
@@ -181,6 +185,7 @@ export type AdminStudentUpdatePayload = {
   gender: string | null
   backgroundSchool: string | null
   highestDegree: string | null
+  program: AdminStudentProgramCode
   requirementsId: string | null
   address: string | null
   city: string | null
@@ -216,6 +221,14 @@ function parseNullableNumber(v: unknown): number | null {
   throw new Error('Unexpected admin students response')
 }
 
+function parseNullableProgram(
+  v: unknown,
+): AdminStudentProgramCode | null {
+  if (v === null || v === undefined) return null
+  if (v === 'MAHM' || v === 'DAHM') return v
+  throw new Error('Unexpected admin students response')
+}
+
 function parseAdminStudentListRow(o: Record<string, unknown>): AdminStudentListItem {
   if (typeof o.studentId !== 'string' || typeof o.name !== 'string') {
     throw new Error('Unexpected admin students response')
@@ -225,6 +238,7 @@ function parseAdminStudentListRow(o: Record<string, unknown>): AdminStudentListI
     division: parseAdminDivision(o.division),
     name: o.name,
     email: parseNullableString(o.email),
+    program: parseNullableProgram(o.program),
     requirementsId: parseNullableRequirementsId(o.requirementsId),
     highestDegree: parseNullableString(o.highestDegree),
     backgroundSchool: parseNullableString(o.backgroundSchool),
@@ -249,6 +263,7 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
     division: parseAdminDivision(o.division),
     name: o.name,
     email: parseNullableString(o.email),
+    program: parseNullableProgram(o.program),
     requirementsId: parseNullableRequirementsId(o.requirementsId),
     highestDegree: parseNullableString(o.highestDegree),
     backgroundSchool: parseNullableString(o.backgroundSchool),
@@ -260,7 +275,7 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
     address: parseNullableString(o.address),
     city: parseNullableString(o.city),
     state: parseNullableString(o.state),
-    zip: parseNullableRequirementsId(o.zip),
+    zip: parseNullableString(o.zip),
     latestRegistrationTerm: parseNullableString(o.latestRegistrationTerm),
   }
 }
@@ -323,6 +338,7 @@ export type CreateAdminStudentBody = {
   /** ISO `YYYY-MM-DD`; id bucket uses calendar year + month from this date. */
   entryDate: string
   name: string
+  program: AdminStudentProgramCode
   email?: string | null
   gender?: string | null
   requirementsId?: number | null

@@ -1,5 +1,6 @@
 import { pool } from "../lib/db.js";
 import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, legacyStudentMasterExists, legacyStudentPasswordRowExists, listLegacyAdminStudentRows, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
+import { getStudentProgramAdminByStudentId, getStudentProgramAdminMapForStudentIds, upsertStudentProgramAdmin, } from "../repositories/studentProgramAdminRepository.js";
 import { combineAddressLine, legacyDbDateToIso, resolveEnrollmentDate, } from "./studentProfileService.js";
 function str(v) {
     if (v == null)
@@ -72,7 +73,14 @@ function mapRowToListItem(r) {
 }
 export async function listAdminStudents() {
     const rows = await listLegacyAdminStudentRows(pool);
-    return rows.map((row) => mapRowToListItem(row));
+    const programById = await getStudentProgramAdminMapForStudentIds(pool, rows.map((row) => str(row.id)));
+    return rows.map((row) => {
+        const base = mapRowToListItem(row);
+        return {
+            ...base,
+            program: programById.get(base.studentId) ?? null,
+        };
+    });
 }
 function mapProfileRowToAdminDetail(row, latestRegistrationTerm) {
     const studentId = str(row.id);
@@ -128,7 +136,9 @@ export async function getAdminStudentDetail(studentIdRaw) {
     const latestRegistrationTerm = latest
         ? formatLatestRegistrationTerm(latest.term, latest.year)
         : null;
-    return mapProfileRowToAdminDetail(row, latestRegistrationTerm);
+    const base = mapProfileRowToAdminDetail(row, latestRegistrationTerm);
+    const program = await getStudentProgramAdminByStudentId(pool, studentId);
+    return { ...base, program };
 }
 const DATE_VALIDATION_PREFIX = "Validation:";
 function sqlDateFromBodyField(label, raw) {
@@ -198,6 +208,13 @@ export async function updateAdminStudent(studentIdRaw, body) {
             message: `${DATE_VALIDATION_PREFIX} name is required.`,
         };
     }
+    if (body.program !== "MAHM" && body.program !== "DAHM") {
+        return {
+            ok: false,
+            status: 400,
+            message: `${DATE_VALIDATION_PREFIX} program must be MAHM or DAHM.`,
+        };
+    }
     const signed = sqlDateFromBodyField("signedDate", body.signedDate);
     if (signed.kind === "error") {
         return { ok: false, status: 400, message: signed.message };
@@ -233,6 +250,7 @@ export async function updateAdminStudent(studentIdRaw, body) {
     if (!updated) {
         return { ok: false, status: 404, message: "Student not found." };
     }
+    await upsertStudentProgramAdmin(pool, studentId, body.program);
     const detail = await getAdminStudentDetail(studentId);
     if (!detail) {
         return { ok: false, status: 404, message: "Student not found." };
@@ -342,6 +360,14 @@ export async function createAdminStudent(body) {
     if (zip.kind === "error") {
         return { ok: false, status: 400, message: zip.message };
     }
+    const programCode = body.program;
+    if (programCode !== "MAHM" && programCode !== "DAHM") {
+        return {
+            ok: false,
+            status: 400,
+            message: `${DATE_VALIDATION_PREFIX} program must be MAHM or DAHM.`,
+        };
+    }
     const insertPayload = {
         name,
         email: str(body.email),
@@ -382,6 +408,7 @@ export async function createAdminStudent(body) {
             ...insertPayload,
         });
         await createLegacyStudentPasswordRow(connection, studentId, initialPassword);
+        await upsertStudentProgramAdmin(connection, studentId, programCode);
         await connection.commit();
         return { ok: true, studentId };
     }

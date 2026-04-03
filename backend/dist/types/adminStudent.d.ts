@@ -1,9 +1,13 @@
+/** Portal-only program label; stored in `student_program_admin`, not legacy `students`. */
+export type AdminStudentProgramCode = "MAHM" | "DAHM";
 /** GET /api/admin/students — normalized roster row for the admin Students table. */
 export type AdminStudentListItem = {
     studentId: string;
     division: "Chinese" | "English" | "Unknown";
     name: string;
     email: string | null;
+    /** Admin-managed; null when no row in `student_program_admin`. */
+    program: AdminStudentProgramCode | null;
     requirementsId: string | null;
     highestDegree: string | null;
     backgroundSchool: string | null;
@@ -19,6 +23,7 @@ export type AdminStudentDetail = {
     division: "Chinese" | "English" | "Unknown";
     name: string;
     email: string | null;
+    program: AdminStudentProgramCode | null;
     requirementsId: string | null;
     highestDegree: string | null;
     backgroundSchool: string | null;
@@ -40,6 +45,7 @@ export type AdminStudentUpdateBody = {
     gender: string | null;
     backgroundSchool: string | null;
     highestDegree: string | null;
+    program: AdminStudentProgramCode;
     requirementsId: string | null;
     address: string | null;
     city: string | null;
@@ -55,6 +61,7 @@ export type AdminStudentCreateBody = {
     /** ISO calendar date `YYYY-MM-DD`; year and month drive student id bucket. */
     entryDate: string;
     name: string;
+    program: AdminStudentProgramCode;
     email?: string | null;
     gender?: string | null;
     requirementsId?: number | null;

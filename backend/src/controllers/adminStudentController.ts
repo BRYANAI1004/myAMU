@@ -25,15 +25,23 @@ function parseNullableStringField(v: unknown): string | null {
   return s === "" ? null : s;
 }
 
+function parseProgramCode(raw: unknown): "MAHM" | "DAHM" | null {
+  if (raw === "MAHM" || raw === "DAHM") return raw;
+  return null;
+}
+
 function parseUpdateBody(raw: unknown): AdminStudentUpdateBody | null {
   if (!isRecord(raw)) return null;
   if (typeof raw.name !== "string") return null;
+  const program = parseProgramCode(raw.program);
+  if (program == null) return null;
   return {
     name: raw.name,
     email: parseNullableStringField(raw.email),
     gender: parseNullableStringField(raw.gender),
     backgroundSchool: parseNullableStringField(raw.backgroundSchool),
     highestDegree: parseNullableStringField(raw.highestDegree),
+    program,
     requirementsId: parseNullableStringField(raw.requirementsId),
     address: parseNullableStringField(raw.address),
     city: parseNullableStringField(raw.city),
@@ -70,6 +78,8 @@ function parseCreateBody(raw: unknown): AdminStudentCreateBody | null {
   if (raw.division !== "Chinese" && raw.division !== "English") return null;
   if (typeof raw.name !== "string") return null;
   if (typeof raw.initialPassword !== "string") return null;
+  const program = parseProgramCode(raw.program);
+  if (program == null) return null;
   const entryDate = parseEntryDateFromBody(raw.entryDate);
   if (entryDate == null) return null;
   const requirementsId = parseRequirementsIdFromBody(raw.requirementsId);
@@ -80,6 +90,7 @@ function parseCreateBody(raw: unknown): AdminStudentCreateBody | null {
     division: raw.division,
     entryDate,
     name: raw.name,
+    program,
     email: parseNullableStringField(raw.email),
     gender: parseNullableStringField(raw.gender),
     requirementsId:

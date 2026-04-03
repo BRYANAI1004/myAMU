@@ -4,6 +4,7 @@ import {
   fetchAdminStudentDetail,
   updateAdminStudent,
   type AdminStudentDetail,
+  type AdminStudentProgramCode,
   type AdminStudentUpdatePayload,
 } from '../../lib/api'
 
@@ -19,6 +20,7 @@ function detailToFormState(d: AdminStudentDetail): Record<string, string> {
     gender: d.gender ?? '',
     backgroundSchool: d.backgroundSchool ?? '',
     highestDegree: d.highestDegree ?? '',
+    program: d.program ?? '',
     requirementsId: d.requirementsId ?? '',
     address: d.address ?? '',
     city: d.city ?? '',
@@ -29,13 +31,21 @@ function detailToFormState(d: AdminStudentDetail): Record<string, string> {
   }
 }
 
-function formToPayload(f: Record<string, string>): AdminStudentUpdatePayload {
+function formToPayload(
+  f: Record<string, string>,
+): AdminStudentUpdatePayload | null {
+  const programRaw = f.program.trim()
+  if (programRaw !== 'MAHM' && programRaw !== 'DAHM') {
+    return null
+  }
+  const program = programRaw as AdminStudentProgramCode
   return {
     name: f.name.trim(),
     email: nullableTrim(f.email),
     gender: nullableTrim(f.gender),
     backgroundSchool: nullableTrim(f.backgroundSchool),
     highestDegree: nullableTrim(f.highestDegree),
+    program,
     requirementsId: nullableTrim(f.requirementsId),
     address: nullableTrim(f.address),
     city: nullableTrim(f.city),
@@ -103,6 +113,10 @@ export function AdminStudentEditPage() {
     setError(null)
     try {
       const payload = formToPayload(form)
+      if (!payload) {
+        setError('Program must be MAHM or DAHM.')
+        return
+      }
       await updateAdminStudent(studentId, payload)
       navigate(`/admin/students/${encodeURIComponent(studentId)}`, {
         replace: true,
@@ -133,7 +147,7 @@ export function AdminStudentEditPage() {
           name={key}
           type={opts?.type ?? 'text'}
           className="admin-input"
-          style={{ maxWidth: '28rem', width: '100%' }}
+          style={{ width: '100%', maxWidth: '100%' }}
           value={form[key]}
           onChange={(ev) =>
             setForm((prev) =>
@@ -207,7 +221,7 @@ export function AdminStudentEditPage() {
         <form
           onSubmit={onSubmit}
           className="portal-card portal-stack"
-          style={{ gap: '1.25rem', maxWidth: '40rem' }}
+          style={{ gap: '1.25rem', width: '100%', maxWidth: '100%' }}
         >
           {error ? (
             <p
@@ -232,6 +246,33 @@ export function AdminStudentEditPage() {
             {field('gender', 'Gender')}
             {field('backgroundSchool', 'Background school')}
             {field('highestDegree', 'Highest degree')}
+            {form ? (
+              <div className="portal-stack" style={{ gap: '0.35rem' }}>
+                <label
+                  htmlFor="admin-edit-program"
+                  className="portal-card-note"
+                  style={{ margin: 0 }}
+                >
+                  Program *
+                </label>
+                <select
+                  id="admin-edit-program"
+                  className="admin-input"
+                  style={{ width: '100%', maxWidth: '100%' }}
+                  value={form.program}
+                  onChange={(ev) =>
+                    setForm((prev) =>
+                      prev ? { ...prev, program: ev.target.value } : prev,
+                    )
+                  }
+                  disabled={saving}
+                >
+                  <option value="">Select…</option>
+                  <option value="MAHM">MAHM</option>
+                  <option value="DAHM">DAHM</option>
+                </select>
+              </div>
+            ) : null}
             {field('requirementsId', 'Requirements ID')}
             {field('address', 'Address')}
             {field('city', 'City')}

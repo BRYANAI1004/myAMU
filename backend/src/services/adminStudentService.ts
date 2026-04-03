@@ -10,6 +10,11 @@ import {
   loadLegacyStudentProfileRow,
   updateLegacyStudentMasterRow,
 } from "../repositories/studentLegacyAccountRepository.js";
+import {
+  getStudentProgramAdminByStudentId,
+  getStudentProgramAdminMapForStudentIds,
+  upsertStudentProgramAdmin,
+} from "../repositories/studentProgramAdminRepository.js";
 import type {
   AdminDivision,
   AdminStudentCreateBody,
@@ -72,7 +77,10 @@ function entryYearFromResolved(iso: string | null): number | null {
   return Number.isFinite(y) ? y : null;
 }
 
-function mapRowToListItem(r: Record<string, unknown>): AdminStudentListItem {
+function mapRowToListItem(r: Record<string, unknown>): Omit<
+  AdminStudentListItem,
+  "program"
+> {
   const studentId = str(r.id);
   const nameRaw = str(r.name);
   const name = nameRaw.length > 0 ? nameRaw : studentId;
@@ -108,13 +116,23 @@ function mapRowToListItem(r: Record<string, unknown>): AdminStudentListItem {
 
 export async function listAdminStudents(): Promise<AdminStudentListItem[]> {
   const rows = await listLegacyAdminStudentRows(pool);
-  return rows.map((row) => mapRowToListItem(row as Record<string, unknown>));
+  const programById = await getStudentProgramAdminMapForStudentIds(
+    pool,
+    rows.map((row) => str((row as Record<string, unknown>).id)),
+  );
+  return rows.map((row) => {
+    const base = mapRowToListItem(row as Record<string, unknown>);
+    return {
+      ...base,
+      program: programById.get(base.studentId) ?? null,
+    };
+  });
 }
 
 function mapProfileRowToAdminDetail(
   row: Record<string, unknown>,
   latestRegistrationTerm: string | null,
-): AdminStudentDetail {
+): Omit<AdminStudentDetail, "program"> {
   const studentId = str(row.id);
   const nameRaw = str(row.name);
   const name = nameRaw.length > 0 ? nameRaw : studentId;
@@ -173,7 +191,12 @@ export async function getAdminStudentDetail(
   const latestRegistrationTerm = latest
     ? formatLatestRegistrationTerm(latest.term, latest.year)
     : null;
-  return mapProfileRowToAdminDetail(row as Record<string, unknown>, latestRegistrationTerm);
+  const base = mapProfileRowToAdminDetail(
+    row as Record<string, unknown>,
+    latestRegistrationTerm,
+  );
+  const program = await getStudentProgramAdminByStudentId(pool, studentId);
+  return { ...base, program };
 }
 
 const DATE_VALIDATION_PREFIX = "Validation:";
@@ -261,6 +284,14 @@ export async function updateAdminStudent(
     };
   }
 
+  if (body.program !== "MAHM" && body.program !== "DAHM") {
+    return {
+      ok: false,
+      status: 400,
+      message: `${DATE_VALIDATION_PREFIX} program must be MAHM or DAHM.`,
+    };
+  }
+
   const signed = sqlDateFromBodyField("signedDate", body.signedDate);
   if (signed.kind === "error") {
     return { ok: false, status: 400, message: signed.message };
@@ -300,6 +331,8 @@ export async function updateAdminStudent(
   if (!updated) {
     return { ok: false, status: 404, message: "Student not found." };
   }
+
+  await upsertStudentProgramAdmin(pool, studentId, body.program);
 
   const detail = await getAdminStudentDetail(studentId);
   if (!detail) {
@@ -444,6 +477,15 @@ export async function createAdminStudent(
     return { ok: false, status: 400, message: zip.message };
   }
 
+  const programCode = body.program;
+  if (programCode !== "MAHM" && programCode !== "DAHM") {
+    return {
+      ok: false,
+      status: 400,
+      message: `${DATE_VALIDATION_PREFIX} program must be MAHM or DAHM.`,
+    };
+  }
+
   const insertPayload = {
     name,
     email: str(body.email),
@@ -499,6 +541,8 @@ export async function createAdminStudent(
       studentId,
       initialPassword,
     );
+
+    await upsertStudentProgramAdmin(connection, studentId, programCode);
 
     await connection.commit();
     return { ok: true, studentId };

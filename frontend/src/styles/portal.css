@@ -5787,6 +5787,12 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   align-items: center;
 }
 
+.admin-students-table--center th,
+.admin-students-table--center td {
+  text-align: center;
+  vertical-align: middle;
+}
+
 .admin-finance-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -4,6 +4,7 @@ import {
   createAdminStudent,
   fetchNextAdminStudentId,
   type AdminDivision,
+  type AdminStudentProgramCode,
   type CreateAdminStudentBody,
 } from '../../lib/api'
 
@@ -56,6 +57,7 @@ export function AdminStudentCreatePage() {
   const [previewError, setPreviewError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
+  const [program, setProgram] = useState<'' | AdminStudentProgramCode>('')
   const [initialPassword, setInitialPassword] = useState('')
   const [email, setEmail] = useState('')
   const [gender, setGender] = useState('')
@@ -130,6 +132,7 @@ export function AdminStudentCreatePage() {
     previewId != null &&
     previewError == null &&
     name.trim() !== '' &&
+    (program === 'MAHM' || program === 'DAHM') &&
     initialPassword.trim() !== '' &&
     requirementsParsed !== 'invalid'
 
@@ -137,6 +140,7 @@ export function AdminStudentCreatePage() {
     e.preventDefault()
     if (!formValid) return
     if (division !== 'Chinese' && division !== 'English') return
+    if (program !== 'MAHM' && program !== 'DAHM') return
 
     const reqId = requirementsParsed
 
@@ -144,6 +148,7 @@ export function AdminStudentCreatePage() {
       division,
       entryDate: entryDate.trim(),
       name: name.trim(),
+      program,
       initialPassword,
       email: nullableTrim(email),
       gender: nullableTrim(gender),
@@ -195,7 +200,7 @@ export function AdminStudentCreatePage() {
       <form
         onSubmit={onSubmit}
         className="portal-card portal-stack"
-        style={{ gap: '1.25rem', maxWidth: '40rem' }}
+        style={{ gap: '1.25rem', width: '100%', maxWidth: '100%' }}
       >
         {error ? (
           <p
@@ -268,7 +273,7 @@ export function AdminStudentCreatePage() {
             <select
               id="admin-create-division"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={division}
               onChange={(ev) =>
                 setDivision(ev.target.value as AdminDivision | '')
@@ -288,7 +293,7 @@ export function AdminStudentCreatePage() {
               id="admin-create-entry-date"
               type="date"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={entryDate}
               onChange={(ev) => setEntryDate(ev.target.value)}
             />
@@ -304,10 +309,30 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-name"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={name}
               onChange={(ev) => setName(ev.target.value)}
             />
+          </div>
+
+          <div className="portal-stack" style={{ gap: '0.35rem' }}>
+            <label htmlFor="admin-create-program" className="portal-card-note" style={{ margin: 0 }}>
+              Program *
+            </label>
+            <select
+              id="admin-create-program"
+              className="admin-input"
+              style={{ width: '100%', maxWidth: '100%' }}
+              value={program}
+              onChange={(ev) =>
+                setProgram(ev.target.value as '' | AdminStudentProgramCode)
+              }
+              required
+            >
+              <option value="">Select…</option>
+              <option value="MAHM">MAHM</option>
+              <option value="DAHM">DAHM</option>
+            </select>
           </div>
 
           <div className="portal-stack" style={{ gap: '0.35rem' }}>
@@ -319,7 +344,7 @@ export function AdminStudentCreatePage() {
               type="password"
               autoComplete="new-password"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={initialPassword}
               onChange={(ev) => setInitialPassword(ev.target.value)}
             />
@@ -333,7 +358,7 @@ export function AdminStudentCreatePage() {
               id="admin-create-email"
               type="email"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
             />
@@ -346,7 +371,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-gender"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={gender}
               onChange={(ev) => setGender(ev.target.value)}
             />
@@ -359,7 +384,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-req"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={requirementsId}
               onChange={(ev) => setRequirementsId(ev.target.value)}
             />
@@ -377,7 +402,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-degree"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={highestDegree}
               onChange={(ev) => setHighestDegree(ev.target.value)}
             />
@@ -390,7 +415,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-bg"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={backgroundSchool}
               onChange={(ev) => setBackgroundSchool(ev.target.value)}
             />
@@ -404,7 +429,7 @@ export function AdminStudentCreatePage() {
               id="admin-create-signed"
               type="date"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={signedDate}
               onChange={(ev) => setSignedDate(ev.target.value)}
             />
@@ -418,7 +443,7 @@ export function AdminStudentCreatePage() {
               id="admin-create-enroll"
               type="date"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={enrollStartDate}
               onChange={(ev) => setEnrollStartDate(ev.target.value)}
             />
@@ -431,7 +456,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-addr"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={address}
               onChange={(ev) => setAddress(ev.target.value)}
             />
@@ -444,7 +469,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-addr2"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={address2}
               onChange={(ev) => setAddress2(ev.target.value)}
             />
@@ -457,7 +482,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-city"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={city}
               onChange={(ev) => setCity(ev.target.value)}
             />
@@ -470,7 +495,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-state"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={state}
               onChange={(ev) => setState(ev.target.value)}
             />
@@ -483,7 +508,7 @@ export function AdminStudentCreatePage() {
             <input
               id="admin-create-zip"
               className="admin-input"
-              style={{ maxWidth: '28rem', width: '100%' }}
+              style={{ width: '100%', maxWidth: '100%' }}
               value={zip}
               onChange={(ev) => setZip(ev.target.value)}
             />
