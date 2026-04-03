@@ -1,6 +1,8 @@
 import { PROGRAM_LABEL } from "../config/constants.js";
 import type {
   AccountContext,
+  AccountCurrentTerm,
+  AccountScheduleTermOption,
   BillingLineItem,
   PaymentRecord,
   StudentAccountPayload,
@@ -35,7 +37,12 @@ const DEFAULT_PREFERENCE: StudentTermPreference = {
 
 export function assembleStudentAccountPayload(
   ctx: AccountContext,
-  options?: { termChargeEffectiveDate?: string },
+  options?: {
+    termChargeEffectiveDate?: string;
+    /** When set, overrides `buildAccountCurrentTerm(ctx)` for true active term vs browse term. */
+    portalCurrentTerm?: AccountCurrentTerm | null;
+    availableScheduleTerms?: AccountScheduleTermOption[];
+  },
 ): StudentAccountPayload {
   const {
     studentId,
@@ -75,11 +82,15 @@ export function assembleStudentAccountPayload(
     Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
   const summary = buildStudentAccountSummary(lineItems, paymentsTotal);
   const scheduleRows = buildScheduleRows(enrollments, courseById);
-  const currentTerm = buildAccountCurrentTerm(term, year);
+  const currentTerm =
+    options?.portalCurrentTerm !== undefined
+      ? options.portalCurrentTerm
+      : buildAccountCurrentTerm(term, year);
+  const browseLabel = buildAccountCurrentTerm(term, year).label;
   const registration = deriveAccountRegistration({
     scheduleRows,
     enrollmentSourceCount: enrollments.length,
-    termLabel: currentTerm.label,
+    termLabel: browseLabel,
   });
 
   const instCount = pref.useInstallmentPlan
@@ -97,6 +108,13 @@ export function assembleStudentAccountPayload(
     method: p.method,
     description: p.description,
   }));
+
+  const availableScheduleTerms: AccountScheduleTermOption[] =
+    options?.availableScheduleTerms ??
+    (() => {
+      const ct = buildAccountCurrentTerm(term, year);
+      return [{ term, year, label: ct.label }];
+    })();
 
   return {
     program: PROGRAM_LABEL,
@@ -120,6 +138,7 @@ export function assembleStudentAccountPayload(
     summary,
     scheduleRows,
     currentTerm,
+    availableScheduleTerms,
     registration,
     payments: apiPayments,
     installmentSchedule,

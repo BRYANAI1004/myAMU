@@ -3,27 +3,91 @@ import { pool } from "../lib/db.js";
 import { listMarksForStudent } from "../repositories/studentAcademicsRepository.js";
 import {
   findLatestLegacyTermYear,
+  listLegacyRegistrationTermsForStudent,
   loadLegacyAccountSnapshot,
   loadLegacyAccountingRows,
 } from "../repositories/studentLegacyAccountRepository.js";
 import {
   findLatestTermYearForStudent,
+  listPortalScheduleTermsForStudent,
   loadAccountContext,
 } from "../repositories/studentAccountRepository.js";
 import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
-import type { StudentAccountPayload } from "../types/studentAccount.js";
+import type {
+  AccountScheduleTermOption,
+  StudentAccountPayload,
+} from "../types/studentAccount.js";
 import { getCatalogDemoAccountPayload } from "./demoAccountService.js";
+import {
+  resolveRegistrationAnchoredAcademicTerm,
+  termSortOrder,
+} from "./studentAcademicCourseRecords.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
+import { buildAccountCurrentTerm } from "./studentAccountDashboard.js";
 import { assembleStudentAccountPayload } from "./studentAccountAssembler.js";
 
 export type AccountTermYearInput =
   | { mode: "explicit"; term: string; year: number }
   | { mode: "auto" };
 
+function toScheduleTermOptions(
+  pairs: { term: string; year: number }[],
+): AccountScheduleTermOption[] {
+  return pairs.map(({ term, year }) => {
+    const ct = buildAccountCurrentTerm(term, year);
+    return { term, year, label: ct.label };
+  });
+}
+
+function mergeScheduleTermOptionLists(
+  primary: AccountScheduleTermOption[],
+  browseTerm: string,
+  browseYear: number,
+): AccountScheduleTermOption[] {
+  const byKey = new Map<string, AccountScheduleTermOption>();
+  for (const o of primary) {
+    byKey.set(`${o.term.toLowerCase()}|${o.year}`, o);
+  }
+  const bKey = `${browseTerm.toLowerCase()}|${browseYear}`;
+  if (!byKey.has(bKey)) {
+    const ct = buildAccountCurrentTerm(browseTerm, browseYear);
+    byKey.set(bKey, { term: browseTerm, year: browseYear, label: ct.label });
+  }
+  return [...byKey.values()].sort((a, b) => {
+    if (b.year !== a.year) return b.year - a.year;
+    return termSortOrder(b.term) - termSortOrder(a.term);
+  });
+}
+
+function augmentPayloadScheduleMeta(
+  payload: StudentAccountPayload,
+  args: {
+    portalCurrentTerm: ReturnType<typeof buildAccountCurrentTerm> | null;
+    availableScheduleTerms: AccountScheduleTermOption[];
+  },
+): StudentAccountPayload {
+  const availableScheduleTerms = mergeScheduleTermOptionLists(
+    args.availableScheduleTerms,
+    payload.term,
+    payload.year,
+  );
+  return {
+    ...payload,
+    currentTerm: args.portalCurrentTerm,
+    availableScheduleTerms,
+  };
+}
+
 async function getDemoStudentAccountPayload(
   studentId: string,
   termYear: AccountTermYearInput,
 ): Promise<StudentAccountPayload | null> {
+  const listedPairs = await listPortalScheduleTermsForStudent(
+    pool,
+    studentId,
+  ).catch(() => [] as { term: string; year: number }[]);
+  const listedOptions = toScheduleTermOptions(listedPairs);
+
   let term: string;
   let year: number;
 
@@ -33,11 +97,25 @@ async function getDemoStudentAccountPayload(
   } else {
     const latest = await findLatestTermYearForStudent(pool, studentId);
     if (!latest) {
-      return getCatalogDemoAccountPayload("Fall", 2026);
+      const catalog = getCatalogDemoAccountPayload("Fall", 2026);
+      const portalCt = buildAccountCurrentTerm("Fall", 2026);
+      return augmentPayloadScheduleMeta(catalog, {
+        portalCurrentTerm: portalCt,
+        availableScheduleTerms:
+          listedOptions.length > 0
+            ? listedOptions
+            : [{ term: "Fall", year: 2026, label: portalCt.label }],
+      });
     }
     term = latest.term;
     year = latest.year;
   }
+
+  const latestForActive = await findLatestTermYearForStudent(pool, studentId);
+  const portalCurrentTerm =
+    latestForActive != null
+      ? buildAccountCurrentTerm(latestForActive.term, latestForActive.year)
+      : buildAccountCurrentTerm(term, year);
 
   console.debug(
     "[account-debug] getStudentAccountPayload (demo) input",
@@ -47,7 +125,14 @@ async function getDemoStudentAccountPayload(
   try {
     const ctx = await loadAccountContext(pool, studentId, term, year);
     if (ctx) {
-      return assembleStudentAccountPayload(ctx);
+      return assembleStudentAccountPayload(ctx, {
+        portalCurrentTerm,
+        availableScheduleTerms: mergeScheduleTermOptionLists(
+          listedOptions,
+          term,
+          year,
+        ),
+      });
     }
   } catch (err) {
     console.warn(
@@ -55,7 +140,11 @@ async function getDemoStudentAccountPayload(
       (err as Error).message,
     );
   }
-  return getCatalogDemoAccountPayload(term, year);
+  const catalog = getCatalogDemoAccountPayload(term, year);
+  return augmentPayloadScheduleMeta(catalog, {
+    portalCurrentTerm,
+    availableScheduleTerms: listedOptions,
+  });
 }
 
 async function getRealStudentAccountPayload(
@@ -86,20 +175,44 @@ async function getRealStudentAccountPayload(
     JSON.stringify({ studentId, term, year, mode: termYear.mode }),
   );
 
-  const snap = await loadLegacyAccountSnapshot(pool, studentId, term, year);
+  const [snap, listedPairs] = await Promise.all([
+    loadLegacyAccountSnapshot(pool, studentId, term, year),
+    listLegacyRegistrationTermsForStudent(pool, studentId),
+  ]);
   if (!snap) {
     return null;
   }
-  const [accountingRows, allMarksRows, courseLookup] = await Promise.all([
-    loadLegacyAccountingRows(pool, studentId, term, year),
-    listMarksForStudent(pool, studentId),
-    loadCoursesTranscriptLookup(pool),
-  ]);
+  const [accountingRows, allMarksRows, courseLookup, latestReg] =
+    await Promise.all([
+      loadLegacyAccountingRows(pool, studentId, term, year),
+      listMarksForStudent(pool, studentId),
+      loadCoursesTranscriptLookup(pool),
+      findLatestLegacyTermYear(pool, studentId),
+    ]);
+
+  let portalActiveTerm: { term: string; year: number } | null = null;
+  if (latestReg != null) {
+    const anchor = resolveRegistrationAnchoredAcademicTerm(
+      latestReg,
+      allMarksRows,
+    );
+    if (anchor != null) {
+      portalActiveTerm = { term: anchor.term, year: anchor.year };
+    }
+  }
+
+  const availableScheduleTerms = mergeScheduleTermOptionLists(
+    toScheduleTermOptions(listedPairs),
+    snap.term,
+    snap.year,
+  );
+
   return assembleLegacyStudentAccountPayload(
     snap,
     accountingRows,
     allMarksRows,
     courseLookup,
+    { portalActiveTerm, availableScheduleTerms },
   );
 }
 

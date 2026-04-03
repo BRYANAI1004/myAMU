@@ -7,6 +7,15 @@ import {
   formatPortalCourseLocation,
   noCurrentCoursesMessage,
 } from '../../lib/academicCourseRecordsDisplay'
+import {
+  blockVerticalStyle,
+  buildWeekTimetableFromScheduleRows,
+  formatHourLabel,
+  hourTickMinutes,
+  type WeekTimetableModel,
+  WEEKDAY_SHORT_LABEL,
+} from '../../lib/dashboardWeekTimetable'
+import type { MahmAccountMock } from '../../mock/mahmAccountMock'
 import type { ScheduleRow } from '../../types/billing'
 
 type CalendarView = 'list' | 'week'
@@ -127,28 +136,125 @@ function scheduleRowKey(row: ScheduleRow, index: number): string {
   return `${code}-${index}`
 }
 
+function browseTermDisplayLabel(account: MahmAccountMock): string {
+  const t = account.student.term?.trim()
+  const y = account.student.year
+  const match = account.availableScheduleTerms?.find(
+    (x) => x.term.trim().toLowerCase() === t.toLowerCase() && x.year === y,
+  )
+  if (match?.label?.trim()) return match.label.trim()
+  return currentTermLabel(
+    t && Number.isFinite(y) && y > 0 ? { term: t, year: y } : null,
+  )
+}
+
+function scheduleTermOptionValue(term: string, year: number): string {
+  return `${term.trim()}|${year}`
+}
+
+function DashboardWeekTimetableGrid({ model }: { model: WeekTimetableModel }) {
+  const { visibleDays, gridStartMinutes, gridEndMinutes, blocksByDay } = model
+  const colCount = visibleDays.length
+  const ticks = hourTickMinutes(gridStartMinutes, gridEndMinutes)
+
+  return (
+    <div
+      className="portal-dashboard-courses-timetable"
+      style={{
+        gridTemplateColumns: `3.625rem repeat(${colCount}, minmax(0, 1fr))`,
+        minWidth: `min(100%, ${14 + colCount * 5.5}rem)`,
+      }}
+    >
+      <div
+        className="portal-dashboard-courses-timetable-corner"
+        style={{ gridColumn: 1, gridRow: 1 }}
+        aria-hidden
+      />
+      {visibleDays.map((day, i) => (
+        <div
+          key={day}
+          className="portal-dashboard-courses-timetable-dayhead"
+          style={{ gridColumn: i + 2, gridRow: 1 }}
+        >
+          {WEEKDAY_SHORT_LABEL[day]}
+        </div>
+      ))}
+      <div
+        className="portal-dashboard-courses-timetable-timecol"
+        style={{ gridColumn: 1, gridRow: 2 }}
+      >
+        {ticks.map((t) => (
+          <span key={t} className="portal-dashboard-courses-timetable-time-label">
+            {formatHourLabel(t)}
+          </span>
+        ))}
+      </div>
+      {visibleDays.map((day, i) => (
+        <div
+          key={day}
+          className="portal-dashboard-courses-timetable-daycol"
+          style={{ gridColumn: i + 2, gridRow: 2 }}
+        >
+          <div className="portal-dashboard-courses-timetable-track">
+            {blocksByDay[day].map((block, bi) => {
+              const pos = blockVerticalStyle(block, gridStartMinutes, gridEndMinutes)
+              return (
+                <div
+                  key={`${day}-${block.courseCode}-${block.startMinutes}-${bi}`}
+                  className="portal-dashboard-courses-timetable-block"
+                  style={{ top: pos.top, height: pos.height }}
+                  aria-label={`${block.courseCode}, ${formatHourLabel(block.startMinutes)} to ${formatHourLabel(
+                    block.endMinutes,
+                  )}`}
+                >
+                  <span className="portal-dashboard-courses-timetable-code">{block.courseCode}</span>
+                  {block.subtitle ? (
+                    <span className="portal-dashboard-courses-timetable-subtitle">{block.subtitle}</span>
+                  ) : null}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function DashboardCoursesWidget() {
   const [view, setView] = useState<CalendarView>('list')
-  const { account, loading, isAuthenticated } = useAccount()
+  const {
+    account,
+    loading,
+    isAuthenticated,
+    scheduleBrowseTerm,
+    setScheduleBrowseTerm,
+  } = useAccount()
 
   const scheduleRows = account.scheduleRows
-  const currentTerm = account.currentTerm
   const registration = account.registration
-  const termLabel =
-    currentTerm.label?.trim() ||
-    currentTermLabel(
-      currentTerm.term?.trim() && Number.isFinite(currentTerm.year) && currentTerm.year > 0
-        ? { term: currentTerm.term, year: currentTerm.year }
-        : null,
-    )
+  const browseLabel = browseTermDisplayLabel(account)
+  const availableTerms = account.availableScheduleTerms ?? []
 
   const isLoadingAccount = Boolean(loading && isAuthenticated)
+  const showTermPicker =
+    isAuthenticated && !isLoadingAccount && availableTerms.length > 1
+
+  const selectValue =
+    scheduleBrowseTerm != null
+      ? scheduleTermOptionValue(scheduleBrowseTerm.term, scheduleBrowseTerm.year)
+      : scheduleTermOptionValue(account.student.term, account.student.year)
+
   const showCourseTable =
     !isLoadingAccount &&
     registration.status === 'registered' &&
     scheduleRows.length > 0
 
-  const showWeekTimetableMessage =
+  const weekTimetableModel = showCourseTable
+    ? buildWeekTimetableFromScheduleRows(scheduleRows)
+    : null
+
+  const showWeekPanel =
     !isLoadingAccount && showCourseTable && view === 'week'
 
   const showEmptyState =
@@ -161,7 +267,42 @@ export function DashboardCoursesWidget() {
           <h2 id="portal-dashboard-courses-heading" className="portal-dashboard-card-panel-title">
             My Calendar
           </h2>
-          <p className="portal-dashboard-courses-term-line">{termLabel}</p>
+          <p className="portal-dashboard-courses-term-line">{browseLabel}</p>
+          {showTermPicker ? (
+            <div className="portal-dashboard-courses-term-select-wrap">
+              <label
+                htmlFor="portal-dashboard-courses-term-select"
+                className="portal-dashboard-courses-term-select-label"
+              >
+                Term
+              </label>
+              <select
+                id="portal-dashboard-courses-term-select"
+                className="portal-account-ledger__select portal-dashboard-courses-term-select"
+                value={selectValue}
+                aria-label="Academic term for calendar and schedule"
+                onChange={(e) => {
+                  const raw = e.target.value
+                  const pipe = raw.indexOf('|')
+                  if (pipe < 0) return
+                  const term = raw.slice(0, pipe).trim()
+                  const year = Number(raw.slice(pipe + 1))
+                  if (!term || !Number.isFinite(year)) return
+                  setScheduleBrowseTerm({ term, year })
+                }}
+              >
+                {availableTerms.map((opt) => (
+                  <option
+                    key={scheduleTermOptionValue(opt.term, opt.year)}
+                    value={scheduleTermOptionValue(opt.term, opt.year)}
+                  >
+                    {opt.label?.trim() ||
+                      currentTermLabel({ term: opt.term, year: opt.year })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <p
             className="portal-dashboard-courses-registration-status"
             data-status={registration.status}
@@ -211,7 +352,7 @@ export function DashboardCoursesWidget() {
           <p className="portal-dashboard-courses-empty-text">
             {registration.emptyReason?.trim()
               ? registration.emptyReason.trim()
-              : noCurrentCoursesMessage(termLabel)}
+              : noCurrentCoursesMessage(browseLabel)}
           </p>
           <Link to="/registration" className="portal-dashboard-courses-empty-cta">
             Go to Registration
@@ -271,17 +412,31 @@ export function DashboardCoursesWidget() {
         </div>
       ) : null}
 
-      {showWeekTimetableMessage ? (
-        <div
-          className="portal-dashboard-courses-timetable-wrap"
-          role="region"
-          aria-label="Weekly timetable"
-        >
-          <p className="portal-dashboard-courses-week-placeholder">
-            Official weekly timetable is not available for this term. Use the Courses tab for meeting
-            days and times from your schedule of record.
-          </p>
-        </div>
+      {showWeekPanel ? (
+        weekTimetableModel ? (
+          <div
+            className="portal-dashboard-courses-timetable-wrap"
+            role="region"
+            aria-label={`Weekly timetable for ${browseLabel}`}
+          >
+            <DashboardWeekTimetableGrid model={weekTimetableModel} />
+          </div>
+        ) : (
+          <div
+            className="portal-dashboard-courses-week-empty portal-card"
+            role="status"
+            aria-label="Weekly timetable"
+          >
+            <h3 className="portal-dashboard-courses-week-empty-title">
+              No weekly timetable for this term
+            </h3>
+            <p className="portal-dashboard-courses-week-empty-text">
+              Sections for {browseLabel} do not include times of day that can be placed on a week
+              grid. Open the Courses tab for any meeting pattern on file, or contact the registrar if
+              something looks wrong.
+            </p>
+          </div>
+        )
       ) : null}
 
     </section>

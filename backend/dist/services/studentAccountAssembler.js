@@ -31,11 +31,14 @@ export function assembleStudentAccountPayload(ctx, options) {
     const paymentsTotal = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100) / 100;
     const summary = buildStudentAccountSummary(lineItems, paymentsTotal);
     const scheduleRows = buildScheduleRows(enrollments, courseById);
-    const currentTerm = buildAccountCurrentTerm(term, year);
+    const currentTerm = options?.portalCurrentTerm !== undefined
+        ? options.portalCurrentTerm
+        : buildAccountCurrentTerm(term, year);
+    const browseLabel = buildAccountCurrentTerm(term, year).label;
     const registration = deriveAccountRegistration({
         scheduleRows,
         enrollmentSourceCount: enrollments.length,
-        termLabel: currentTerm.label,
+        termLabel: browseLabel,
     });
     const instCount = pref.useInstallmentPlan
         ? Math.min(Math.max(pref.installmentCount ?? 3, 2), 3)
@@ -47,6 +50,11 @@ export function assembleStudentAccountPayload(ctx, options) {
         method: p.method,
         description: p.description,
     }));
+    const availableScheduleTerms = options?.availableScheduleTerms ??
+        (() => {
+            const ct = buildAccountCurrentTerm(term, year);
+            return [{ term, year, label: ct.label }];
+        })();
     return {
         program: PROGRAM_LABEL,
         term,
@@ -68,6 +76,7 @@ export function assembleStudentAccountPayload(ctx, options) {
         summary,
         scheduleRows,
         currentTerm,
+        availableScheduleTerms,
         registration,
         payments: apiPayments,
         installmentSchedule,

@@ -1,5 +1,12 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { useAccount } from './context/AccountContext'
+import { useAdminAuth } from './context/AdminAuthContext'
+import { AdminLayout } from './components/admin/AdminLayout'
+import { AdminLoginPage } from './pages/admin/AdminLoginPage'
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage'
+import { AdminStudentsPage } from './pages/admin/AdminStudentsPage'
+import { AdminCoursesPage } from './pages/admin/AdminCoursesPage'
+import { AdminFinancePage } from './pages/admin/AdminFinancePage'
 import { LoginPage } from './pages/LoginPage'
 import { PaymentPlanPage } from './pages/PaymentPlanPage'
 import { PortalLayout } from './components/PortalLayout'
@@ -39,10 +46,27 @@ function RequireAuth() {
   return <Outlet />
 }
 
+function RequireAdminAuth() {
+  const { isAuthenticated } = useAdminAuth()
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />
+  }
+  return <Outlet />
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/admin/login" element={<AdminLoginPage />} />
+      <Route element={<RequireAdminAuth />}>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboardPage />} />
+          <Route path="students" element={<AdminStudentsPage />} />
+          <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="finance" element={<AdminFinancePage />} />
+        </Route>
+      </Route>
       <Route element={<RequireAuth />}>
         <Route element={<PortalLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />

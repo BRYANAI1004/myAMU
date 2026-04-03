@@ -18,13 +18,9 @@ export function legacyAccountingDateToIso(dateRaw) {
 function typeNorm(type) {
     return type.trim().toLowerCase();
 }
-/**
- * Real-student payload: legacy `students` + `registration` + `accounting` (Step 3B).
- * Category splits are minimal; `lineItems` and portal-only fields stay empty until later steps.
- */
 export function assembleLegacyStudentAccountPayload(snap, accountingRows, 
 /** All `marks` rows for the student (newest term first), same source as `/academics`. */
-allMarksRows, courseLookup) {
+allMarksRows, courseLookup, options) {
     const regFees = roundMoney(snap.totalFees);
     let totalCharges;
     let paymentsTotal;
@@ -70,25 +66,28 @@ allMarksRows, courseLookup) {
             description: r.memo.length > 0 ? r.memo : undefined,
         }));
     }
-    const registrationTerm = { term: snap.term, year: snap.year };
-    const resolvedActive = resolveRegistrationAnchoredAcademicTerm(registrationTerm, allMarksRows);
-    const marksRowsForReg = allMarksRows.filter((m) => m.year === registrationTerm.year &&
-        termsMatch(m.term, registrationTerm.term));
-    const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(snap.studentId, allMarksRows, courseLookup, resolvedActive);
-    const currentTermMarks = resolvedActive != null
-        ? courseRecords.filter((r) => r.year === resolvedActive.year &&
-            termsMatch(r.term, resolvedActive.term))
-        : [];
-    const scheduleRows = scheduleRowsFromAcademicCourseRecords(currentTermMarks);
-    const currentTerm = resolvedActive != null
-        ? buildAccountCurrentTerm(resolvedActive.term, resolvedActive.year)
+    const browseTerm = { term: snap.term, year: snap.year };
+    const { portalActiveTerm, availableScheduleTerms } = options;
+    const marksRowsForBrowse = allMarksRows.filter((m) => m.year === browseTerm.year && termsMatch(m.term, browseTerm.term));
+    const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(snap.studentId, allMarksRows, courseLookup, portalActiveTerm);
+    const browseRecords = courseRecords.filter((r) => r.year === browseTerm.year && termsMatch(r.term, browseTerm.term));
+    const scheduleRows = scheduleRowsFromAcademicCourseRecords(browseRecords);
+    const currentTerm = portalActiveTerm != null
+        ? buildAccountCurrentTerm(portalActiveTerm.term, portalActiveTerm.year)
         : null;
-    const billingTermLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
+    const browseLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
+    const browseMatchesPortalActive = portalActiveTerm != null &&
+        portalActiveTerm.year === browseTerm.year &&
+        termsMatch(portalActiveTerm.term, browseTerm.term);
     const registration = deriveAccountRegistration({
         scheduleRows,
-        termLabel: currentTerm?.label ?? billingTermLabel,
-        academicEnrollmentActive: resolvedActive != null,
-        marksRowsForRegistrationTerm: marksRowsForReg.length,
+        termLabel: browseLabel,
+        ...(browseMatchesPortalActive
+            ? {
+                academicEnrollmentActive: resolveRegistrationAnchoredAcademicTerm(browseTerm, allMarksRows) != null,
+                marksRowsForRegistrationTerm: marksRowsForBrowse.length,
+            }
+            : {}),
     });
     return {
         program: null,
@@ -114,6 +113,7 @@ allMarksRows, courseLookup) {
         },
         scheduleRows,
         currentTerm,
+        availableScheduleTerms,
         registration,
         payments,
         installmentSchedule: [],

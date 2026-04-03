@@ -96,6 +96,34 @@ export async function findLatestTermYearForStudent(
   return out;
 }
 
+/**
+ * Distinct term/year pairs from `portal_enrollments` for this student.
+ * Newest first: year DESC, then Fall > Summer > Spring > Winter within the year.
+ */
+export async function listPortalScheduleTermsForStudent(
+  pool: Pool,
+  studentExternalId: string,
+): Promise<{ term: string; year: number }[]> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT term, year
+     FROM portal_enrollments
+     WHERE student_external_id = ?
+     ORDER BY year DESC,
+       CASE UPPER(TRIM(term))
+         WHEN 'FALL' THEN 4
+         WHEN 'SUMMER' THEN 3
+         WHEN 'SPRING' THEN 2
+         WHEN 'WINTER' THEN 1
+         ELSE 0
+       END DESC`,
+    [studentExternalId],
+  );
+  return rows.map((r) => ({
+    term: String(r.term),
+    year: Number(r.year),
+  }));
+}
+
 export async function loadAccountContext(
   pool: Pool,
   studentId: string,

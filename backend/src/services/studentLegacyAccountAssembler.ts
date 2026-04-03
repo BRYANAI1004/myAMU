@@ -4,7 +4,11 @@ import type {
   LegacyAccountSnapshot,
 } from "../repositories/studentLegacyAccountRepository.js";
 import type { CourseTranscriptLookupEntry } from "../repositories/studentTranscriptRepository.js";
-import type { PaymentRecord, StudentAccountPayload } from "../types/studentAccount.js";
+import type {
+  AccountScheduleTermOption,
+  PaymentRecord,
+  StudentAccountPayload,
+} from "../types/studentAccount.js";
 import {
   buildAcademicCourseRecordsFromMarksWithLookup,
   resolveRegistrationAnchoredAcademicTerm,
@@ -41,12 +45,19 @@ function typeNorm(type: string): string {
  * Real-student payload: legacy `students` + `registration` + `accounting` (Step 3B).
  * Category splits are minimal; `lineItems` and portal-only fields stay empty until later steps.
  */
+export type AssembleLegacyStudentAccountOptions = {
+  /** True active enrollment term (latest open registration on marks); drives `currentTerm` on the payload. */
+  portalActiveTerm: { term: string; year: number } | null;
+  availableScheduleTerms: AccountScheduleTermOption[];
+};
+
 export function assembleLegacyStudentAccountPayload(
   snap: LegacyAccountSnapshot,
   accountingRows: LegacyAccountingRow[],
   /** All `marks` rows for the student (newest term first), same source as `/academics`. */
   allMarksRows: MarksRow[],
   courseLookup: Map<string, CourseTranscriptLookupEntry>,
+  options: AssembleLegacyStudentAccountOptions,
 ): StudentAccountPayload {
   const regFees = roundMoney(snap.totalFees);
 
@@ -98,41 +109,45 @@ export function assembleLegacyStudentAccountPayload(
       }));
   }
 
-  const registrationTerm = { term: snap.term, year: snap.year };
-  const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
-    registrationTerm,
-    allMarksRows,
-  );
-  const marksRowsForReg = allMarksRows.filter(
-    (m) =>
-      m.year === registrationTerm.year &&
-      termsMatch(m.term, registrationTerm.term),
+  const browseTerm = { term: snap.term, year: snap.year };
+  const { portalActiveTerm, availableScheduleTerms } = options;
+
+  const marksRowsForBrowse = allMarksRows.filter(
+    (m) => m.year === browseTerm.year && termsMatch(m.term, browseTerm.term),
   );
   const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(
     snap.studentId,
     allMarksRows,
     courseLookup,
-    resolvedActive,
+    portalActiveTerm,
   );
-  const currentTermMarks =
-    resolvedActive != null
-      ? courseRecords.filter(
-          (r) =>
-            r.year === resolvedActive.year &&
-            termsMatch(r.term, resolvedActive.term),
-        )
-      : [];
-  const scheduleRows = scheduleRowsFromAcademicCourseRecords(currentTermMarks);
+  const browseRecords = courseRecords.filter(
+    (r) => r.year === browseTerm.year && termsMatch(r.term, browseTerm.term),
+  );
+  const scheduleRows = scheduleRowsFromAcademicCourseRecords(browseRecords);
   const currentTerm =
-    resolvedActive != null
-      ? buildAccountCurrentTerm(resolvedActive.term, resolvedActive.year)
+    portalActiveTerm != null
+      ? buildAccountCurrentTerm(portalActiveTerm.term, portalActiveTerm.year)
       : null;
-  const billingTermLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
+  const browseLabel = buildAccountCurrentTerm(snap.term, snap.year).label;
+  const browseMatchesPortalActive =
+    portalActiveTerm != null &&
+    portalActiveTerm.year === browseTerm.year &&
+    termsMatch(portalActiveTerm.term, browseTerm.term);
+
   const registration = deriveAccountRegistration({
     scheduleRows,
-    termLabel: currentTerm?.label ?? billingTermLabel,
-    academicEnrollmentActive: resolvedActive != null,
-    marksRowsForRegistrationTerm: marksRowsForReg.length,
+    termLabel: browseLabel,
+    ...(browseMatchesPortalActive
+      ? {
+          academicEnrollmentActive:
+            resolveRegistrationAnchoredAcademicTerm(
+              browseTerm,
+              allMarksRows,
+            ) != null,
+          marksRowsForRegistrationTerm: marksRowsForBrowse.length,
+        }
+      : {}),
   });
 
   return {
@@ -159,6 +174,7 @@ export function assembleLegacyStudentAccountPayload(
     },
     scheduleRows,
     currentTerm,
+    availableScheduleTerms,
     registration,
     payments,
     installmentSchedule: [],

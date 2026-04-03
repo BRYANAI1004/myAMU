@@ -78,6 +78,34 @@ export async function findLatestLegacyTermYear(
 }
 
 /**
+ * Distinct term/year pairs from legacy `registration` for this student.
+ * Newest first: year DESC, then Fall > Summer > Spring > Winter within the year.
+ */
+export async function listLegacyRegistrationTermsForStudent(
+  pool: Pool,
+  studentId: string,
+): Promise<{ term: string; year: number }[]> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT TRIM(term) AS term, year
+     FROM registration
+     WHERE id = ?
+     ORDER BY year DESC,
+       CASE UPPER(TRIM(term))
+         WHEN 'FALL' THEN 4
+         WHEN 'SUMMER' THEN 3
+         WHEN 'SPRING' THEN 2
+         WHEN 'WINTER' THEN 1
+         ELSE 0
+       END DESC`,
+    [studentId],
+  );
+  return rows.map((r) => ({
+    term: normalizeTerm(r.term),
+    year: Number(r.year),
+  }));
+}
+
+/**
  * Load display name from `students` and financial snapshot from `registration` for one term.
  */
 export async function loadLegacyAccountSnapshot(

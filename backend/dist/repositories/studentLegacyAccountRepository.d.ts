@@ -37,6 +37,14 @@ export declare function findLatestLegacyTermYear(pool: Pool, studentId: string):
     year: number;
 } | null>;
 /**
+ * Distinct term/year pairs from legacy `registration` for this student.
+ * Newest first: year DESC, then Fall > Summer > Spring > Winter within the year.
+ */
+export declare function listLegacyRegistrationTermsForStudent(pool: Pool, studentId: string): Promise<{
+    term: string;
+    year: number;
+}[]>;
+/**
  * Load display name from `students` and financial snapshot from `registration` for one term.
  */
 export declare function loadLegacyAccountSnapshot(pool: Pool, studentId: string, term: string, year: number): Promise<LegacyAccountSnapshot | null>;

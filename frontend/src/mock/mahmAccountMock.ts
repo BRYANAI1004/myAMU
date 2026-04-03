@@ -72,6 +72,8 @@ export type MahmAccountMock = {
   billingStatus: string
   termChargeEffectiveDate: string
   scheduleRows: ScheduleRow[]
+  /** Terms available for schedule/account browsing (API); omit or single entry when not used. */
+  availableScheduleTerms?: Array<{ term: string; year: number; label: string }>
   recentActivity: MahmRecentActivityEntry[]
   statements: MahmStatementEntry[]
 }
@@ -162,6 +164,8 @@ export const mahmAccountMock: MahmAccountMock = {
   billingStatus: 'Current — installment plan active',
 
   termChargeEffectiveDate: '2026-08-15',
+
+  availableScheduleTerms: [{ term: 'Fall', year: 2026, label: 'Fall 2026' }],
 
   scheduleRows: [
     {

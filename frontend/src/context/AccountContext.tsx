@@ -147,6 +147,34 @@ function parseCurrentTermFromApi(
   return defaultCurrentTermFromStudent(student)
 }
 
+function parseAvailableScheduleTermsFromApi(
+  raw: unknown,
+  student: MahmAccountMock['student'],
+): NonNullable<MahmAccountMock['availableScheduleTerms']> {
+  const rows = Array.isArray(raw) ? raw : []
+  const mapped: NonNullable<MahmAccountMock['availableScheduleTerms']> = []
+  for (const row of rows) {
+    if (row == null || typeof row !== 'object') continue
+    const r = row as Record<string, unknown>
+    const term = String(r.term ?? '').trim()
+    const year = Number(r.year)
+    const labelRaw = String(r.label ?? '').trim()
+    if (!term || !Number.isFinite(year)) continue
+    const cap = titleCaseTerm(term)
+    const label =
+      labelRaw || (cap && year ? `${cap} ${year}` : cap || (year ? String(year) : ''))
+    mapped.push({ term, year, label })
+  }
+  if (mapped.length > 0) return mapped
+  const st = student.term?.trim()
+  const sy = Number(student.year)
+  if (st && Number.isFinite(sy)) {
+    const cap = titleCaseTerm(st)
+    return [{ term: st, year: sy, label: cap && sy ? `${cap} ${sy}` : cap || String(sy) }]
+  }
+  return []
+}
+
 function parseRegistrationFromApi(
   raw: unknown,
   scheduleRows: ScheduleRow[],
@@ -184,7 +212,20 @@ function ensureAccountDashboardFields(account: MahmAccountMock): MahmAccountMock
     parseRegistrationStatus(account.registration.status) != null
       ? account.registration
       : fallbackRegistrationFromSchedule(account.scheduleRows, termLabel)
-  return { ...account, currentTerm, registration }
+  let availableScheduleTerms = account.availableScheduleTerms
+  if (availableScheduleTerms == null || availableScheduleTerms.length === 0) {
+    const st = account.student.term?.trim()
+    const sy = Number(account.student.year)
+    if (st && Number.isFinite(sy)) {
+      const cap = titleCaseTerm(st)
+      availableScheduleTerms = [
+        { term: st, year: sy, label: cap && sy ? `${cap} ${sy}` : cap || String(sy) },
+      ]
+    } else {
+      availableScheduleTerms = []
+    }
+  }
+  return { ...account, currentTerm, registration, availableScheduleTerms }
 }
 
 /**
@@ -327,10 +368,21 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
       : ''
 
   const currentTerm = parseCurrentTermFromApi(o.currentTerm, student)
+  const availableScheduleTerms = parseAvailableScheduleTermsFromApi(
+    o.availableScheduleTerms,
+    student,
+  )
+  const browseLabel =
+    availableScheduleTerms.find(
+      (x) =>
+        x.term.trim().toLowerCase() === student.term.trim().toLowerCase() &&
+        x.year === student.year,
+    )?.label ??
+    currentTerm.label
   const registration = parseRegistrationFromApi(
     o.registration,
     scheduleRows,
-    currentTerm.label,
+    browseLabel,
   )
 
   return ensureAccountDashboardFields({
@@ -344,6 +396,7 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
     termChargeEffectiveDate,
     scheduleRows,
     currentTerm,
+    availableScheduleTerms,
     registration,
     recentActivity,
     statements: [],
@@ -390,8 +443,11 @@ function authenticatedPlaceholderAccount(studentId: string): MahmAccountMock {
     },
     recentActivity: [],
     statements: [],
+    availableScheduleTerms: [],
   })
 }
+
+type ScheduleBrowseTerm = { term: string; year: number }
 
 type AccountContextValue = {
   /** Last successful API payload for the current student; null after logout or a failed fetch. */
@@ -409,6 +465,12 @@ type AccountContextValue = {
   login: (studentId: string) => void
   logout: () => void
   isAuthenticated: boolean
+  /**
+   * When null, the account API uses the server default term. When set, account (billing + schedule)
+   * is loaded for that term — independent of `account.currentTerm` (true active enrollment).
+   */
+  scheduleBrowseTerm: ScheduleBrowseTerm | null
+  setScheduleBrowseTerm: (term: ScheduleBrowseTerm | null) => void
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null)
@@ -423,6 +485,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   )
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [scheduleBrowseTerm, setScheduleBrowseTerm] = useState<ScheduleBrowseTerm | null>(
+    null,
+  )
 
   const login = useCallback((studentId: string) => {
     const trimmed = studentId.trim()
@@ -436,6 +501,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setCurrentStudentId(null)
+    setScheduleBrowseTerm(null)
     try {
       localStorage.removeItem(PORTAL_STUDENT_ID_KEY)
     } catch {
@@ -446,6 +512,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   const reload = useCallback(() => {
     setReloadKey((k) => k + 1)
   }, [])
+
+  useEffect(() => {
+    setScheduleBrowseTerm(null)
+  }, [currentStudentId])
 
   useEffect(() => {
     if (!currentStudentId?.trim()) {
@@ -464,7 +534,12 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
     ;(async () => {
       try {
-        const raw = await fetchStudentAccount(id, { signal: ac.signal })
+        const raw = await fetchStudentAccount(id, {
+          ...(scheduleBrowseTerm
+            ? { term: scheduleBrowseTerm.term, year: scheduleBrowseTerm.year }
+            : {}),
+          signal: ac.signal,
+        })
         if (ac.signal.aborted) return
         setFetchedAccount(normalizeApiStudentAccount(raw))
         setError(null)
@@ -482,7 +557,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, reloadKey])
+  }, [currentStudentId, reloadKey, scheduleBrowseTerm])
 
   const isAuthenticated =
     currentStudentId !== null && currentStudentId.trim().length > 0
@@ -514,6 +589,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       isAuthenticated,
+      scheduleBrowseTerm,
+      setScheduleBrowseTerm,
     }),
     [
       account,
@@ -524,6 +601,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       reload,
+      scheduleBrowseTerm,
     ],
   )
 

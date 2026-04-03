@@ -42,6 +42,13 @@ export type AccountCurrentTerm = {
   quarterOrder?: number;
 };
 
+/** Distinct terms the student can browse for schedule/account (newest first in API lists). */
+export type AccountScheduleTermOption = {
+  term: string;
+  year: number;
+  label: string;
+};
+
 export type AccountRegistrationStatus =
   | "registered"
   | "not_registered"
@@ -93,8 +100,13 @@ export type StudentAccountPayload = {
   lineItems: BillingLineItem[];
   summary: StudentAccountSummary;
   scheduleRows: ScheduleRow[];
-  /** Academic “current” quarter for schedule/dashboard; null when the registration term has concluded or there is no registration anchor. */
+  /**
+   * True active enrollment term for the student (legacy: latest `registration` row still open on `marks`).
+   * Independent of `term`/`year`, which reflect the selected account browse term.
+   */
   currentTerm: AccountCurrentTerm | null;
+  /** Distinct registration terms with account data, newest first — for schedule/account term picker. */
+  availableScheduleTerms: AccountScheduleTermOption[];
   registration: AccountRegistration;
   payments: PaymentRecord[];
   installmentSchedule: InstallmentScheduleEntry[];

@@ -4580,6 +4580,50 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   letter-spacing: 0.01em;
 }
 
+.portal-dashboard-courses-term-select-wrap {
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.portal-dashboard-courses-term-select-label {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-text-muted);
+}
+
+.portal-dashboard-courses-term-select {
+  min-width: 10rem;
+  max-width: 100%;
+}
+
+.portal-dashboard-courses-week-empty {
+  margin-top: 0.75rem;
+  padding: 1rem 1.125rem;
+  border-radius: var(--portal-radius-md, 8px);
+  border: 1px solid var(--portal-border, rgba(0, 0, 0, 0.08));
+  background: var(--portal-surface-subtle, rgba(0, 0, 0, 0.03));
+}
+
+.portal-dashboard-courses-week-empty-title {
+  margin: 0 0 0.375rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--portal-text);
+}
+
+.portal-dashboard-courses-week-empty-text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--portal-text-muted);
+}
+
 .portal-dashboard-courses-registration-status {
   margin: 0.125rem 0 0;
   font-size: 0.6875rem;
@@ -5054,7 +5098,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 }
 
 .portal-dashboard-courses-timetable {
-  /* Taller grid so hour rows read calm and evenly spaced (8:00 AM–6:00 PM) */
+  /* Taller grid; column count set inline (Mon–Fri + optional Sat/Sun). */
   --portal-timetable-track-min-h: 27.5rem;
   display: grid;
   grid-template-columns: 3.625rem repeat(5, minmax(0, 1fr));
@@ -5088,8 +5132,8 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   border-bottom: 1px solid color-mix(in srgb, var(--portal-border-subtle) 85%, transparent);
 }
 
-/* Friday column header — last of the five day heads (child 6: corner + Mon–Thu) */
-.portal-dashboard-courses-timetable-dayhead:nth-child(6) {
+/* Last weekday/weekend column header */
+.portal-dashboard-courses-timetable-dayhead:last-of-type {
   border-right: none;
 }
 
@@ -5308,5 +5352,402 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 @media (max-width: 520px) {
   .portal-dashboard-service-tile {
     padding: 0 1.25rem;
+  }
+}
+
+/* —— Administrator portal (separate from student shell) —— */
+.admin-login-card-subtitle {
+  white-space: normal;
+  max-width: 100%;
+}
+
+.admin-portal {
+  --portal-bg: var(--page-gray);
+  --portal-surface: var(--amu-card);
+  --portal-border: var(--border-gray);
+  --portal-border-subtle: #e8eaee;
+  --portal-text: var(--text-dark);
+  --portal-text-muted: #5c6578;
+  --portal-text-faint: #7a8499;
+  --portal-accent: var(--amu-red);
+  --portal-accent-hover: var(--amu-red-dark);
+  --portal-accent-soft: #f2e8ea;
+  --portal-radius: 6px;
+  --portal-shadow: 0 1px 2px rgba(28, 35, 51, 0.06);
+  --portal-body-font-size: 0.875rem;
+  --portal-space-section: 1.75rem;
+  --admin-sidebar-width: 232px;
+  --admin-header-height: 4.75rem;
+  display: flex;
+  min-height: 100vh;
+  font-size: var(--portal-body-font-size);
+  line-height: 1.45;
+  color: var(--portal-text);
+  background: var(--page-gray);
+}
+
+.admin-portal__frame {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: var(--admin-sidebar-width);
+}
+
+.admin-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 20;
+  width: var(--admin-sidebar-width);
+  box-sizing: border-box;
+  padding: 1.25rem 0 1.5rem;
+  background: #a6192e;
+  color: #ffffff;
+  border-right: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.admin-sidebar__brand {
+  padding: 0 1.25rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 1rem;
+}
+
+.admin-sidebar__brand-title {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-sidebar__brand-sub {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+.admin-sidebar__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-sidebar__link {
+  display: block;
+  margin: 0.25rem 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-sidebar__link:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: #ffffff;
+}
+
+.admin-sidebar__link:focus-visible {
+  outline: 2px solid #f2c300;
+  outline-offset: 2px;
+}
+
+.admin-sidebar__link--active {
+  background: #7a1222;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.admin-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: var(--admin-header-height);
+  padding: 0 clamp(1rem, 2vw, 1.5rem);
+  background: #f2c300;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+
+.admin-header__left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.admin-header__logo-link {
+  display: flex;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.admin-header__logo {
+  display: block;
+  height: 44px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+}
+
+.admin-header__title {
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-header__right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.admin-header__name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.admin-header__logout {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--amu-red-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-header__logout:hover {
+  color: var(--amu-red);
+}
+
+.admin-header__logout:focus-visible {
+  outline: 2px solid var(--amu-red);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.admin-portal__main {
+  flex: 1;
+  min-width: 0;
+  padding: clamp(1.25rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.75rem) 2.5rem;
+  background: var(--page-gray);
+}
+
+.admin-page__title {
+  margin: 0 0 0.35rem;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-dark);
+}
+
+.admin-page__title--inline {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-page__lede {
+  margin: 0 0 1.5rem;
+  font-size: 0.875rem;
+}
+
+.admin-page__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-page__toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.75rem;
+  margin-left: auto;
+}
+
+.admin-page__toolbar-actions--wrap {
+  justify-content: flex-end;
+}
+
+.admin-input {
+  height: 2.375rem;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-dark);
+  background: var(--amu-card);
+  border: 1px solid #cccccc;
+  border-radius: var(--portal-radius);
+}
+
+.admin-input:focus {
+  outline: none;
+  border-color: var(--amu-red);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+.admin-input--search {
+  min-width: min(100%, 280px);
+  width: 280px;
+}
+
+.admin-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-top: 0.5rem;
+}
+
+.admin-dashboard-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1.35rem;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 10px;
+  border-top: 4px solid var(--amu-red);
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-dashboard-card__title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.admin-dashboard-card__body {
+  margin: 0 0 1.25rem;
+  flex: 1;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--portal-text-muted);
+}
+
+.admin-dashboard-card__cta {
+  align-self: flex-start;
+}
+
+.admin-table-wrap {
+  margin-bottom: 0;
+}
+
+.admin-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-finance-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-stat-card {
+  padding: 1.15rem 1.25rem;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-stat-card__label {
+  margin: 0 0 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-stat-card__value {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dark);
+}
+
+@media (max-width: 1100px) {
+  .admin-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-finance-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-portal {
+    flex-direction: column;
+  }
+
+  .admin-portal__frame {
+    margin-left: 0;
+  }
+
+  .admin-sidebar {
+    position: relative;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  .admin-sidebar__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .admin-sidebar__list li {
+    flex: 1 1 auto;
+    min-width: 7rem;
+  }
+
+  .admin-sidebar__link {
+    margin: 0.15rem;
+    text-align: center;
+    font-size: 0.8125rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .admin-page__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-page__toolbar-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .admin-input--search {
+    width: 100%;
   }
 }
