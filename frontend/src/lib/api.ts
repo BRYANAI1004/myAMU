@@ -312,6 +312,79 @@ export async function updateAdminStudent(
   return parseAdminStudentDetailPayload(data)
 }
 
+export type AdminDivision = 'Chinese' | 'English'
+
+export type PreviewNextStudentIdResponse = {
+  studentId: string
+}
+
+export type CreateAdminStudentBody = {
+  division: AdminDivision
+  entryYear: number
+  name: string
+  email?: string | null
+  gender?: string | null
+  requirementsId?: number | null
+  highestDegree?: string | null
+  backgroundSchool?: string | null
+  signedDate?: string | null
+  enrollStartDate?: string | null
+  address?: string | null
+  address2?: string | null
+  city?: string | null
+  state?: string | null
+  zip?: string | null
+  initialPassword: string
+}
+
+export async function fetchNextAdminStudentId(
+  division: AdminDivision,
+  year: number,
+  options?: { signal?: AbortSignal },
+): Promise<string> {
+  const params = new URLSearchParams()
+  params.set('division', division)
+  params.set('year', String(Math.trunc(year)))
+  const path = `/api/admin/students/next-id?${params.toString()}`
+  const data = (await fetchApiJson(path, {
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as { studentId?: unknown }).studentId === 'string'
+  ) {
+    return (data as PreviewNextStudentIdResponse).studentId
+  }
+  throw new Error('Unexpected next student id response')
+}
+
+export type CreateAdminStudentResponse = {
+  ok: boolean
+  studentId: string
+}
+
+export async function createAdminStudent(
+  body: CreateAdminStudentBody,
+  options?: { signal?: AbortSignal },
+): Promise<CreateAdminStudentResponse> {
+  const data = (await fetchApiJson('/api/admin/students', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true &&
+    typeof (data as { studentId?: unknown }).studentId === 'string'
+  ) {
+    return data as CreateAdminStudentResponse
+  }
+  throw new Error('Unexpected create student response')
+}
+
 export async function fetchStudentProfile(
   studentId: string,
   options?: { signal?: AbortSignal },

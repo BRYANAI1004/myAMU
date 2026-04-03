@@ -1,4 +1,7 @@
-import type { Pool, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
+
+/** Pool or a single connection (for transactions). */
+export type LegacyMysqlClient = Pool | PoolConnection;
 
 /**
  * Legacy MySQL tables (live school DB):
@@ -423,4 +426,157 @@ export async function updateLegacyStudentMasterRow(
   );
   const header = result as { affectedRows?: number };
   return (header.affectedRows ?? 0) > 0;
+}
+
+export type LegacyStudentMasterInsert = {
+  studentId: string;
+  name: string;
+  email: string;
+  gender: string;
+  requirements_id: number | null;
+  tertiary: string;
+  background: string;
+  signed_date_sql: string;
+  enroll_start_sql: string;
+  address: string;
+  address2: string;
+  city: string;
+  state: string;
+  zip: number;
+};
+
+/**
+ * Next student id in a division+year bucket: prefix (C|E) + 2-digit year + 3-digit sequence.
+ * Query uses `LIKE 'E26%'` style pattern; empty bucket starts at ...001.
+ */
+export async function getNextLegacyStudentId(
+  pool: LegacyMysqlClient,
+  division: "Chinese" | "English",
+  entryYear: number,
+): Promise<string> {
+  const prefix = division === "Chinese" ? "C" : "E";
+  const y = Math.trunc(entryYear);
+  const year2 = String(((y % 100) + 100) % 100).padStart(2, "0");
+  const likePattern = `${prefix}${year2}%`;
+
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT TRIM(id) AS id
+     FROM students
+     WHERE id LIKE ?
+     ORDER BY id DESC
+     LIMIT 1`,
+    [likePattern],
+  );
+
+  const re = new RegExp(
+    `^${prefix}${year2}(\\d{3})$`,
+    "i",
+  );
+
+  let nextSeq = 1;
+  const row = rows[0];
+  const lastId =
+    row?.id != null && String(row.id).trim() !== ""
+      ? String(row.id).trim()
+      : "";
+  const m = lastId ? re.exec(lastId) : null;
+  if (m) {
+    const n = Number.parseInt(m[1]!, 10);
+    if (Number.isFinite(n)) {
+      nextSeq = n + 1;
+    }
+  }
+
+  if (nextSeq > 999) {
+    throw new Error(
+      `Legacy student id sequence overflow for ${prefix}${year2} (max 999).`,
+    );
+  }
+
+  return `${prefix}${year2}${String(nextSeq).padStart(3, "0")}`;
+}
+
+export async function legacyStudentMasterExists(
+  pool: LegacyMysqlClient,
+  studentId: string,
+): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 AS ok FROM students WHERE id = ? LIMIT 1`,
+    [studentId],
+  );
+  return rows.length > 0;
+}
+
+export async function legacyStudentPasswordRowExists(
+  pool: LegacyMysqlClient,
+  studentId: string,
+): Promise<boolean> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 AS ok FROM password_stu WHERE id = ? LIMIT 1`,
+    [studentId],
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Insert one legacy `students` row with safe defaults for columns not exposed in the admin create form.
+ */
+export async function createLegacyStudentMasterRow(
+  pool: LegacyMysqlClient,
+  input: LegacyStudentMasterInsert,
+): Promise<void> {
+  await pool.execute(
+    `INSERT INTO students (
+       name, alias, id, dob,
+       address, address2, city, state, zip, country, ssn,
+       gender, race, status,
+       phone1, phone2, phone3, email,
+       background, tertiary, visa,
+       regis_fee, clinic_fee, admission_credits,
+       notes, cpr, toefl, exam, level1exam, level2exam, level3exam, cnt,
+       hold, signed_date, grad_date, grad_term, grad_year, withdraw_date,
+       required_units_to_grad, marital, citizenship,
+       EnrollStartDate, requirements_id, financial_aid, grad_check_out,
+       cale_license, cale_date, level1practice
+     ) VALUES (
+       ?, '', ?, '0000-00-00',
+       ?, ?, ?, ?, ?, '', '',
+       ?, '', '',
+       '', '', '', ?,
+       ?, ?, '',
+       0, 0, 0,
+       '', '', '', '', '', '', '', '',
+       0, ?, '0000-00-00', '-', 0, '0000-00-00',
+       0, '', '',
+       ?, ?, 0, 0,
+       NULL, '0000-00-00', ''
+     )`,
+    [
+      input.name,
+      input.studentId,
+      input.address,
+      input.address2,
+      input.city,
+      input.state,
+      input.zip,
+      input.gender,
+      input.email,
+      input.background,
+      input.tertiary,
+      input.signed_date_sql,
+      input.enroll_start_sql,
+      input.requirements_id,
+    ],
+  );
+}
+
+export async function createLegacyStudentPasswordRow(
+  pool: LegacyMysqlClient,
+  studentId: string,
+  password: string,
+): Promise<void> {
+  await pool.execute(`INSERT INTO password_stu (id, password) VALUES (?, ?)`, [
+    studentId,
+    password,
+  ]);
 }

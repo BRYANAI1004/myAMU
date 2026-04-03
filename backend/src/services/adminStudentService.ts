@@ -1,11 +1,18 @@
 import { pool } from "../lib/db.js";
 import {
+  createLegacyStudentMasterRow,
+  createLegacyStudentPasswordRow,
   findLatestLegacyTermYear,
+  getNextLegacyStudentId,
+  legacyStudentMasterExists,
+  legacyStudentPasswordRowExists,
   listLegacyAdminStudentRows,
   loadLegacyStudentProfileRow,
   updateLegacyStudentMasterRow,
 } from "../repositories/studentLegacyAccountRepository.js";
 import type {
+  AdminDivision,
+  AdminStudentCreateBody,
   AdminStudentDetail,
   AdminStudentListItem,
   AdminStudentUpdateBody,
@@ -196,6 +203,9 @@ function parseRequirementsIdForDb(
   raw: unknown,
 ): { kind: "ok"; value: number | null } | { kind: "error"; message: string } {
   if (raw == null) return { kind: "ok", value: null };
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return { kind: "ok", value: Math.trunc(raw) };
+  }
   const s = String(raw).trim();
   if (s === "") return { kind: "ok", value: null };
   const n = Number.parseInt(s, 10);
@@ -296,4 +306,207 @@ export async function updateAdminStudent(
     return { ok: false, status: 404, message: "Student not found." };
   }
   return { ok: true, detail };
+}
+
+const ENTRY_YEAR_MIN = 1900;
+const ENTRY_YEAR_MAX = 2100;
+
+function parseDivisionParam(
+  raw: unknown,
+):
+  | { ok: true; value: AdminDivision }
+  | { ok: false; status: 400; message: string } {
+  if (raw === "Chinese" || raw === "English") {
+    return { ok: true, value: raw };
+  }
+  return {
+    ok: false,
+    status: 400,
+    message: "division must be Chinese or English.",
+  };
+}
+
+function parseEntryYearParam(
+  raw: unknown,
+):
+  | { ok: true; value: number }
+  | { ok: false; status: 400; message: string } {
+  if (raw == null || raw === "") {
+    return {
+      ok: false,
+      status: 400,
+      message: "year is required.",
+    };
+  }
+  const n =
+    typeof raw === "number"
+      ? raw
+      : Number.parseInt(String(raw).trim(), 10);
+  if (!Number.isFinite(n) || !Number.isInteger(n)) {
+    return {
+      ok: false,
+      status: 400,
+      message: "year must be an integer.",
+    };
+  }
+  if (n < ENTRY_YEAR_MIN || n > ENTRY_YEAR_MAX) {
+    return {
+      ok: false,
+      status: 400,
+      message: "year is out of range.",
+    };
+  }
+  return { ok: true, value: n };
+}
+
+export async function previewNextAdminStudentId(
+  divisionRaw: unknown,
+  yearRaw: unknown,
+): Promise<
+  | { ok: true; studentId: string }
+  | { ok: false; status: 400; message: string }
+> {
+  const div = parseDivisionParam(divisionRaw);
+  if (!div.ok) return div;
+  const yr = parseEntryYearParam(yearRaw);
+  if (!yr.ok) return yr;
+  try {
+    const studentId = await getNextLegacyStudentId(
+      pool,
+      div.value,
+      yr.value,
+    );
+    return { ok: true, studentId };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Could not compute next id.";
+    return { ok: false, status: 400, message: msg };
+  }
+}
+
+export type AdminStudentCreateResult =
+  | { ok: true; studentId: string }
+  | { ok: false; status: 400 | 409; message: string };
+
+export async function createAdminStudent(
+  body: AdminStudentCreateBody,
+): Promise<AdminStudentCreateResult> {
+  const div = parseDivisionParam(body.division);
+  if (!div.ok) {
+    return { ok: false, status: 400, message: div.message };
+  }
+
+  const yr = parseEntryYearParam(body.entryYear);
+  if (!yr.ok) {
+    return { ok: false, status: 400, message: yr.message };
+  }
+
+  const name = str(body.name);
+  if (name === "") {
+    return {
+      ok: false,
+      status: 400,
+      message: `${DATE_VALIDATION_PREFIX} name is required.`,
+    };
+  }
+
+  const initialPassword = str(body.initialPassword);
+  if (initialPassword === "") {
+    return {
+      ok: false,
+      status: 400,
+      message: `${DATE_VALIDATION_PREFIX} initialPassword is required.`,
+    };
+  }
+
+  const signed = sqlDateFromBodyField("signedDate", body.signedDate);
+  if (signed.kind === "error") {
+    return { ok: false, status: 400, message: signed.message };
+  }
+  const enroll = sqlDateFromBodyField("enrollStartDate", body.enrollStartDate);
+  if (enroll.kind === "error") {
+    return { ok: false, status: 400, message: enroll.message };
+  }
+
+  const req = parseRequirementsIdForDb(body.requirementsId);
+  if (req.kind === "error") {
+    return { ok: false, status: 400, message: req.message };
+  }
+
+  const zip = parseZipForDb(body.zip);
+  if (zip.kind === "error") {
+    return { ok: false, status: 400, message: zip.message };
+  }
+
+  const insertPayload = {
+    name,
+    email: str(body.email),
+    gender: str(body.gender),
+    background: str(body.backgroundSchool),
+    tertiary: str(body.highestDegree),
+    requirements_id: req.value,
+    address: str(body.address),
+    address2: str(body.address2),
+    city: str(body.city),
+    state: str(body.state),
+    zip: zip.value,
+    signed_date_sql: signed.value,
+    enroll_start_sql: enroll.value,
+  };
+
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const studentId = await getNextLegacyStudentId(
+      connection,
+      div.value,
+      yr.value,
+    );
+
+    if (await legacyStudentMasterExists(connection, studentId)) {
+      await connection.rollback();
+      return {
+        ok: false,
+        status: 409,
+        message:
+          "Generated student id already exists. Refresh and try again.",
+      };
+    }
+    if (await legacyStudentPasswordRowExists(connection, studentId)) {
+      await connection.rollback();
+      return {
+        ok: false,
+        status: 409,
+        message:
+          "A password record already exists for the generated id. Refresh and try again.",
+      };
+    }
+
+    await createLegacyStudentMasterRow(connection, {
+      studentId,
+      ...insertPayload,
+    });
+    await createLegacyStudentPasswordRow(
+      connection,
+      studentId,
+      initialPassword,
+    );
+
+    await connection.commit();
+    return { ok: true, studentId };
+  } catch (e) {
+    await connection.rollback();
+    const err = e as NodeJS.ErrnoException & { code?: string };
+    if (err.code === "ER_DUP_ENTRY") {
+      return {
+        ok: false,
+        status: 409,
+        message:
+          "Student id or password row conflicts with existing data.",
+      };
+    }
+    throw e;
+  } finally {
+    connection.release();
+  }
 }

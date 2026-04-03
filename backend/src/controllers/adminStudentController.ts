@@ -1,10 +1,15 @@
 import type { Request, Response } from "express";
 import {
+  createAdminStudent,
   getAdminStudentDetail,
   listAdminStudents,
+  previewNextAdminStudentId,
   updateAdminStudent,
 } from "../services/adminStudentService.js";
-import type { AdminStudentUpdateBody } from "../types/adminStudent.js";
+import type {
+  AdminStudentCreateBody,
+  AdminStudentUpdateBody,
+} from "../types/adminStudent.js";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return v != null && typeof v === "object" && !Array.isArray(v);
@@ -36,6 +41,64 @@ function parseUpdateBody(raw: unknown): AdminStudentUpdateBody | null {
     zip: parseNullableStringField(raw.zip),
     signedDate: parseNullableStringField(raw.signedDate),
     enrollStartDate: parseNullableStringField(raw.enrollStartDate),
+  };
+}
+
+function parseEntryYearFromBody(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return raw;
+  }
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function parseRequirementsIdFromBody(raw: unknown): number | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.trunc(raw);
+  }
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    if (t === "") return null;
+    const n = Number.parseInt(t, 10);
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return undefined;
+}
+
+function parseCreateBody(raw: unknown): AdminStudentCreateBody | null {
+  if (!isRecord(raw)) return null;
+  if (raw.division !== "Chinese" && raw.division !== "English") return null;
+  if (typeof raw.name !== "string") return null;
+  if (typeof raw.initialPassword !== "string") return null;
+  const entryYear = parseEntryYearFromBody(raw.entryYear);
+  if (entryYear == null) return null;
+  const requirementsId = parseRequirementsIdFromBody(raw.requirementsId);
+  if (requirementsId === undefined && raw.requirementsId != null) {
+    return null;
+  }
+  return {
+    division: raw.division,
+    entryYear,
+    name: raw.name,
+    email: parseNullableStringField(raw.email),
+    gender: parseNullableStringField(raw.gender),
+    requirementsId:
+      requirementsId === undefined ? null : requirementsId,
+    highestDegree: parseNullableStringField(raw.highestDegree),
+    backgroundSchool: parseNullableStringField(raw.backgroundSchool),
+    signedDate: parseNullableStringField(raw.signedDate),
+    enrollStartDate: parseNullableStringField(raw.enrollStartDate),
+    address: parseNullableStringField(raw.address),
+    address2: parseNullableStringField(raw.address2),
+    city: parseNullableStringField(raw.city),
+    state: parseNullableStringField(raw.state),
+    zip: parseNullableStringField(raw.zip),
+    initialPassword: raw.initialPassword,
   };
 }
 
@@ -84,6 +147,47 @@ export async function getAdminStudent(
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to load student" });
+  }
+}
+
+export async function getNextAdminStudentId(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const division = req.query.division;
+  const year = req.query.year;
+  try {
+    const result = await previewNextAdminStudentId(division, year);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.message });
+      return;
+    }
+    res.json({ studentId: result.studentId });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to compute next student id" });
+  }
+}
+
+export async function postAdminStudent(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const body = parseCreateBody(req.body);
+  if (!body) {
+    res.status(400).json({ error: "Invalid request body." });
+    return;
+  }
+  try {
+    const result = await createAdminStudent(body);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.message });
+      return;
+    }
+    res.status(201).json({ ok: true, studentId: result.studentId });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "Failed to create student" });
   }
 }
 

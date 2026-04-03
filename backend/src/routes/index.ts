@@ -2,6 +2,8 @@ import { Router } from "express";
 import {
   getAdminStudent,
   getAdminStudents,
+  getNextAdminStudentId,
+  postAdminStudent,
   putAdminStudent,
 } from "../controllers/adminStudentController.js";
 import {
@@ -56,6 +58,8 @@ apiRouter.delete(
 /** Admin section CRUD: protect with auth / role checks before exposing publicly. */
 const adminRouter = Router();
 adminRouter.get("/students", getAdminStudents);
+adminRouter.get("/students/next-id", getNextAdminStudentId);
+adminRouter.post("/students", postAdminStudent);
 adminRouter.get("/students/:studentId", getAdminStudent);
 adminRouter.put("/students/:studentId", putAdminStudent);
 adminRouter.post("/course-sections", postAdminCourseSection);
