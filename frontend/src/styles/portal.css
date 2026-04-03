@@ -1855,11 +1855,73 @@ button.portal-tab {
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
-  max-width: min(75rem, 100%);
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+  margin: 0;
   padding: 0;
   background: transparent;
   box-sizing: border-box;
+}
+
+/* Quiz tab only: full-width LMS-style rows (scoped — Agreements reuses card classes outside this wrapper) */
+.portal-documents-quiz-page .portal-doc-quiz-entry-list > li {
+  width: 100%;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card {
+  width: 100%;
+  box-sizing: border-box;
+  background: #f7f8fa;
+  border: 1px solid #e2e5ea;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card:hover {
+  background: #f0f2f5;
+  border-color: #d5d9e0;
+  box-shadow: none;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-list {
+  gap: 0.875rem;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card__row {
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  padding: 1rem 1.25rem;
+  min-height: 0;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-right: 0.75rem;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card__title {
+  margin: 0 0 0.25rem;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card__desc {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-entry-card__aside {
+  flex-direction: row;
+  align-items: center;
+  align-self: center;
+  gap: 0.625rem;
+}
+
+.portal-documents-quiz-page .portal-doc-quiz-row__action {
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  padding: 0 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
 }
 
 .portal-documents-quiz-page-title {
@@ -2023,6 +2085,31 @@ button.portal-tab {
 
   .portal-doc-quiz-expand-form__inner {
     padding: 1.35rem 1.1rem 1.65rem;
+  }
+
+  .portal-documents-quiz-page .portal-doc-quiz-entry-card__row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 1rem 1.125rem;
+  }
+
+  .portal-documents-quiz-page .portal-doc-quiz-entry-card__text {
+    padding-right: 0;
+  }
+
+  .portal-documents-quiz-page .portal-doc-quiz-entry-card__aside {
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+  }
+
+  .portal-documents-quiz-page .portal-doc-quiz-row__action {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .portal-documents-quiz-page .portal-doc-quiz-entry-card__completed {
+    align-self: flex-end;
   }
 }
 

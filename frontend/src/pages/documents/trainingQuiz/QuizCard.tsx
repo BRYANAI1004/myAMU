@@ -44,12 +44,7 @@ export function QuizCard({
           ) : null}
           <button
             type="button"
-            className={[
-              'portal-tab',
-              expanded ? 'portal-tab--active' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
+            className="portal-btn portal-btn--secondary portal-doc-quiz-row__action"
             aria-expanded={expanded}
             aria-controls={`doc-quiz-expand-${quiz.id}`}
             id={`doc-quiz-trigger-${quiz.id}`}
