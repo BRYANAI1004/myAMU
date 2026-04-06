@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
@@ -9,11 +9,15 @@ function binRowKey(item: CourseBinItem): string {
 export function MyCourseBinPage() {
   const registrationTermId = useRegistrationTermSearchParam()
   const navigate = useNavigate()
+  const location = useLocation()
   const { items, removeFromCourseBin } = useCourseBin()
   const hasItems = items.length > 0
 
   const handleCheckout = () => {
-    navigate('/finances/overview')
+    navigate({
+      pathname: '/registration/checkout',
+      search: location.search,
+    })
   }
 
   return (

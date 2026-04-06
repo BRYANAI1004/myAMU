@@ -40,6 +40,10 @@ import {
 } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
 import {
+  getStudentEnrolledSections,
+  postStudentEnroll,
+} from "../controllers/studentEnrollmentController.js";
+import {
   getAcademicTerms,
   getAcademicTermsCurrent,
   getAcademicTermsRecent,
@@ -54,6 +58,9 @@ apiRouter.get("/health", getHealth);
 apiRouter.get("/health/db", getHealthDb);
 
 apiRouter.post("/auth/login", postStudentLogin);
+
+apiRouter.post("/student/enroll", postStudentEnroll);
+apiRouter.get("/student/enrolled-sections", getStudentEnrolledSections);
 
 apiRouter.post("/ai/ask", postAiAsk);
 

@@ -14,10 +14,17 @@ import {
 } from '../../lib/timetableBlockLayout'
 import {
   formatWeekdaysLongFromStored,
-  formatWeekdaysShortFromStored,
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
-import { useCourseBin, type CourseBinItem } from './CourseBinContext'
+import {
+  courseBinSectionKey,
+  useCourseBin,
+  type CourseBinItem,
+} from './CourseBinContext'
+import {
+  adminSectionToCourseBinItem,
+  type CatalogCourseLite,
+} from './sectionToCourseBinItem'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 const OFFERED_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
@@ -30,75 +37,9 @@ const DAY_HEADERS: { full: WeekdayFull; label: string }[] = [
   { full: 'Friday', label: 'Friday' },
 ]
 
-const PLACEHOLDER_REGISTERED = '0 of 0'
-
-type CatalogCourse = {
-  code: string | number | null | undefined
-  eng_name: string | number | null | undefined
-  chi_name: string | number | null | undefined
-  units: string | number | null | undefined
-}
-
-function cellText(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return ''
-  return String(value).trim()
-}
-
-function sessionLabelFromSection(sec: AdminCourseSection): string {
-  const term = cellText(sec.term)
-  const year = sec.year
-  if (term === '' && (year === null || year === undefined || Number.isNaN(Number(year)))) {
-    return '—'
-  }
-  if (term === '') return String(year)
-  return `${term} ${year}`
-}
-
-/** Match Course Search CourseBin `type` (raw delivery_mode, not display label). */
-function typeLabelForCourseBin(sec: AdminCourseSection): string {
-  const d = cellText(sec.delivery_mode)
-  return d === '' ? 'Lecture' : d
-}
-
-function adminSectionToCourseBinItem(
-  sec: AdminCourseSection,
-  catalog: CatalogCourse | undefined,
-): CourseBinItem {
-  const code = cellText(sec.course_code)
-  const timeRaw = formatTimeRangeHmsForDisplay(sec.start_time, sec.end_time)
-  const daysRaw = formatWeekdaysShortFromStored(sec.weekday)
-  const instRaw = cellText(sec.instructor)
-  const locRaw = cellText(sec.room)
-  const secCode = cellText(sec.section_code)
-  const eng = catalog ? cellText(catalog.eng_name) : ''
-  const chi = catalog ? cellText(catalog.chi_name) : ''
-  const unitsCat = catalog ? cellText(catalog.units) : ''
-  return {
-    course_code: code,
-    eng_name: eng === '' ? code : eng,
-    chi_name: chi,
-    units: unitsCat === '' ? '—' : unitsCat,
-    section: secCode === '' ? '—' : secCode,
-    session: sessionLabelFromSection(sec),
-    type: typeLabelForCourseBin(sec),
-    registered: PLACEHOLDER_REGISTERED,
-    time: timeRaw === '—' ? 'TBA' : timeRaw,
-    days: daysRaw === '—' ? 'TBA' : daysRaw,
-    instructor: instRaw === '' ? 'TBA' : instRaw,
-    location: locRaw === '' ? 'TBA' : locRaw,
-    schedule_weekday: sec.weekday?.trim() ? sec.weekday.trim() : null,
-    schedule_start_time: sec.start_time,
-    schedule_end_time: sec.end_time,
-  }
-}
-
-function binKey(courseCode: string, section: string): string {
-  return `${courseCode.trim().toLowerCase()}|${section.trim().toLowerCase()}`
-}
-
 function isSectionInBin(items: CourseBinItem[], sec: AdminCourseSection): boolean {
-  const k = binKey(sec.course_code, sec.section_code)
-  return items.some((x) => binKey(x.course_code, x.section) === k)
+  const k = courseBinSectionKey(sec.course_code, sec.section_code)
+  return items.some((x) => courseBinSectionKey(x.course_code, x.section) === k)
 }
 
 export function OfferedTimetablePage() {
@@ -106,7 +47,7 @@ export function OfferedTimetablePage() {
   const { items: binItems, addToCourseBin, removeFromCourseBin } = useCourseBin()
   const [detailSection, setDetailSection] = useState<AdminCourseSection | null>(null)
   const [sections, setSections] = useState<AdminCourseSection[] | null>(null)
-  const [catalog, setCatalog] = useState<CatalogCourse[]>([])
+  const [catalog, setCatalog] = useState<CatalogCourseLite[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -136,7 +77,7 @@ export function OfferedTimetablePage() {
           throw new Error('Unexpected course catalog response.')
         }
         if (!ac.signal.aborted) {
-          setCatalog(data as CatalogCourse[])
+          setCatalog(data as CatalogCourseLite[])
         }
       } catch (e) {
         if (ac.signal.aborted) return
@@ -148,7 +89,7 @@ export function OfferedTimetablePage() {
   }, [])
 
   const catalogByCode = useMemo(() => {
-    const m = new Map<string, CatalogCourse>()
+    const m = new Map<string, CatalogCourseLite>()
     for (const c of catalog) {
       const code = cellText(c.code)
       if (code !== '') m.set(code.toUpperCase(), c)

@@ -3,7 +3,7 @@ import {
   createCourseSection as insertCourseSection,
   deleteCourseSectionById,
   listCourseSectionsByCourseCode,
-  listCourseSectionsByTermYear,
+  listCourseSectionsWithEnrollmentAggregates,
   updateCourseSection as patchCourseSection,
   type CourseSectionCreateInput,
   type CourseSectionDetail,
@@ -44,9 +44,8 @@ export async function listCourseSectionsByAcademicTermId(
 ): Promise<CourseSectionDetail[] | null> {
   const row = await getAcademicTermById(academicTermId.trim());
   if (!row) return null;
-  return listCourseSectionsByCourseCode(courseCode.trim(), {
-    term: row.term_name,
-    year: row.year,
+  return listCourseSectionsWithEnrollmentAggregates(row.term_name, row.year, {
+    courseCode: courseCode.trim(),
   });
 }
 
@@ -56,7 +55,7 @@ export async function listAllCourseSectionsByAcademicTermId(
 ): Promise<CourseSectionDetail[] | null> {
   const row = await getAcademicTermById(academicTermId.trim());
   if (!row) return null;
-  return listCourseSectionsByTermYear(row.term_name, row.year);
+  return listCourseSectionsWithEnrollmentAggregates(row.term_name, row.year);
 }
 
 export type CourseSectionCreateWithTermIdInput = Omit<

@@ -39,6 +39,7 @@ function courseBinItemToSyntheticSection(
     room: item.location === 'TBA' ? null : item.location.trim() || null,
     instructor: item.instructor === 'TBA' ? null : item.instructor.trim() || null,
     notes: null,
+    enrolled_count: 0,
   }
 }
 

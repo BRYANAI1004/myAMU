@@ -574,6 +574,8 @@ export function AdminCourseSectionsPage() {
               <th scope="col">Delivery</th>
               <th scope="col">Room</th>
               <th scope="col">Instructor</th>
+              <th scope="col">Enrolled</th>
+              <th scope="col">Students</th>
               <th scope="col">Notes</th>
               <th scope="col">Actions</th>
             </tr>
@@ -581,12 +583,12 @@ export function AdminCourseSectionsPage() {
           <tbody>
             {sectionsLoading && (
               <tr>
-                <td colSpan={9}>Loading sections…</td>
+                <td colSpan={11}>Loading sections…</td>
               </tr>
             )}
             {!sectionsLoading && sections != null && sections.length === 0 && (
               <tr>
-                <td colSpan={9}>No sections for this term and course.</td>
+                <td colSpan={11}>No sections for this term and course.</td>
               </tr>
             )}
             {!sectionsLoading &&
@@ -599,6 +601,17 @@ export function AdminCourseSectionsPage() {
                   <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
                   <td>{displayCell(row.room)}</td>
                   <td>{displayCell(row.instructor)}</td>
+                  <td>{row.enrolled_count}</td>
+                  <td>
+                    {row.enrolled_students != null && row.enrolled_students.length > 0
+                      ? row.enrolled_students
+                          .map((s) => {
+                            const name = s.full_name?.trim()
+                            return name ? `${name} (${s.student_external_id})` : s.student_external_id
+                          })
+                          .join('; ')
+                      : '—'}
+                  </td>
                   <td>{displayCell(row.notes)}</td>
                   <td>
                     <div className="admin-inline-actions">

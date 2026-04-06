@@ -33,11 +33,12 @@ type CourseBinContextValue = {
   items: CourseBinItem[]
   addToCourseBin: (item: CourseBinItem) => void
   removeFromCourseBin: (courseCode: string, section: string) => void
+  clearCourseBin: () => void
 }
 
 const CourseBinContext = createContext<CourseBinContextValue | null>(null)
 
-function courseSectionKey(courseCode: string, section: string): string {
+export function courseBinSectionKey(courseCode: string, section: string): string {
   return `${courseCode.trim().toLowerCase()}|${section.trim().toLowerCase()}`
 }
 
@@ -113,8 +114,8 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
     if (code === '') return
 
     setItems((prev) => {
-      const key = courseSectionKey(item.course_code, item.section)
-      if (prev.some((x) => courseSectionKey(x.course_code, x.section) === key)) {
+      const key = courseBinSectionKey(item.course_code, item.section)
+      if (prev.some((x) => courseBinSectionKey(x.course_code, x.section) === key)) {
         return prev
       }
       return [...prev, item]
@@ -122,8 +123,12 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
   }, [])
 
   const removeFromCourseBin = useCallback((courseCode: string, section: string) => {
-    const key = courseSectionKey(courseCode, section)
-    setItems((prev) => prev.filter((x) => courseSectionKey(x.course_code, x.section) !== key))
+    const key = courseBinSectionKey(courseCode, section)
+    setItems((prev) => prev.filter((x) => courseBinSectionKey(x.course_code, x.section) !== key))
+  }, [])
+
+  const clearCourseBin = useCallback(() => {
+    setItems([])
   }, [])
 
   const value = useMemo(
@@ -131,8 +136,9 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
       items,
       addToCourseBin,
       removeFromCourseBin,
+      clearCourseBin,
     }),
-    [items, addToCourseBin, removeFromCourseBin],
+    [items, addToCourseBin, removeFromCourseBin, clearCourseBin],
   )
 
   return <CourseBinContext.Provider value={value}>{children}</CourseBinContext.Provider>

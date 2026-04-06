@@ -1272,6 +1272,12 @@ export type AdminCourseSection = {
   room: string | null
   instructor: string | null
   notes: string | null
+  /** Distinct students in `portal_enrollments` for this course + term/year. */
+  enrolled_count: number
+  enrolled_students?: Array<{
+    student_external_id: string
+    full_name: string | null
+  }>
 }
 
 function parseNullableStringField(v: unknown): string | null {
@@ -1307,6 +1313,32 @@ function parseAdminCourseSectionRow(
   const year =
     typeof yearRaw === 'number' ? yearRaw : Number(yearRaw)
   if (!Number.isFinite(year)) return null
+  const ecRaw = row.enrolled_count ?? row.enrolledCount
+  let enrolled_count = 0
+  if (typeof ecRaw === 'number' && Number.isFinite(ecRaw)) {
+    enrolled_count = Math.trunc(ecRaw)
+  } else if (typeof ecRaw === 'string' && ecRaw.trim() !== '') {
+    const n = Number(ecRaw)
+    if (Number.isFinite(n)) enrolled_count = Math.trunc(n)
+  }
+  const esRaw = row.enrolled_students ?? row.enrolledStudents
+  let enrolled_students: AdminCourseSection['enrolled_students']
+  if (Array.isArray(esRaw)) {
+    const list: NonNullable<AdminCourseSection['enrolled_students']> = []
+    for (const el of esRaw) {
+      if (el == null || typeof el !== 'object') continue
+      const r = el as Record<string, unknown>
+      const sid = r.student_external_id ?? r.studentExternalId
+      if (typeof sid !== 'string' || sid.trim() === '') continue
+      const fn = r.full_name ?? r.fullName
+      list.push({
+        student_external_id: sid.trim(),
+        full_name:
+          fn == null || String(fn).trim() === '' ? null : String(fn).trim(),
+      })
+    }
+    if (list.length > 0) enrolled_students = list
+  }
   return {
     id,
     course_code: course_code.trim(),
@@ -1320,6 +1352,8 @@ function parseAdminCourseSectionRow(
     room: parseNullableStringField(row.room),
     instructor: parseNullableStringField(row.instructor),
     notes: parseNullableStringField(row.notes),
+    enrolled_count,
+    ...(enrolled_students != null ? { enrolled_students } : {}),
   }
 }
 
@@ -1339,6 +1373,55 @@ function parseAdminCourseSectionList(data: unknown): AdminCourseSection[] {
     out.push(row)
   }
   return out
+}
+
+export type PostStudentEnrollBody = {
+  studentId: string
+  academic_term_id: string
+  sections: Array<{ course_code: string; section_code: string }>
+}
+
+export type PostStudentEnrollResponse = {
+  success: true
+  insertedCount: number
+}
+
+/** POST /api/student/enroll — inserts `portal_enrollments` for the term (course-level; deduped). */
+export async function postStudentEnroll(
+  body: PostStudentEnrollBody,
+  options?: { signal?: AbortSignal },
+): Promise<PostStudentEnrollResponse> {
+  const data = (await fetchApiJson('/api/student/enroll', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { success?: unknown }).success === true &&
+    typeof (data as { insertedCount?: unknown }).insertedCount === 'number'
+  ) {
+    return data as PostStudentEnrollResponse
+  }
+  throw new Error('Unexpected enroll response')
+}
+
+/** GET /api/student/enrolled-sections — section rows derived from portal enrollments for the term. */
+export async function fetchStudentEnrolledSections(
+  studentId: string,
+  academicTermId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AdminCourseSection[]> {
+  const qs = new URLSearchParams()
+  qs.set('studentId', studentId.trim())
+  qs.set('academic_term_id', academicTermId.trim())
+  const data = (await fetchApiJson(
+    `/api/student/enrolled-sections?${qs.toString()}`,
+    { signal: options?.signal },
+  )) as unknown
+  return parseAdminCourseSectionList(data)
 }
 
 export async function fetchAdminCourseSections(params: {

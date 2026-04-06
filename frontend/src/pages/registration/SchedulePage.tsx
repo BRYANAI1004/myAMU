@@ -1,4 +1,6 @@
-import { useMemo, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useAccount } from '../../context/AccountContext'
+import { fetchStudentEnrolledSections } from '../../lib/api'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeHmsForDisplay } from '../../lib/formatScheduleTime'
 import {
@@ -8,9 +10,10 @@ import {
   timetableBodyHeightPx,
 } from '../../lib/timetableBlockLayout'
 import type { WeekdayFull } from '../../lib/weekdaySchedule'
-import { useCourseBin } from './CourseBinContext'
+import { courseBinSectionKey, useCourseBin, type CourseBinItem } from './CourseBinContext'
 import { partitionCourseBinItemsForTimetable } from './courseBinSchedule'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
+import { adminSectionToCourseBinItem } from './sectionToCourseBinItem'
 
 const MY_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 
@@ -24,11 +27,54 @@ const DAY_HEADERS: { full: WeekdayFull; label: string }[] = [
 
 export function SchedulePage() {
   const registrationTermId = useRegistrationTermSearchParam()
+  const { currentStudentId, isAuthenticated } = useAccount()
   const { items } = useCourseBin()
+  const [enrolledItems, setEnrolledItems] = useState<CourseBinItem[]>([])
+  const [enrolledError, setEnrolledError] = useState<string | null>(null)
+
+  const termKey = registrationTermId?.trim() ?? ''
+  const studentKey = currentStudentId?.trim() ?? ''
+
+  useEffect(() => {
+    if (termKey === '' || !isAuthenticated || studentKey === '') {
+      setEnrolledItems([])
+      setEnrolledError(null)
+      return
+    }
+    const ac = new AbortController()
+    ;(async () => {
+      try {
+        const rows = await fetchStudentEnrolledSections(studentKey, termKey, {
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) return
+        setEnrolledItems(rows.map((r) => adminSectionToCourseBinItem(r, undefined)))
+        setEnrolledError(null)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setEnrolledItems([])
+        setEnrolledError(
+          e instanceof Error ? e.message : 'Could not load enrolled sections.',
+        )
+      }
+    })()
+    return () => ac.abort()
+  }, [termKey, studentKey, isAuthenticated])
+
+  const displayItems = useMemo(() => {
+    const map = new Map<string, CourseBinItem>()
+    for (const it of enrolledItems) {
+      map.set(courseBinSectionKey(it.course_code, it.section), it)
+    }
+    for (const it of items) {
+      map.set(courseBinSectionKey(it.course_code, it.section), it)
+    }
+    return [...map.values()]
+  }, [enrolledItems, items])
 
   const { sections, unplaced } = useMemo(
-    () => partitionCourseBinItemsForTimetable(items),
-    [items],
+    () => partitionCourseBinItemsForTimetable(displayItems),
+    [displayItems],
   )
 
   const hourRows = useMemo(() => {
@@ -61,8 +107,9 @@ export function SchedulePage() {
           My Timetable
         </h2>
         <p className="portal-text-muted" style={{ marginTop: 0 }}>
-          Sections in your CourseBin for this term (Monday–Friday, 8:00 a.m.–9:00 p.m.). Add or remove
-          sections from the Offered Timetable or My CourseBin.
+          Your registered courses for this term and anything still in your CourseBin (Monday–Friday,
+          8:00 a.m.–9:00 p.m.). CourseBin entries override the server view when both refer to the same
+          section.
         </p>
 
         {termMissing && (
@@ -71,13 +118,20 @@ export function SchedulePage() {
           </p>
         )}
 
-        {!termMissing && items.length === 0 && (
+        {enrolledError != null && !termMissing && (
           <p className="portal-text-muted" role="status">
-            Your CourseBin is empty. Add sections from the Offered Timetable to see them here.
+            {enrolledError}
           </p>
         )}
 
-        {!termMissing && items.length > 0 && sections.length === 0 && (
+        {!termMissing && displayItems.length === 0 && (
+          <p className="portal-text-muted" role="status">
+            No registered sections for this term and your CourseBin is empty. Add sections from the
+            Offered Timetable or complete registration from Checkout.
+          </p>
+        )}
+
+        {!termMissing && displayItems.length > 0 && sections.length === 0 && (
           <p className="portal-text-muted" role="status">
             None of your CourseBin sections have a placeable weekly schedule (e.g. time or days are
             TBA). Check My CourseBin for details.
@@ -170,7 +224,7 @@ export function SchedulePage() {
           <div className="portal-my-timetable-unplaced portal-stack">
             <h3 className="portal-my-timetable-unplaced__title">Not shown on grid</h3>
             <p className="portal-text-muted" style={{ marginTop: 0 }}>
-              These CourseBin entries do not have enough schedule detail to place on the timetable.
+              These entries do not have enough schedule detail to place on the timetable.
             </p>
             <ul className="portal-my-timetable-unplaced__list">
               {unplaced.map((u) => (
