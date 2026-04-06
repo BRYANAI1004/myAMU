@@ -7,6 +7,7 @@ import {
   readRegistrationTermIdFromSearch,
   type AcademicTerm,
 } from '../../lib/api'
+import { AIAssistantLauncher } from '../../components/ai/AIAssistantLauncher'
 import { CourseBinProvider } from './CourseBinContext'
 import { RegistrationNav } from './RegistrationNav'
 
@@ -184,6 +185,7 @@ export function RegistrationLayout() {
         <div className="portal-registration-outlet">
           <Outlet />
         </div>
+        <AIAssistantLauncher pageContext="registration" />
       </div>
     </CourseBinProvider>
   )
