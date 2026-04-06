@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 const links = [
   { to: '/admin/students', label: 'Students' },
   { to: '/admin/courses', label: 'Courses' },
+  { to: '/admin/course-sections', label: 'Course Sections' },
   { to: '/admin/finance', label: 'Finance' },
 ] as const
 

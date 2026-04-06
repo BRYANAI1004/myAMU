@@ -1121,3 +1121,234 @@ export async function updateAcademicTerm(
   }
   return term
 }
+
+/** GET /api/courses — catalog rows for admin scheduling pickers. */
+export type CourseCatalogItem = {
+  code: string
+  eng_name: string | null
+  chi_name: string | null
+  units: number | string | null
+}
+
+function parseCourseCatalogList(data: unknown): CourseCatalogItem[] {
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected courses response')
+  }
+  const out: CourseCatalogItem[] = []
+  for (const row of data) {
+    if (row == null || typeof row !== 'object') continue
+    const o = row as Record<string, unknown>
+    if (typeof o.code !== 'string' || o.code.trim() === '') continue
+    const eng = o.eng_name
+    const chi = o.chi_name
+    out.push({
+      code: o.code.trim(),
+      eng_name: typeof eng === 'string' ? eng : null,
+      chi_name: typeof chi === 'string' ? chi : null,
+      units: o.units as number | string | null,
+    })
+  }
+  return out
+}
+
+export async function fetchCourses(options?: {
+  signal?: AbortSignal
+}): Promise<CourseCatalogItem[]> {
+  const data = (await fetchApiJson('/api/courses', {
+    signal: options?.signal,
+  })) as unknown
+  return parseCourseCatalogList(data)
+}
+
+/** One row from `course_sections` (admin + student section APIs). */
+export type AdminCourseSection = {
+  id: number
+  course_code: string
+  term: string
+  year: number
+  section_code: string
+  weekday: string
+  start_time: string | null
+  end_time: string | null
+  delivery_mode: string | null
+  room: string | null
+  instructor: string | null
+  notes: string | null
+}
+
+function parseNullableStringField(v: unknown): string | null {
+  if (v == null) return null
+  if (typeof v === 'string') return v
+  return String(v)
+}
+
+function parseAdminCourseSectionRow(
+  row: Record<string, unknown>,
+): AdminCourseSection | null {
+  const idRaw = row.id
+  const id =
+    typeof idRaw === 'number'
+      ? idRaw
+      : typeof idRaw === 'string'
+        ? Number(idRaw)
+        : NaN
+  if (!Number.isInteger(id) || id <= 0) return null
+  const course_code = row.course_code
+  const term = row.term
+  const yearRaw = row.year
+  const section_code = row.section_code
+  const weekday = row.weekday
+  if (
+    typeof course_code !== 'string' ||
+    typeof term !== 'string' ||
+    typeof section_code !== 'string' ||
+    typeof weekday !== 'string'
+  ) {
+    return null
+  }
+  const year =
+    typeof yearRaw === 'number' ? yearRaw : Number(yearRaw)
+  if (!Number.isFinite(year)) return null
+  return {
+    id,
+    course_code: course_code.trim(),
+    term: term.trim(),
+    year: Math.trunc(year),
+    section_code: section_code.trim(),
+    weekday: weekday.trim(),
+    start_time: parseNullableStringField(row.start_time),
+    end_time: parseNullableStringField(row.end_time),
+    delivery_mode: parseNullableStringField(row.delivery_mode),
+    room: parseNullableStringField(row.room),
+    instructor: parseNullableStringField(row.instructor),
+    notes: parseNullableStringField(row.notes),
+  }
+}
+
+function parseAdminCourseSectionList(data: unknown): AdminCourseSection[] {
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected course sections response')
+  }
+  const out: AdminCourseSection[] = []
+  for (const el of data) {
+    if (el == null || typeof el !== 'object') {
+      throw new Error('Unexpected course sections response')
+    }
+    const row = parseAdminCourseSectionRow(el as Record<string, unknown>)
+    if (!row) {
+      throw new Error('Unexpected course sections response')
+    }
+    out.push(row)
+  }
+  return out
+}
+
+export async function fetchAdminCourseSections(params: {
+  academicTermId: string
+  courseCode: string
+  signal?: AbortSignal
+}): Promise<AdminCourseSection[]> {
+  const qs = new URLSearchParams()
+  qs.set('academic_term_id', params.academicTermId.trim())
+  qs.set('course_code', params.courseCode.trim())
+  const data = (await fetchApiJson(
+    `/api/admin/course-sections?${qs.toString()}`,
+    { signal: params.signal },
+  )) as unknown
+  return parseAdminCourseSectionList(data)
+}
+
+export type AdminCourseSectionCreatePayload = {
+  academic_term_id: string
+  course_code: string
+  section_code: string
+  weekday: string
+  start_time?: string | null
+  end_time?: string | null
+  delivery_mode?: string | null
+  room?: string | null
+  instructor?: string | null
+  notes?: string | null
+}
+
+export type AdminCourseSectionUpdatePayload = {
+  academic_term_id: string
+} & Partial<
+  Omit<AdminCourseSectionCreatePayload, 'academic_term_id'>
+>
+
+function parseAdminCourseSectionPayload(data: unknown): AdminCourseSection {
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected course section response')
+  }
+  const row = parseAdminCourseSectionRow(data as Record<string, unknown>)
+  if (!row) {
+    throw new Error('Unexpected course section response')
+  }
+  return row
+}
+
+export async function createAdminCourseSection(
+  body: AdminCourseSectionCreatePayload,
+  options?: { signal?: AbortSignal },
+): Promise<AdminCourseSection> {
+  const data = (await fetchApiJson('/api/admin/course-sections', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  return parseAdminCourseSectionPayload(data)
+}
+
+export async function updateAdminCourseSection(
+  sectionId: number,
+  body: AdminCourseSectionUpdatePayload,
+  options?: { signal?: AbortSignal },
+): Promise<AdminCourseSection> {
+  const path = `/api/admin/course-sections/${encodeURIComponent(String(sectionId))}`
+  const data = (await fetchApiJson(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  return parseAdminCourseSectionPayload(data)
+}
+
+/**
+ * DELETE /api/admin/course-sections/:id — 204 No Content (not JSON).
+ */
+export async function deleteAdminCourseSection(
+  sectionId: number,
+  options?: { signal?: AbortSignal },
+): Promise<void> {
+  const path = `/api/admin/course-sections/${encodeURIComponent(String(sectionId))}`
+  const res = await apiFetch(path, {
+    method: 'DELETE',
+    signal: options?.signal,
+  })
+  if (res.ok && res.status === 204) return
+
+  const text = await res.text()
+  const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+  if (ct.includes('application/json') && text.trim() !== '') {
+    try {
+      const body = JSON.parse(text) as {
+        error?: string
+        message?: string
+      }
+      const msg =
+        (typeof body.message === 'string' && body.message) ||
+        (typeof body.error === 'string' && body.error) ||
+        `Request failed (HTTP ${res.status})`
+      throw new Error(msg)
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error(`Request failed (HTTP ${res.status})`)
+      }
+      throw e
+    }
+  }
+  throw new Error(`Request failed (HTTP ${res.status})`)
+}

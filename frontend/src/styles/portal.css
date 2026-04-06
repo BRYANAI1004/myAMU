@@ -5965,6 +5965,112 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   width: 280px;
 }
 
+.admin-input--wide {
+  min-width: min(100%, 320px);
+  width: 320px;
+}
+
+.admin-page__subtitle {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.admin-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-field--inline .admin-field__label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.admin-field__label {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.admin-form-section {
+  margin-top: 2rem;
+  padding: 1.25rem 1.25rem 1.5rem;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-form-hint {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  max-width: 48rem;
+}
+
+.admin-code {
+  font-size: 0.8125em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--page-gray);
+}
+
+.admin-form-message {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--amu-red);
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-field--span-2 {
+    grid-column: auto;
+  }
+}
+
+.admin-field--span-2 {
+  grid-column: span 2;
+}
+
+.admin-textarea {
+  height: auto;
+  min-height: 4rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  resize: vertical;
+}
+
+.admin-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.65rem;
+}
+
+.admin-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
 .admin-dashboard-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -9,6 +9,7 @@ import { AdminStudentDetailPage } from './pages/admin/AdminStudentDetailPage'
 import { AdminStudentCreatePage } from './pages/admin/AdminStudentCreatePage'
 import { AdminStudentEditPage } from './pages/admin/AdminStudentEditPage'
 import { AdminCoursesPage } from './pages/admin/AdminCoursesPage'
+import { AdminCourseSectionsPage } from './pages/admin/AdminCourseSectionsPage'
 import { AdminFinancePage } from './pages/admin/AdminFinancePage'
 import { LoginPage } from './pages/LoginPage'
 import { PaymentPlanPage } from './pages/PaymentPlanPage'
@@ -75,6 +76,7 @@ export default function App() {
           <Route path="students/:studentId" element={<AdminStudentDetailPage />} />
           <Route path="students" element={<AdminStudentsPage />} />
           <Route path="courses" element={<AdminCoursesPage />} />
+          <Route path="course-sections" element={<AdminCourseSectionsPage />} />
           <Route path="finance" element={<AdminFinancePage />} />
         </Route>
       </Route>
