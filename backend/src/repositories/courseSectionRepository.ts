@@ -138,6 +138,33 @@ export async function listCourseSectionsByTermYear(
   return rows.map((r) => normalizeRow(r));
 }
 
+/** Course-level section counts for one legacy term + year (admin open-registration rollup). */
+export type CourseSectionCountByCourse = {
+  course_code: string;
+  section_count: number;
+};
+
+export async function countCourseSectionsByCourseForTermYear(
+  term: string,
+  year: number,
+): Promise<CourseSectionCountByCourse[]> {
+  const sql = `
+    SELECT course_code, COUNT(*) AS section_count
+    FROM course_sections
+    WHERE term = ? AND year = ?
+    GROUP BY course_code
+    ORDER BY course_code ASC
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [
+    term.trim(),
+    year,
+  ]);
+  return rows.map((r) => ({
+    course_code: String(r.course_code ?? ""),
+    section_count: Number(r.section_count ?? 0),
+  }));
+}
+
 export async function createCourseSection(
   input: CourseSectionCreateInput,
 ): Promise<CourseSectionDetail> {

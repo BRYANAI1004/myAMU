@@ -13,6 +13,7 @@ import {
   patchAdminCourseSection,
   postAdminCourseSection,
 } from "../controllers/adminCourseSectionController.js";
+import { getAdminCoursesOpenForRegistration } from "../controllers/adminOpenRegistrationCoursesController.js";
 import {
   deleteCourseBinItemHandler,
   getCourseBin,
@@ -79,6 +80,10 @@ adminRouter.post("/students", postAdminStudent);
 adminRouter.post("/students/delete-selected", postDeleteSelectedAdminStudents);
 adminRouter.get("/students/:studentId", getAdminStudent);
 adminRouter.put("/students/:studentId", putAdminStudent);
+adminRouter.get(
+  "/courses/open-for-registration",
+  getAdminCoursesOpenForRegistration,
+);
 adminRouter.get("/course-sections", getAdminCourseSections);
 adminRouter.post("/course-sections", postAdminCourseSection);
 adminRouter.patch("/course-sections/:id", patchAdminCourseSection);

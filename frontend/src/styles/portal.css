@@ -6067,6 +6067,48 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   justify-content: flex-end;
 }
 
+/* Admin — /admin/courses tabbed catalog */
+.admin-courses-tablist {
+  margin-bottom: 1rem;
+}
+
+.admin-page__toolbar--courses-open {
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.admin-page__toolbar--courses-open .admin-input--search {
+  flex: 1;
+  min-width: 12rem;
+  max-width: 26rem;
+}
+
+.admin-page__toolbar-actions--open-term {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.admin-courses-term-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-courses-term-field__label {
+  font-size: 0.875rem;
+  color: var(--text-dark);
+  white-space: nowrap;
+}
+
+.admin-courses-feedback {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+}
+
+.admin-courses-feedback--error {
+  color: #a4000f;
+}
+
 .admin-input {
   height: 2.375rem;
   padding: 0 0.75rem;

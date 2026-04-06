@@ -1128,6 +1128,8 @@ export type CourseCatalogItem = {
   eng_name: string | null
   chi_name: string | null
   units: number | string | null
+  /** Present when the `courses` table exposes a category column. */
+  category?: string | null
 }
 
 function parseCourseCatalogList(data: unknown): CourseCatalogItem[] {
@@ -1141,14 +1143,110 @@ function parseCourseCatalogList(data: unknown): CourseCatalogItem[] {
     if (typeof o.code !== 'string' || o.code.trim() === '') continue
     const eng = o.eng_name
     const chi = o.chi_name
-    out.push({
+    const cat = o.category
+    const item: CourseCatalogItem = {
       code: o.code.trim(),
       eng_name: typeof eng === 'string' ? eng : null,
       chi_name: typeof chi === 'string' ? chi : null,
       units: o.units as number | string | null,
-    })
+    }
+    if (typeof cat === 'string' && cat.trim() !== '') {
+      item.category = cat.trim()
+    } else if (cat != null && String(cat).trim() !== '') {
+      item.category = String(cat).trim()
+    }
+    out.push(item)
   }
   return out
+}
+
+/** GET /api/admin/courses/open-for-registration?termId= — course-level rows for a term. */
+export type OpenRegistrationCourseRow = {
+  courseCode: string
+  courseTitle: string
+  credits: number
+  category: string
+  termId: string
+  termLabel: string
+  openSections: number
+  registrationStatus: 'Open' | 'Closed'
+}
+
+function parseOpenRegistrationCourseRow(
+  row: Record<string, unknown>,
+): OpenRegistrationCourseRow | null {
+  const courseCode = row.courseCode ?? row.course_code
+  const courseTitle = row.courseTitle ?? row.course_title
+  const termId = row.termId ?? row.term_id
+  const termLabel = row.termLabel ?? row.term_label
+  const openSections = row.openSections ?? row.open_sections
+  const registrationStatus = row.registrationStatus ?? row.registration_status
+  if (typeof courseCode !== 'string' || courseCode.trim() === '') return null
+  if (typeof courseTitle !== 'string') return null
+  if (typeof termId !== 'string' || termId.trim() === '') return null
+  if (typeof termLabel !== 'string') return null
+  const creditsRaw = row.credits
+  const credits =
+    typeof creditsRaw === 'number'
+      ? creditsRaw
+      : typeof creditsRaw === 'string'
+        ? Number(creditsRaw)
+        : NaN
+  if (!Number.isFinite(credits)) return null
+  const category =
+    typeof row.category === 'string' && row.category.trim() !== ''
+      ? row.category.trim()
+      : '—'
+  const os =
+    typeof openSections === 'number'
+      ? openSections
+      : typeof openSections === 'string'
+        ? Number(openSections)
+        : NaN
+  if (!Number.isInteger(os) || os < 0) return null
+  if (registrationStatus !== 'Open' && registrationStatus !== 'Closed') return null
+  return {
+    courseCode: courseCode.trim(),
+    courseTitle: courseTitle.trim(),
+    credits,
+    category,
+    termId: termId.trim(),
+    termLabel: termLabel.trim(),
+    openSections: os,
+    registrationStatus,
+  }
+}
+
+function parseOpenRegistrationCourseList(data: unknown): OpenRegistrationCourseRow[] {
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected open-registration courses response')
+  }
+  const out: OpenRegistrationCourseRow[] = []
+  for (const el of data) {
+    if (el == null || typeof el !== 'object') {
+      throw new Error('Unexpected open-registration courses response')
+    }
+    const row = parseOpenRegistrationCourseRow(el as Record<string, unknown>)
+    if (!row) {
+      throw new Error('Unexpected open-registration courses response')
+    }
+    out.push(row)
+  }
+  return out
+}
+
+export async function fetchAdminCoursesOpenForRegistration(params: {
+  termId: string
+  signal?: AbortSignal
+}): Promise<OpenRegistrationCourseRow[]> {
+  const id = params.termId.trim()
+  const qs = new URLSearchParams()
+  qs.set('termId', id)
+  const data = (await fetchApiJson(
+    `/api/admin/courses/open-for-registration?${qs.toString()}`,
+    { signal: params.signal },
+  )) as unknown
+  return parseOpenRegistrationCourseList(data)
 }
 
 export async function fetchCourses(options?: {

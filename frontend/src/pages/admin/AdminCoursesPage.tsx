@@ -1,66 +1,196 @@
-import { useMemo, useState } from 'react'
-import { MOCK_ADMIN_COURSES } from '../../data/adminMockData'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  fetchAcademicTerms,
+  fetchAdminCoursesOpenForRegistration,
+  fetchCourses,
+  fetchCurrentAcademicTerm,
+  type AcademicTerm,
+  type CourseCatalogItem,
+  type OpenRegistrationCourseRow,
+} from '../../lib/api'
+import { AllCoursesTable } from './courses/AllCoursesTable'
+import { CoursesTabBar, type AdminCoursesTabId } from './courses/CoursesTabBar'
+import { courseCatalogTitle } from './courses/courseCatalogDisplay'
+import { OpenRegistrationCoursesTable } from './courses/OpenRegistrationCoursesTable'
 
 export function AdminCoursesPage() {
-  const [q, setQ] = useState('')
+  const [tab, setTab] = useState<AdminCoursesTabId>('all')
 
-  const rows = useMemo(() => {
-    const s = q.trim().toLowerCase()
-    if (!s) return MOCK_ADMIN_COURSES
-    return MOCK_ADMIN_COURSES.filter(
-      (r) => r.code.toLowerCase().includes(s) || r.title.toLowerCase().includes(s),
+  const [catalog, setCatalog] = useState<CourseCatalogItem[] | null>(null)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState<string | null>(null)
+
+  const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
+  const [termsLoading, setTermsLoading] = useState(true)
+  const [termsError, setTermsError] = useState<string | null>(null)
+
+  const [allSearch, setAllSearch] = useState('')
+
+  const [openTermId, setOpenTermId] = useState('')
+  const openTermAutoDone = useRef(false)
+
+  const [openSearch, setOpenSearch] = useState('')
+  const [openRowsRaw, setOpenRowsRaw] = useState<OpenRegistrationCourseRow[] | null>(null)
+  const [openLoading, setOpenLoading] = useState(false)
+  const [openError, setOpenError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const ac = new AbortController()
+    setCatalogLoading(true)
+    setTermsLoading(true)
+    setCatalogError(null)
+    setTermsError(null)
+    ;(async () => {
+      try {
+        const [c, t] = await Promise.all([
+          fetchCourses({ signal: ac.signal }),
+          fetchAcademicTerms({ signal: ac.signal }),
+        ])
+        if (ac.signal.aborted) return
+        setCatalog(c)
+        setTerms(t)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        const msg = e instanceof Error ? e.message : 'Could not load data.'
+        setCatalog([])
+        setCatalogError(msg)
+        setTerms([])
+        setTermsError(msg)
+      } finally {
+        if (!ac.signal.aborted) {
+          setCatalogLoading(false)
+          setTermsLoading(false)
+        }
+      }
+    })()
+    return () => ac.abort()
+  }, [])
+
+  useEffect(() => {
+    if (!terms?.length || openTermAutoDone.current) return
+    const ac = new AbortController()
+    ;(async () => {
+      try {
+        const cur = await fetchCurrentAcademicTerm({ signal: ac.signal })
+        if (ac.signal.aborted) return
+        if (cur && terms.some((x) => x.id === cur.id)) {
+          setOpenTermId(cur.id)
+        } else {
+          setOpenTermId(terms[0].id)
+        }
+      } catch {
+        if (!ac.signal.aborted) setOpenTermId(terms[0].id)
+      } finally {
+        if (!ac.signal.aborted) openTermAutoDone.current = true
+      }
+    })()
+    return () => ac.abort()
+  }, [terms])
+
+  useEffect(() => {
+    if (tab !== 'open' || !openTermId) return
+    const ac = new AbortController()
+    setOpenLoading(true)
+    setOpenError(null)
+    ;(async () => {
+      try {
+        const rows = await fetchAdminCoursesOpenForRegistration({
+          termId: openTermId,
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) return
+        setOpenRowsRaw(rows)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setOpenRowsRaw(null)
+        setOpenError(
+          e instanceof Error ? e.message : 'Could not load open-registration courses.',
+        )
+      } finally {
+        if (!ac.signal.aborted) setOpenLoading(false)
+      }
+    })()
+    return () => ac.abort()
+  }, [tab, openTermId])
+
+  const filteredAll = useMemo(() => {
+    const list = catalog ?? []
+    const s = allSearch.trim().toLowerCase()
+    if (!s) return list
+    return list.filter((r) => {
+      const title = courseCatalogTitle(r).toLowerCase()
+      return r.code.toLowerCase().includes(s) || title.includes(s)
+    })
+  }, [catalog, allSearch])
+
+  const filteredOpen = useMemo(() => {
+    const list = openRowsRaw ?? []
+    const s = openSearch.trim().toLowerCase()
+    if (!s) return list
+    return list.filter(
+      (r) =>
+        r.courseCode.toLowerCase().includes(s) ||
+        r.courseTitle.toLowerCase().includes(s),
     )
-  }, [q])
+  }, [openRowsRaw, openSearch])
+
+  const openTabBlocking =
+    tab === 'open' &&
+    (termsLoading || (terms !== null && terms.length > 0 && openTermId === ''))
 
   return (
     <main className="admin-page">
       <div className="admin-page__toolbar">
-        <h1 className="admin-page__title admin-page__title--inline">Courses</h1>
-        <div className="admin-page__toolbar-actions">
-          <input
-            type="search"
-            className="admin-input admin-input--search"
-            placeholder="Search by course code or title"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Search courses"
-          />
-          <button type="button" className="portal-btn portal-btn--primary">
-            Add Course
-          </button>
-        </div>
+        <h1 className="admin-page__title admin-page__title--inline">COURSES</h1>
       </div>
 
-      <div className="portal-table-wrap admin-table-wrap">
-        <table className="portal-table">
-          <thead>
-            <tr>
-              <th scope="col">Course Code</th>
-              <th scope="col">Course Title</th>
-              <th scope="col">Credits</th>
-              <th scope="col">Category</th>
-              <th scope="col">Status</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.code}>
-                <td>{r.code}</td>
-                <td>{r.title}</td>
-                <td>{r.credits}</td>
-                <td>{r.category}</td>
-                <td>{r.status}</td>
-                <td>
-                  <button type="button" className="portal-btn portal-btn--secondary portal-btn--compact">
-                    Edit
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <CoursesTabBar
+        active={tab}
+        onChange={(next) => {
+          setTab(next)
+          if (next === 'open') setOpenSearch('')
+          if (next === 'all') setAllSearch('')
+        }}
+      />
+
+      {tab === 'all' ? (
+        <>
+          <div className="admin-page__toolbar">
+            <div className="admin-page__toolbar-actions">
+              <input
+                type="search"
+                className="admin-input admin-input--search"
+                placeholder="Search by course code or title"
+                value={allSearch}
+                onChange={(e) => setAllSearch(e.target.value)}
+                aria-label="Search courses"
+              />
+              <button type="button" className="portal-btn portal-btn--primary">
+                Add Course
+              </button>
+            </div>
+          </div>
+          <AllCoursesTable
+            rows={filteredAll}
+            loading={catalogLoading}
+            error={catalogError}
+          />
+        </>
+      ) : (
+        <OpenRegistrationCoursesTable
+          terms={terms}
+          termId={openTermId}
+          onTermIdChange={setOpenTermId}
+          termsLoading={termsLoading}
+          termsError={termsError}
+          search={openSearch}
+          onSearchChange={setOpenSearch}
+          rows={filteredOpen}
+          unfilteredCount={openRowsRaw?.length ?? 0}
+          loading={openLoading || openTabBlocking}
+          error={openError}
+        />
+      )}
     </main>
   )
 }
