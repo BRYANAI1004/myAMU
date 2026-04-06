@@ -1,14 +1,17 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
 import {
+  getLegacyStudentDisplayName,
   listMarksForStudent,
   type MarksRow,
 } from "../repositories/studentAcademicsRepository.js";
 import { findLatestLegacyTermYear } from "../repositories/studentLegacyAccountRepository.js";
 import {
-  loadCoursesTranscriptLookup,
-  type CourseTranscriptLookupEntry,
-} from "../repositories/studentTranscriptRepository.js";
+  findLatestPortalEnrollmentTermYear,
+  getPortalStudentDisplayName,
+  listPortalEnrollmentRowsForStudentAcademics,
+} from "../repositories/studentEnrollmentRepository.js";
+import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
 import type { StudentAcademicsResponse } from "../types/studentAcademics.js";
 import {
   buildAcademicCourseRecordsFromMarksWithLookup,
@@ -16,7 +19,12 @@ import {
   courseRecordToEnrollmentItem,
   courseRecordToScheduleItem,
   courseRecordToTranscriptItem,
+  legacyCompletedBlocksPortalRow,
+  pickNewerRegistrationAnchor,
+  portalEnrollmentRowToAcademicCourseRecord,
+  resolveCourseDisplayTitle,
   resolveRegistrationAnchoredAcademicTerm,
+  sortTranscriptPreviewRecords,
   termsMatch,
 } from "./studentAcademicCourseRecords.js";
 import {
@@ -39,40 +47,20 @@ function mergeEnrollmentFeedbackIntoPayload(
   return { ...payload, enrollmentHistory };
 }
 
-function buildPayload(
+function buildMergedPayload(
   studentId: string,
-  rows: MarksRow[],
-  courseLookup: Map<string, CourseTranscriptLookupEntry>,
+  studentName: string,
+  marksRows: MarksRow[],
+  legacyCourseRecords: import("../types/studentAcademics.js").StudentAcademicCourseRecord[],
+  portalCourseRecords: import("../types/studentAcademics.js").StudentAcademicCourseRecord[],
   latestRegistration: { term: string; year: number } | null,
 ): StudentAcademicsResponse {
-  if (rows.length === 0) {
-    const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
-      latestRegistration,
-      [],
-    );
-    return {
-      studentId,
-      studentName: studentId,
-      currentTerm: resolvedActive,
-      availableTerms: [],
-      currentSchedule: [],
-      transcript: [],
-      enrollmentHistory: [],
-      courseRecords: [],
-    };
-  }
+  const courseRecords = [...legacyCourseRecords, ...portalCourseRecords];
+  sortTranscriptPreviewRecords(courseRecords);
 
-  const nameFromMarks = rows[0]!.name.trim();
-  const studentName = nameFromMarks.length > 0 ? nameFromMarks : studentId;
   const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
     latestRegistration,
-    rows,
-  );
-  const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(
-    studentId,
-    rows,
-    courseLookup,
-    resolvedActive,
+    marksRows,
   );
   const currentTerm = resolvedActive;
 
@@ -93,7 +81,7 @@ function buildPayload(
     currentTerm,
     availableTerms: buildAvailableTermsFromCourseRecords(courseRecords),
     currentSchedule,
-    transcript: courseRecords.map(courseRecordToTranscriptItem),
+    transcript: legacyCourseRecords.map(courseRecordToTranscriptItem),
     enrollmentHistory: courseRecords.map((r) => courseRecordToEnrollmentItem(r)),
     courseRecords,
   };
@@ -129,12 +117,96 @@ export async function getStudentAcademicsPayload(
     };
   }
 
-  const [rows, latestRegistration, courseLookup] = await Promise.all([
-    listMarksForStudent(pool, trimmed),
-    findLatestLegacyTermYear(pool, trimmed),
-    loadCoursesTranscriptLookup(pool),
-  ]);
-  const payload = buildPayload(trimmed, rows, courseLookup, latestRegistration);
+  const [marksRows, latestLegacy, latestPortal, courseLookup, portalRows] =
+    await Promise.all([
+      listMarksForStudent(pool, trimmed),
+      findLatestLegacyTermYear(pool, trimmed),
+      findLatestPortalEnrollmentTermYear(trimmed),
+      loadCoursesTranscriptLookup(pool),
+      listPortalEnrollmentRowsForStudentAcademics(trimmed),
+    ]);
+
+  const latestRegistration = pickNewerRegistrationAnchor(
+    latestLegacy,
+    latestPortal,
+  );
+
+  const nameFromMarks = marksRows[0]?.name?.trim() ?? "";
+  let studentName =
+    nameFromMarks.length > 0 ? nameFromMarks : trimmed;
+  if (nameFromMarks.length === 0) {
+    const legacyName = await getLegacyStudentDisplayName(pool, trimmed);
+    if (legacyName != null) studentName = legacyName;
+    else {
+      const pn = await getPortalStudentDisplayName(trimmed);
+      if (pn != null) studentName = pn;
+    }
+  }
+
+  if (marksRows.length === 0 && portalRows.length === 0) {
+    const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
+      latestRegistration,
+      [],
+    );
+    return {
+      studentId: trimmed,
+      studentName,
+      currentTerm: resolvedActive,
+      availableTerms: [],
+      currentSchedule: [],
+      transcript: [],
+      enrollmentHistory: [],
+      courseRecords: [],
+    };
+  }
+
+  const resolvedActiveForRecords = resolveRegistrationAnchoredAcademicTerm(
+    latestRegistration,
+    marksRows,
+  );
+
+  const legacyCourseRecords =
+    marksRows.length > 0
+      ? buildAcademicCourseRecordsFromMarksWithLookup(
+          trimmed,
+          marksRows,
+          courseLookup,
+          resolvedActiveForRecords,
+        )
+      : [];
+
+  const portalCourseRecords = portalRows
+    .filter(
+      (p) =>
+        !legacyCompletedBlocksPortalRow(
+          legacyCourseRecords,
+          p.course_code,
+          p.term,
+          p.year,
+        ),
+    )
+    .map((p) =>
+      portalEnrollmentRowToAcademicCourseRecord(
+        trimmed,
+        p,
+        resolveCourseDisplayTitle(
+          p.course_code,
+          p.course_title_raw.length > 0 ? p.course_title_raw : p.course_code,
+          courseLookup,
+        ),
+        resolvedActiveForRecords,
+      ),
+    );
+
+  const payload = buildMergedPayload(
+    trimmed,
+    studentName,
+    marksRows,
+    legacyCourseRecords,
+    portalCourseRecords,
+    latestRegistration,
+  );
+
   if (payload.courseRecords.length === 0) {
     return payload;
   }

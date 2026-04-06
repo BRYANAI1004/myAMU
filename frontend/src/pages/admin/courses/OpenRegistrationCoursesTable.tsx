@@ -112,8 +112,9 @@ export function OpenRegistrationCoursesTable({
                 <th scope="col">Category</th>
                 <th scope="col">Term</th>
                 <th scope="col">Open Sections</th>
+                <th scope="col">Enrolled</th>
                 <th scope="col">Registration Status</th>
-                <th scope="col">Action</th>
+                <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -125,17 +126,20 @@ export function OpenRegistrationCoursesTable({
                   <td>{r.category}</td>
                   <td>{r.termLabel}</td>
                   <td>{r.openSections}</td>
+                  <td>{r.enrolledCount}</td>
                   <td>{r.registrationStatus}</td>
                   <td>
-                    <Link
-                      to={`/admin/course-sections?${adminSchedulingQueryString({
-                        term: termId,
-                        course: r.courseCode,
-                      })}`}
-                      className="portal-btn portal-btn--secondary portal-btn--compact"
-                    >
-                      Edit
-                    </Link>
+                    <div className="admin-inline-actions">
+                      <Link
+                        to={`/admin/course-sections?${adminSchedulingQueryString({
+                          term: termId,
+                          course: r.courseCode,
+                        })}`}
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
+                      >
+                        View registrations
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

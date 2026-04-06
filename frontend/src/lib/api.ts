@@ -690,7 +690,7 @@ export type StudentAcademicCourseRecord = {
   grade: string | null
   numericGrade: number | null
   status: StudentAcademicCourseStatus
-  source: 'marks' | 'clinic'
+  source: 'marks' | 'clinic' | 'portal'
 }
 
 /** GET /api/students/:studentId/academics — schedule, transcript, and term metadata. */
@@ -1169,6 +1169,11 @@ export type OpenRegistrationCourseRow = {
   termId: string
   termLabel: string
   openSections: number
+  enrolledCount: number
+  enrolledStudents?: Array<{
+    student_external_id: string
+    full_name: string | null
+  }>
   registrationStatus: 'Open' | 'Closed'
 }
 
@@ -1205,6 +1210,37 @@ function parseOpenRegistrationCourseRow(
         : NaN
   if (!Number.isInteger(os) || os < 0) return null
   if (registrationStatus !== 'Open' && registrationStatus !== 'Closed') return null
+  const enrolledCountRaw = row.enrolledCount ?? row.enrolled_count
+  let enrolledCount = 0
+  if (typeof enrolledCountRaw === 'number' && Number.isFinite(enrolledCountRaw)) {
+    enrolledCount = Math.max(0, Math.trunc(enrolledCountRaw))
+  } else if (typeof enrolledCountRaw === 'string') {
+    const n = Number(enrolledCountRaw.trim())
+    if (Number.isFinite(n)) enrolledCount = Math.max(0, Math.trunc(n))
+  }
+  const esRaw = row.enrolledStudents ?? row.enrolled_students
+  let enrolledStudents: OpenRegistrationCourseRow['enrolledStudents']
+  if (Array.isArray(esRaw)) {
+    const list: NonNullable<OpenRegistrationCourseRow['enrolledStudents']> = []
+    for (const el of esRaw) {
+      if (el == null || typeof el !== 'object') continue
+      const o = el as Record<string, unknown>
+      const sid = o.student_external_id ?? o.studentExternalId
+      if (typeof sid !== 'string' || sid.trim() === '') continue
+      const fn = o.full_name ?? o.fullName
+      list.push({
+        student_external_id: sid.trim(),
+        full_name:
+          fn == null || String(fn).trim() === '' ? null : String(fn).trim(),
+      })
+    }
+    list.sort((a, b) =>
+      a.student_external_id.localeCompare(b.student_external_id, undefined, {
+        sensitivity: 'base',
+      }),
+    )
+    if (list.length > 0) enrolledStudents = list
+  }
   return {
     courseCode: courseCode.trim(),
     courseTitle: courseTitle.trim(),
@@ -1213,6 +1249,8 @@ function parseOpenRegistrationCourseRow(
     termId: termId.trim(),
     termLabel: termLabel.trim(),
     openSections: os,
+    enrolledCount,
+    ...(enrolledStudents != null ? { enrolledStudents } : {}),
     registrationStatus,
   }
 }
@@ -1534,4 +1572,39 @@ export async function deleteAdminCourseSection(
     }
   }
   throw new Error(`Request failed (HTTP ${res.status})`)
+}
+
+export type AdminPortalEnrollmentDeleteResponse = {
+  success: boolean
+  removedCount: number
+}
+
+/**
+ * DELETE /api/admin/enrollments — removes one `portal_enrollments` row (course-level; not legacy marks).
+ */
+export async function deleteAdminPortalEnrollment(params: {
+  studentId: string
+  academic_term_id: string
+  course_code: string
+  signal?: AbortSignal
+}): Promise<AdminPortalEnrollmentDeleteResponse> {
+  const data = (await fetchApiJson('/api/admin/enrollments', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      studentId: params.studentId.trim(),
+      academic_term_id: params.academic_term_id.trim(),
+      course_code: params.course_code.trim(),
+    }),
+    signal: params.signal,
+  })) as unknown
+  if (
+    data == null ||
+    typeof data !== 'object' ||
+    typeof (data as { success?: unknown }).success !== 'boolean' ||
+    typeof (data as { removedCount?: unknown }).removedCount !== 'number'
+  ) {
+    throw new Error('Unexpected admin enrollment delete response')
+  }
+  return data as AdminPortalEnrollmentDeleteResponse
 }

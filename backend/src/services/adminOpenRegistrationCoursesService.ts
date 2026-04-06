@@ -1,6 +1,9 @@
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import { listCoursesFromMysql, type CourseListItem } from "../repositories/courseRepository.js";
-import { countCourseSectionsByCourseForTermYear } from "../repositories/courseSectionRepository.js";
+import {
+  countCourseSectionsByCourseForTermYear,
+  listPortalEnrollmentRollupsByCourseForTermYear,
+} from "../repositories/courseSectionRepository.js";
 
 export type AdminOpenRegistrationCourseRow = {
   courseCode: string;
@@ -10,6 +13,12 @@ export type AdminOpenRegistrationCourseRow = {
   termId: string;
   termLabel: string;
   openSections: number;
+  /** Distinct students in `portal_enrollments` for this course + term (course-level, not per section). */
+  enrolledCount: number;
+  enrolledStudents?: Array<{
+    student_external_id: string;
+    full_name: string | null;
+  }>;
   registrationStatus: "Open" | "Closed";
 };
 
@@ -59,11 +68,19 @@ export async function listAdminOpenRegistrationCourses(
   const term = await getAcademicTermById(academicTermId.trim());
   if (!term) return null;
 
-  const counts = await countCourseSectionsByCourseForTermYear(
-    term.term_name,
-    term.year,
-  );
+  const [counts, enrollmentRollups] = await Promise.all([
+    countCourseSectionsByCourseForTermYear(term.term_name, term.year),
+    listPortalEnrollmentRollupsByCourseForTermYear(term.term_name, term.year),
+  ]);
   if (counts.length === 0) return [];
+
+  const enrollmentByCode = new Map<
+    string,
+    (typeof enrollmentRollups)[number]
+  >();
+  for (const r of enrollmentRollups) {
+    enrollmentByCode.set(catalogKey(r.course_code), r);
+  }
 
   const catalog = await listCoursesFromMysql();
   const byCode = new Map<string, CourseListItem>();
@@ -81,6 +98,8 @@ export async function listAdminOpenRegistrationCourses(
     const code = course_code.trim();
     if (code === "" || section_count <= 0) continue;
     const cat = byCode.get(catalogKey(code));
+    const en = enrollmentByCode.get(catalogKey(code));
+    const enrolledCount = en?.enrolled_count ?? 0;
     out.push({
       courseCode: code,
       courseTitle: titleFromCatalog(code, cat),
@@ -89,6 +108,10 @@ export async function listAdminOpenRegistrationCourses(
       termId: term.id,
       termLabel: term.term_label,
       openSections: section_count,
+      enrolledCount,
+      ...(en?.enrolled_students != null && en.enrolled_students.length > 0
+        ? { enrolledStudents: en.enrolled_students }
+        : {}),
       registrationStatus,
     });
   }

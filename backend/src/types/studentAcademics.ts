@@ -1,4 +1,4 @@
-/** GET /api/students/:studentId/academics — Phase 1, sourced from legacy `marks` only. */
+/** GET /api/students/:studentId/academics — legacy `marks` + merged `portal_enrollments` (transcript list stays marks/clinic-only). */
 
 /** Deterministic row status from legacy `marks` (and merged transcript uses the same for `marks`/`clinic`). */
 export type StudentAcademicCourseStatus =
@@ -24,7 +24,8 @@ export type StudentAcademicCourseRecord = {
   grade: string | null;
   numericGrade: number | null;
   status: StudentAcademicCourseStatus;
-  source: "marks" | "clinic";
+  /** `portal` = course-level `portal_enrollments` (no fabricated grades). */
+  source: "marks" | "clinic" | "portal";
 };
 
 export type StudentAcademicsCurrentTerm = {

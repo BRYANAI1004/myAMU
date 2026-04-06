@@ -31,7 +31,8 @@ function nullableString(v: unknown): string | null {
   return String(v);
 }
 
-function parseEnrolledStudentsJson(
+/** Shared by section rows and course-level open-registration rollups. */
+export function parseEnrolledStudentsJson(
   raw: unknown,
 ): CourseSectionDetail["enrolled_students"] {
   if (raw == null || raw === "") return undefined;
@@ -246,6 +247,52 @@ export type CourseSectionCountByCourse = {
   course_code: string;
   section_count: number;
 };
+
+/** Course-level `portal_enrollments` counts (not tied to `section_code`). */
+export type PortalEnrollmentRollupByCourse = {
+  course_code: string;
+  enrolled_count: number;
+  enrolled_students?: CourseSectionDetail["enrolled_students"];
+};
+
+export async function listPortalEnrollmentRollupsByCourseForTermYear(
+  term: string,
+  year: number,
+): Promise<PortalEnrollmentRollupByCourse[]> {
+  const sql = `
+    SELECT
+      pc.course_code AS rollup_course_code,
+      COUNT(DISTINCT e.student_external_id) AS enrolled_count,
+      JSON_ARRAYAGG(
+        JSON_OBJECT(
+          'student_external_id', e.student_external_id,
+          'full_name', ps.full_name
+        )
+      ) AS enrolled_students_json
+    FROM portal_enrollments e
+    INNER JOIN portal_courses pc ON pc.course_id = e.course_id
+    LEFT JOIN portal_students ps ON ps.student_external_id = e.student_external_id
+    WHERE e.term COLLATE utf8mb4_unicode_ci =
+          CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND e.year = ?
+    GROUP BY pc.course_code
+    ORDER BY pc.course_code ASC
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [term.trim(), year]);
+  return rows.map((r) => {
+    const code = String(r.rollup_course_code ?? "").trim();
+    const enrolled_students = parseEnrolledStudentsJson(
+      r.enrolled_students_json,
+    );
+    return {
+      course_code: code,
+      enrolled_count: Number(r.enrolled_count ?? 0),
+      ...(enrolled_students != null && enrolled_students.length > 0
+        ? { enrolled_students }
+        : {}),
+    };
+  });
+}
 
 export async function countCourseSectionsByCourseForTermYear(
   term: string,

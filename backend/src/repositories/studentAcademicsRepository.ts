@@ -119,3 +119,18 @@ export async function listMarksForStudentTerm(
 
   return rows.map(mapMarksRow);
 }
+
+/** Display name from legacy `students` when the student has no `marks` rows yet. */
+export async function getLegacyStudentDisplayName(
+  pool: Pool,
+  studentId: string,
+): Promise<string | null> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT TRIM(name) AS name FROM students WHERE id = ? LIMIT 1`,
+    [studentId.trim()],
+  );
+  const row = rows[0];
+  if (row == null) return null;
+  const n = str(row.name);
+  return n.length > 0 ? n : null;
+}

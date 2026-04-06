@@ -33,6 +33,7 @@ import {
   WEEKDAYS_FULL_ORDERED,
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
+import { AdminSectionEnrolledStudentsModal } from '../../components/admin/AdminSectionEnrolledStudentsModal'
 
 function displayCell(value: string | null | undefined): string {
   if (value == null || String(value).trim() === '') return '—'
@@ -88,6 +89,9 @@ export function AdminCourseSectionsPage() {
   const [formMessage, setFormMessage] = useState<string | null>(null)
   /** Bumped after create/update/delete so the sections query re-runs without changing term/course. */
   const [listVersion, setListVersion] = useState(0)
+  /** `portal_enrollments` list is course-level; any section row for the course can open the same roster. */
+  const [enrolledModalSection, setEnrolledModalSection] =
+    useState<AdminCourseSection | null>(null)
 
   const resetForm = useCallback(() => {
     setForm(emptyForm())
@@ -449,6 +453,14 @@ export function AdminCourseSectionsPage() {
 
   return (
     <main className="admin-page">
+      {enrolledModalSection != null && academicTermId.trim() !== '' ? (
+        <AdminSectionEnrolledStudentsModal
+          section={enrolledModalSection}
+          academicTermId={academicTermId.trim()}
+          onEnrollmentRemoved={() => setListVersion((v) => v + 1)}
+          onClose={() => setEnrolledModalSection(null)}
+        />
+      ) : null}
       <div className="admin-page__toolbar">
         <h1 className="admin-page__title admin-page__title--inline">
           Course Sections
@@ -575,7 +587,7 @@ export function AdminCourseSectionsPage() {
               <th scope="col">Room</th>
               <th scope="col">Instructor</th>
               <th scope="col">Enrolled</th>
-              <th scope="col">Students</th>
+              <th scope="col">Registrations</th>
               <th scope="col">Notes</th>
               <th scope="col">Actions</th>
             </tr>
@@ -603,14 +615,18 @@ export function AdminCourseSectionsPage() {
                   <td>{displayCell(row.instructor)}</td>
                   <td>{row.enrolled_count}</td>
                   <td>
-                    {row.enrolled_students != null && row.enrolled_students.length > 0
-                      ? row.enrolled_students
-                          .map((s) => {
-                            const name = s.full_name?.trim()
-                            return name ? `${name} (${s.student_external_id})` : s.student_external_id
-                          })
-                          .join('; ')
-                      : '—'}
+                    {row.enrolled_count > 0 ? (
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
+                        disabled={busy}
+                        onClick={() => setEnrolledModalSection(row)}
+                      >
+                        View students
+                      </button>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td>{displayCell(row.notes)}</td>
                   <td>

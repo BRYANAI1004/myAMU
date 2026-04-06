@@ -32,7 +32,7 @@ export function transcriptViewRowsFromCourseRecords(
   grade: string | null
   numericGrade: number | null
   credits: number | null
-  source?: 'marks' | 'clinic'
+  source?: 'marks' | 'clinic' | 'portal'
   status?: StudentAcademicCourseRecord['status']
 }> {
   return records.map((r) => ({

@@ -439,6 +439,9 @@ export function academicCourseRecordToTranscriptPreviewRow(
   };
 }
 
+const SOURCE_SORT_RANK: Record<StudentAcademicCourseRecord["source"], number> =
+  { marks: 0, portal: 1, clinic: 2 };
+
 export function sortTranscriptPreviewRecords(
   rows: StudentAcademicCourseRecord[],
 ): void {
@@ -450,9 +453,82 @@ export function sortTranscriptPreviewRecords(
       sensitivity: "base",
     });
     if (c !== 0) return c;
-    if (a.source === b.source) return 0;
-    return a.source === "marks" ? -1 : 1;
+    return SOURCE_SORT_RANK[a.source] - SOURCE_SORT_RANK[b.source];
   });
+}
+
+/** Prefer the newer of legacy registration vs latest portal enrollment (by year, then term). */
+export function pickNewerRegistrationAnchor(
+  legacy: { term: string; year: number } | null,
+  portal: { term: string; year: number } | null,
+): { term: string; year: number } | null {
+  if (legacy == null) return portal;
+  if (portal == null) return legacy;
+  if (legacy.year !== portal.year) {
+    return legacy.year > portal.year ? legacy : portal;
+  }
+  return termSortOrder(legacy.term) >= termSortOrder(portal.term)
+    ? legacy
+    : portal;
+}
+
+export function portalEnrollmentRowToAcademicCourseRecord(
+  studentId: string,
+  row: {
+    course_code: string;
+    course_title_raw: string;
+    term: string;
+    year: number;
+    units: number | null;
+    weekday: string | null;
+    start_time: unknown;
+    end_time: unknown;
+    instructor: string | null;
+  },
+  courseTitle: string,
+  activeTerm: { term: string; year: number } | null,
+): StudentAcademicCourseRecord {
+  const status = inferAcademicCourseStatus({
+    term: row.term,
+    year: row.year,
+    activeTerm,
+    gradeDisplay: null,
+    numericGrade: null,
+  });
+
+  return {
+    studentId,
+    courseCode: row.course_code,
+    courseTitle,
+    term: row.term,
+    year: row.year,
+    credits: row.units,
+    instructor: nullableStr(row.instructor ?? ""),
+    days: row.weekday,
+    timeFrom: formatMysqlTime(row.start_time),
+    timeTo: formatMysqlTime(row.end_time),
+    grade: null,
+    numericGrade: null,
+    status,
+    source: "portal",
+  };
+}
+
+/** Skip a portal row when legacy marks already show a completed grade for the same course/term. */
+export function legacyCompletedBlocksPortalRow(
+  legacyRecords: StudentAcademicCourseRecord[],
+  courseCode: string,
+  term: string,
+  year: number,
+): boolean {
+  const c = courseCode.trim().toLowerCase();
+  return legacyRecords.some(
+    (r) =>
+      r.year === year &&
+      termsMatch(r.term, term) &&
+      r.courseCode.trim().toLowerCase() === c &&
+      r.status === "completed",
+  );
 }
 
 /** Legacy account `scheduleRows` from normalized academic records (marks-sourced rows). */
