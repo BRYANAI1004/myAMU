@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, Ref } from 'react'
 import type { AIAssistantChatMessage } from '../../hooks/useAIAssistant'
 import { AIAssistantInput } from './AIAssistantInput'
+import { AIAssistantWelcomeMessage } from './AIAssistantWelcomeMessage'
 
 type AIAssistantPanelProps = {
   inputId: string
@@ -112,7 +113,19 @@ export function AIAssistantPanel({
               }
             >
               <span className="visually-hidden">{m.role === 'user' ? 'You' : 'Assistant'}: </span>
-              <div className="portal-ai-assistant-bubble">{m.content}</div>
+              <div
+                className={
+                  m.welcomeLines?.length
+                    ? 'portal-ai-assistant-bubble portal-ai-assistant-bubble--welcome'
+                    : 'portal-ai-assistant-bubble'
+                }
+              >
+                {m.welcomeLines?.length ? (
+                  <AIAssistantWelcomeMessage lines={m.welcomeLines} lottieSize={56} />
+                ) : (
+                  m.content
+                )}
+              </div>
             </li>
           ))}
           {isAwaitingReply ? (

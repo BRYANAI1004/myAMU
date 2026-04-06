@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AIAssistantPageContext } from '../data/aiMockReplies'
-import { getWelcomeMessage } from '../data/aiMockReplies'
+import { getWelcomeLines } from '../data/aiMockReplies'
 import { sendAssistantMessage } from '../lib/sendAssistantMessage'
 
 export type AIAssistantChatRole = 'user' | 'assistant'
@@ -10,13 +10,26 @@ export type AIAssistantChatMessage = {
   role: AIAssistantChatRole
   content: string
   createdAt: number
+  /** Present only for the initial welcome message — renders cat + structured copy in the panel. */
+  welcomeLines?: string[]
 }
 
 function newId(): string {
   return crypto.randomUUID()
 }
 
-function assistantMessage(content: string): AIAssistantChatMessage {
+function assistantWelcomeMessage(pageContext: AIAssistantPageContext): AIAssistantChatMessage {
+  const lines = getWelcomeLines(pageContext)
+  return {
+    id: newId(),
+    role: 'assistant',
+    content: lines.join('\n\n'),
+    createdAt: Date.now(),
+    welcomeLines: [...lines],
+  }
+}
+
+function assistantTextMessage(content: string): AIAssistantChatMessage {
   return { id: newId(), role: 'assistant', content, createdAt: Date.now() }
 }
 
@@ -37,7 +50,7 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
   const ensureWelcome = useCallback(() => {
     setMessages((prev) => {
       if (prev.length > 0) return prev
-      return [assistantMessage(getWelcomeMessage(pageContext))]
+      return [assistantWelcomeMessage(pageContext)]
     })
   }, [pageContext])
 
@@ -67,7 +80,7 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
     abortRef.current = null
     setIsAwaitingReply(false)
     setDraft('')
-    setMessages([assistantMessage(getWelcomeMessage(pageContext))])
+    setMessages([assistantWelcomeMessage(pageContext)])
   }, [pageContext])
 
   const submitDraft = useCallback(async () => {
@@ -85,12 +98,12 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
 
     try {
       const reply = await sendAssistantMessage(text, pageContext, { signal: ac.signal })
-      setMessages((m) => [...m, assistantMessage(reply)])
+      setMessages((m) => [...m, assistantTextMessage(reply)])
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
       setMessages((m) => [
         ...m,
-        assistantMessage(
+        assistantTextMessage(
           'Something went wrong while generating a reply. Please try again in a moment.',
         ),
       ])
@@ -101,6 +114,15 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
       }
     }
   }, [draft, isAwaitingReply, pageContext])
+
+  useEffect(() => {
+    setMessages((prev) => {
+      if (prev.length !== 1) return prev
+      const m = prev[0]
+      if (m.role !== 'assistant' || !m.welcomeLines?.length) return prev
+      return [assistantWelcomeMessage(pageContext)]
+    })
+  }, [pageContext])
 
   useEffect(() => {
     if (panelState !== 'open') return

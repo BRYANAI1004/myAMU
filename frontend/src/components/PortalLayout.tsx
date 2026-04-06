@@ -1,4 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
+import { AIAssistantLauncher } from './ai/AIAssistantLauncher'
+import { AIAssistantProvider } from './ai/AIAssistantProvider'
+import { deriveAIAssistantPageContext } from '../data/aiMockReplies'
 import { PortalShell } from './PortalShell'
 
 function isDashboardRoute(pathname: string) {
@@ -13,14 +16,19 @@ export function PortalLayout() {
   const showSidebar = !isDashboard
   const showPortalBanner = isDashboard
 
+  const assistantPageContext = deriveAIAssistantPageContext(pathname)
+
   return (
-    <PortalShell
-      showStudentBar={showStudentBar}
-      showSidebar={showSidebar}
-      showPortalBanner={showPortalBanner}
-      dashboardHome={isDashboard}
-    >
-      <Outlet />
-    </PortalShell>
+    <AIAssistantProvider pageContext={assistantPageContext}>
+      <PortalShell
+        showStudentBar={showStudentBar}
+        showSidebar={showSidebar}
+        showPortalBanner={showPortalBanner}
+        dashboardHome={isDashboard}
+      >
+        <Outlet />
+      </PortalShell>
+      <AIAssistantLauncher />
+    </AIAssistantProvider>
   )
 }

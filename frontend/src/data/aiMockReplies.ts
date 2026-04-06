@@ -1,14 +1,69 @@
-export type AIAssistantPageContext = 'registration' | 'finances'
+export type AIAssistantPageContext =
+  | 'registration'
+  | 'finances'
+  | 'academics'
+  | 'clinical'
+  | 'documents'
+  | 'account'
+  | 'general'
 
-const WELCOME: Record<AIAssistantPageContext, string> = {
-  registration:
-    'Hi — I am the AMU AI Assistant for registration. Ask about course search, your course bin, checkout, building a schedule, syllabi, prerequisites, or choosing the right term. I am a demo helper right now; confirm important dates and policies with the registrar.',
-  finances:
-    'Hi — I am the AMU AI Assistant for finances. Ask about your balance, tuition, making a payment, installment plans, statements, or late fees. I am a demo helper right now; confirm amounts and deadlines with the bursar or student accounts office.',
+/** Derive assistant page context from the current route (no query string). */
+export function deriveAIAssistantPageContext(pathname: string): AIAssistantPageContext {
+  const p = pathname.split('?')[0].toLowerCase()
+  if (p.startsWith('/registration')) return 'registration'
+  if (p.startsWith('/finances')) return 'finances'
+  if (p.startsWith('/academics')) return 'academics'
+  if (p.startsWith('/clinical')) return 'clinical'
+  if (p.startsWith('/documents')) return 'documents'
+  if (p.startsWith('/profile') || p.startsWith('/my-account')) return 'account'
+  return 'general'
 }
 
+const WELCOME_LINES: Record<AIAssistantPageContext, readonly string[]> = {
+  registration: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with course search, your course bin, timetable planning, syllabi, prerequisites, and registration steps.',
+    'I am a demo helper for now, so please confirm important dates and policies with the registrar.',
+  ],
+  finances: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help explain tuition, billing, payments, installment plans, and general account questions.',
+    'I am a demo helper for now, so please confirm important deadlines and policies with the finance office.',
+  ],
+  academics: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with grades, transcripts, GPA, academic progress, enrollment verification, and academics navigation in myAMU.',
+    'I am a demo helper for now, so please confirm official records and policies with the registrar or academic affairs.',
+  ],
+  clinical: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with clinical scheduling, hours, evaluations, compliance pages, and how to use this part of the portal.',
+    'I am a demo helper for now, so please confirm requirements and deadlines with your clinical coordinator or program office.',
+  ],
+  documents: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with registration forms, agreements, quizzes, and finding documents in this section of the portal.',
+    'I am a demo helper for now, so please confirm submissions and policies with the registrar or appropriate office.',
+  ],
+  account: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with profile settings, student contact information, and general myAMU navigation.',
+    'I am a demo helper for now, so please confirm critical updates with student services or the registrar.',
+  ],
+  general: [
+    'Hi — I am the AMU AI Assistant cat.',
+    'I can help with course planning, student portal guidance, billing questions, documents, and general navigation.',
+    'I am a demo helper for now, so please confirm official policies with the appropriate office.',
+  ],
+}
+
+export function getWelcomeLines(context: AIAssistantPageContext): readonly string[] {
+  return WELCOME_LINES[context]
+}
+
+/** Plain-text welcome for accessibility / fallbacks. */
 export function getWelcomeMessage(context: AIAssistantPageContext): string {
-  return WELCOME[context]
+  return getWelcomeLines(context).join('\n\n')
 }
 
 type KeywordRule = { keywords: string[]; reply: string }
@@ -99,11 +154,117 @@ const FINANCES_RULES: KeywordRule[] = [
   },
 ]
 
-const REGISTRATION_FALLBACK =
-  'I can help you think through registration steps: picking a term, searching courses, using your course bin, checkout, and schedule planning. Try asking about syllabi, prerequisites, or conflicts — and verify deadlines with the registrar.'
+const ACADEMICS_RULES: KeywordRule[] = [
+  {
+    keywords: ['grade', 'grades', 'gpa'],
+    reply:
+      'Grades and GPA summaries in Academics reflect posted coursework. If a grade is missing or incorrect, note the course and term before contacting the registrar or instructor.',
+  },
+  {
+    keywords: ['transcript'],
+    reply:
+      'Transcript pages show your academic record as the school publishes it. Use official requests through the registrar when you need a transcript sent to a third party.',
+  },
+  {
+    keywords: ['progress', 'degree', 'audit'],
+    reply:
+      'Academic progress views help compare completed work to program requirements. Your advisor can interpret exceptions, substitutions, and remaining requirements.',
+  },
+  {
+    keywords: ['enrollment', 'verification'],
+    reply:
+      'Enrollment verification confirms your status for insurers or employers. Generate or download what the portal offers, and contact the registrar if an external form is required.',
+  },
+]
 
-const FINANCES_FALLBACK =
-  'I can help you interpret this finances overview: balances, charges, payments, installment plans, and late fees. Ask using words like tuition, balance, payment, or statement — and confirm official figures with student accounts.'
+const CLINICAL_RULES: KeywordRule[] = [
+  {
+    keywords: ['schedule', 'rotation', 'site'],
+    reply:
+      'Clinical scheduling tools show where you are expected and when. Confirm last-minute changes with your coordinator; the portal may not reflect real-time adjustments.',
+  },
+  {
+    keywords: ['hour', 'hours'],
+    reply:
+      'Required hours pages summarize expectations for clinical time. Log hours the way your program specifies so evaluations and compliance stay accurate.',
+  },
+  {
+    keywords: ['evaluation', 'eval'],
+    reply:
+      'Evaluations capture feedback from preceptors and faculty. Complete them by the deadlines shown so your file stays current.',
+  },
+  {
+    keywords: ['compliance', 'immunization', 'credential'],
+    reply:
+      'Compliance sections list documents and health requirements. Upload items promptly and follow up with clinical administration if something is rejected or expired.',
+  },
+]
+
+const DOCUMENTS_RULES: KeywordRule[] = [
+  {
+    keywords: ['form', 'registration form'],
+    reply:
+      'Registration forms here are completed and submitted per term or program instructions. Save confirmations and contact the registrar if a form stays in pending status.',
+  },
+  {
+    keywords: ['agreement', 'policy'],
+    reply:
+      'Agreements and policy acknowledgements are records of your acceptance. Read the linked text carefully; contact the listed office if you need clarification before signing.',
+  },
+  {
+    keywords: ['quiz'],
+    reply:
+      'Quizzes in Documents may be required before registration or clinical access. Finish all required attempts and keep screenshots of completion if the portal is slow to update.',
+  },
+]
+
+const PORTAL_WIDE_RULES: KeywordRule[] = [
+  {
+    keywords: ['login', 'password', 'sign in'],
+    reply:
+      'Account access issues are handled outside this assistant. Use the portal login help or IT support channels your school publishes; avoid sharing passwords in chat.',
+  },
+  {
+    keywords: ['dashboard', 'home'],
+    reply:
+      'The dashboard links to major modules like registration, finances, and academics. Use the sidebar for deeper pages; confirm deadlines on official school communications.',
+  },
+  {
+    keywords: ['document', 'upload', 'pdf'],
+    reply:
+      'Documents may live under Documents, Academics, or Clinical depending on type. If you cannot find a file, check the module sidebar and search within the page.',
+  },
+  {
+    keywords: ['payment', 'pay', 'bill'],
+    reply:
+      'Billing and payments are centered under Finances. You can review balances, plans, and history there; confirm amounts with student accounts before large transactions.',
+  },
+  {
+    keywords: ['course', 'class'],
+    reply:
+      'Course planning spans Registration and Academics. Search and enroll in Registration; review grades and records in Academics after the term.',
+  },
+]
+
+const CONTEXT_FALLBACK: Record<AIAssistantPageContext, string> = {
+  registration:
+    'I can help you think through registration steps: picking a term, searching courses, using your course bin, checkout, and schedule planning. Try asking about syllabi, prerequisites, or conflicts — and verify deadlines with the registrar.',
+  finances:
+    'I can help you interpret finances topics: balances, charges, payments, installment plans, and late fees. Ask using words like tuition, balance, payment, or statement — and confirm official figures with student accounts.',
+  academics:
+    'I can help you navigate academics: grades, transcripts, GPA, progress, and enrollment verification. Ask about a specific page or task — and confirm official records with the registrar.',
+  clinical:
+    'I can help you find your way around clinical tools: schedule, hours, evaluations, and compliance. Ask about a specific workflow — and confirm requirements with your program office.',
+  documents:
+    'I can help with forms, agreements, and quizzes in Documents. Describe what you are trying to submit or find — and confirm requirements with the registrar.',
+  account:
+    'I can help with profile and my-account navigation. Describe what you want to update — and confirm sensitive changes with student services if needed.',
+  general:
+    'I can help with course planning, portal navigation, billing questions, and documents. Ask in your own words — and confirm official policies with the appropriate office.',
+}
+
+const REGISTRATION_FALLBACK = CONTEXT_FALLBACK.registration
+const FINANCES_FALLBACK = CONTEXT_FALLBACK.finances
 
 function normalize(text: string): string {
   return text.trim().toLowerCase()
@@ -118,6 +279,14 @@ function firstMatchingRule(rules: KeywordRule[], q: string): string | null {
   return null
 }
 
+function firstMatchingRules(rulesList: KeywordRule[][], q: string): string | null {
+  for (const rules of rulesList) {
+    const hit = firstMatchingRule(rules, q)
+    if (hit) return hit
+  }
+  return null
+}
+
 /**
  * Local keyword-based replies for the AI assistant UI.
  * Replace the implementation behind {@link sendAssistantMessage} when wiring a backend.
@@ -128,11 +297,24 @@ export function generateMockAssistantReply(
 ): string {
   const q = normalize(userText)
   if (q === '') {
-    return context === 'registration' ? REGISTRATION_FALLBACK : FINANCES_FALLBACK
+    return CONTEXT_FALLBACK[context]
   }
 
   if (context === 'registration') {
     return firstMatchingRule(REGISTRATION_RULES, q) ?? REGISTRATION_FALLBACK
   }
-  return firstMatchingRule(FINANCES_RULES, q) ?? FINANCES_FALLBACK
+  if (context === 'finances') {
+    return firstMatchingRule(FINANCES_RULES, q) ?? FINANCES_FALLBACK
+  }
+
+  const ruleSets: KeywordRule[][] =
+    context === 'academics'
+      ? [ACADEMICS_RULES, PORTAL_WIDE_RULES]
+      : context === 'clinical'
+        ? [CLINICAL_RULES, PORTAL_WIDE_RULES]
+        : context === 'documents'
+          ? [DOCUMENTS_RULES, PORTAL_WIDE_RULES]
+          : [PORTAL_WIDE_RULES]
+
+  return firstMatchingRules(ruleSets, q) ?? CONTEXT_FALLBACK[context]
 }

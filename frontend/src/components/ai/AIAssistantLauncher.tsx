@@ -1,18 +1,17 @@
-import { useId } from 'react'
-import type { AIAssistantPageContext } from '../../data/aiMockReplies'
-import { useAIAssistant } from '../../hooks/useAIAssistant'
+import { useId, useRef } from 'react'
 import { AIAssistantPanel } from './AIAssistantPanel'
+import { AIAssistantPet } from './AIAssistantPet'
+import { useAIAssistantContext } from './AIAssistantProvider'
+import { useAIAssistantCatDragEnabled, useAIAssistantDockPosition } from './useAIAssistantDockPosition'
 import { useAIAssistantPanelLayout } from './useAIAssistantPanelLayout'
 import './aiAssistant.css'
 
-type AIAssistantLauncherProps = {
-  pageContext: AIAssistantPageContext
-}
-
-export function AIAssistantLauncher({ pageContext }: AIAssistantLauncherProps) {
+export function AIAssistantLauncher() {
   const baseId = useId()
   const inputId = `${baseId}-input`
   const messagesRegionId = `${baseId}-messages`
+  const dockRef = useRef<HTMLDivElement>(null)
+  const dragEnabled = useAIAssistantCatDragEnabled()
 
   const {
     panelState,
@@ -27,37 +26,65 @@ export function AIAssistantLauncher({ pageContext }: AIAssistantLauncherProps) {
     closePanel,
     clearChat,
     submitDraft,
-  } = useAIAssistant(pageContext)
+  } = useAIAssistantContext()
 
   const layout = useAIAssistantPanelLayout()
+
+  const { dockStyle, onCatPointerDown, onCatPointerMove, onCatPointerUp, onCatPointerCancel } =
+    useAIAssistantDockPosition(dockRef, dragEnabled, openPanel)
 
   return (
     <div className="portal-ai-assistant-root">
       {panelState === 'closed' ? (
-        <button
-          type="button"
-          className="portal-ai-assistant-launcher"
-          onClick={openPanel}
-          aria-label="Open AMU AI Assistant chat"
-          aria-haspopup="dialog"
+        <div
+          ref={dockRef}
+          className={`portal-ai-assistant-dock${dragEnabled ? ' portal-ai-assistant-dock--draggable' : ''}`}
+          style={dockStyle}
         >
-          <span className="portal-ai-assistant-launcher__icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
-              <path
-                d="M12 3C7.03 3 3 6.58 3 11c0 2.13 1.04 4.06 2.72 5.35L4.5 20.5l4.45-1.18A8.94 8.94 0 0012 19c4.97 0 9-3.58 9-8s-4.03-8-9-8z"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M8.5 11h.01M12 11h.01M15.5 11h.01"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-        </button>
+          <div
+            className="portal-ai-assistant-dock__cat-hit"
+            role="button"
+            tabIndex={0}
+            aria-label="Open AMU AI Assistant"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                openPanel()
+              }
+            }}
+            onPointerDown={dragEnabled ? onCatPointerDown : undefined}
+            onPointerMove={dragEnabled ? onCatPointerMove : undefined}
+            onPointerUp={dragEnabled ? onCatPointerUp : undefined}
+            onPointerCancel={dragEnabled ? onCatPointerCancel : undefined}
+            onClick={!dragEnabled ? () => openPanel() : undefined}
+          >
+            <AIAssistantPet size={78} aria-hidden={true} />
+          </div>
+          <button
+            type="button"
+            className="portal-ai-assistant-launcher"
+            onClick={openPanel}
+            aria-label="Open AMU AI Assistant chat"
+            aria-haspopup="dialog"
+          >
+            <span className="portal-ai-assistant-launcher__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
+                <path
+                  d="M12 3C7.03 3 3 6.58 3 11c0 2.13 1.04 4.06 2.72 5.35L4.5 20.5l4.45-1.18A8.94 8.94 0 0012 19c4.97 0 9-3.58 9-8s-4.03-8-9-8z"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M8.5 11h.01M12 11h.01M15.5 11h.01"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </span>
+          </button>
+        </div>
       ) : null}
 
       {panelState === 'minimized' ? (

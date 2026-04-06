@@ -9,13 +9,17 @@
   --portal-ai-border: var(--border-gray, #e5e5e5);
   --portal-ai-shadow: 0 12px 40px rgba(28, 35, 51, 0.14), 0 4px 12px rgba(28, 35, 51, 0.08);
   position: fixed;
+  inset: 0;
   z-index: 85;
-  right: max(1rem, env(safe-area-inset-right));
-  bottom: max(1rem, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 0.75rem;
+  padding-right: max(1rem, env(safe-area-inset-right));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  padding-left: 0;
+  padding-top: 0;
   pointer-events: none;
   font-size: var(--portal-body-font-size, 0.875rem);
   line-height: var(--portal-body-line-height, 1.45);
@@ -23,6 +27,102 @@
 
 .portal-ai-assistant-root > * {
   pointer-events: auto;
+}
+
+.portal-ai-assistant-dock {
+  position: fixed;
+  z-index: 87;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 10px;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  left: auto;
+  top: auto;
+}
+
+.portal-ai-assistant-dock__cat-hit {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.portal-ai-assistant-dock--draggable .portal-ai-assistant-dock__cat-hit {
+  cursor: grab;
+  touch-action: none;
+}
+
+.portal-ai-assistant-dock--draggable .portal-ai-assistant-dock__cat-hit:active {
+  cursor: grabbing;
+}
+
+.portal-ai-assistant-dock__cat-hit:focus-visible {
+  outline: 2px solid var(--portal-ai-gold);
+  outline-offset: 3px;
+}
+
+.portal-ai-assistant-pet {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  user-select: none;
+}
+
+.portal-ai-assistant-pet--loading {
+  border-radius: 12px;
+  background: rgba(166, 25, 46, 0.06);
+}
+
+.portal-ai-assistant-welcome {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.portal-ai-assistant-welcome__lottie {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portal-ai-assistant-welcome__lottie-placeholder {
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: rgba(166, 25, 46, 0.08);
+}
+
+.portal-ai-assistant-welcome__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--portal-ai-text);
+}
+
+.portal-ai-assistant-welcome__p {
+  margin: 0 0 0.35rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--portal-ai-muted);
+}
+
+.portal-ai-assistant-welcome__p:last-child {
+  margin-bottom: 0;
+}
+
+.portal-ai-assistant-bubble--welcome {
+  max-width: 100%;
+  padding: 0.65rem 0.75rem;
 }
 
 .portal-ai-assistant-launcher {
