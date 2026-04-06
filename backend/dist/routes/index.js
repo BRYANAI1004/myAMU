@@ -10,12 +10,16 @@ import { getStudentCourseFeedback, postStudentCourseFeedback, } from "../control
 import { getStudentTranscriptPreview } from "../controllers/studentTranscriptController.js";
 import { getDemoAccount, getDemoActivity, getStudentAccount, getStudentActivity, getStudentProfile, } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
+import { getAcademicTerms, getAcademicTermsCurrent, getAcademicTermsRecent, patchAdminAcademicTerm, postAdminAcademicTerm, } from "../controllers/academicTermController.js";
 export const apiRouter = Router();
 apiRouter.get("/health", getHealth);
 apiRouter.get("/health/db", getHealthDb);
 apiRouter.post("/auth/login", postStudentLogin);
 apiRouter.get("/courses", getCourses);
 apiRouter.get("/courses/:code/sections", getCourseSections);
+apiRouter.get("/academic-terms/recent", getAcademicTermsRecent);
+apiRouter.get("/academic-terms/current", getAcademicTermsCurrent);
+apiRouter.get("/academic-terms", getAcademicTerms);
 /** Course bin (per student); requires `student_course_bin` table when used. */
 apiRouter.get("/course-bin/:studentId", getCourseBin);
 apiRouter.post("/course-bin/:studentId", postCourseBin);
@@ -31,6 +35,8 @@ adminRouter.put("/students/:studentId", putAdminStudent);
 adminRouter.post("/course-sections", postAdminCourseSection);
 adminRouter.patch("/course-sections/:id", patchAdminCourseSection);
 adminRouter.delete("/course-sections/:id", deleteAdminCourseSection);
+adminRouter.post("/academic-terms", postAdminAcademicTerm);
+adminRouter.patch("/academic-terms/:id", patchAdminAcademicTerm);
 apiRouter.use("/admin", adminRouter);
 apiRouter.get("/students/:studentId/profile", getStudentProfile);
 apiRouter.get("/students/:studentId/academics", getStudentAcademics);
