@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AIAssistantPageContext } from '../data/aiMockReplies'
 import { getWelcomeLines } from '../data/aiMockReplies'
-import {
-  sendAssistantMessage,
-  type SendAssistantAttachmentPayload,
-} from '../lib/sendAssistantMessage'
+import { buildApiUrl } from '../lib/api'
+import type { SendAssistantAttachmentPayload } from '../lib/sendAssistantMessage'
 
 export type AIAssistantChatRole = 'user' | 'assistant'
 
@@ -43,6 +41,24 @@ function assistantTextMessage(content: string): AIAssistantChatMessage {
 
 function userMessage(content: string): AIAssistantChatMessage {
   return { id: newId(), role: 'user', content, createdAt: Date.now() }
+}
+
+function formatSourcesAppendix(sources: unknown): string {
+  if (!Array.isArray(sources) || sources.length === 0) return ''
+  const lines: string[] = []
+  for (const item of sources) {
+    if (typeof item !== 'object' || item === null) continue
+    const o = item as Record<string, unknown>
+    const src = typeof o.source === 'string' ? o.source : ''
+    if (!src) continue
+    const chunk =
+      typeof o.chunkIndex === 'number' && Number.isFinite(o.chunkIndex)
+        ? o.chunkIndex
+        : null
+    lines.push(chunk != null ? `- ${src} (chunk ${chunk})` : `- ${src}`)
+  }
+  if (lines.length === 0) return ''
+  return `\n\nSources:\n${lines.join('\n')}`
 }
 
 function isChatMessageRecord(v: unknown): v is AIAssistantChatMessage {
@@ -216,13 +232,13 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
     if ((text === '' && attachments.length === 0) || isAwaitingReply) return
 
     const outgoingAttachments = attachments
-    setDraft('')
-    setAttachments([])
-
     const userLine = text || (outgoingAttachments.length > 0 ? 'Sent file(s).' : '')
+
     if (userLine) {
       setMessages((m) => [...m, userMessage(userLine)])
     }
+    setDraft('')
+    setAttachments([])
 
     setIsAwaitingReply(true)
 
@@ -231,17 +247,46 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
     abortRef.current = ac
 
     try {
-      const reply = await sendAssistantMessage(
-        { text, attachments: outgoingAttachments, pageContext },
-        { signal: ac.signal },
-      )
-      setMessages((m) => [...m, assistantTextMessage(reply)])
+      const res = await fetch(buildApiUrl('/api/ai/ask'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: userLine }),
+        signal: ac.signal,
+      })
+
+      const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+      let data: unknown
+      if (ct.includes('application/json')) {
+        data = await res.json()
+      } else {
+        const snippet = (await res.text()).slice(0, 200)
+        throw new Error(
+          `Expected JSON from /api/ai/ask (HTTP ${res.status}). Body starts with: ${snippet || '(empty)'}`,
+        )
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          typeof (data as { error?: string }).error === 'string'
+            ? (data as { error: string }).error
+            : `Request failed (HTTP ${res.status})`,
+        )
+      }
+
+      if (typeof data !== 'object' || data === null || typeof (data as { answer?: unknown }).answer !== 'string') {
+        throw new Error('Invalid response: missing answer string')
+      }
+
+      const answer = (data as { answer: string; sources?: unknown }).answer
+      const appendix = formatSourcesAppendix((data as { sources?: unknown }).sources)
+      setMessages((m) => [...m, assistantTextMessage(answer + appendix)])
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
+      console.error(e)
       setMessages((m) => [
         ...m,
         assistantTextMessage(
-          'Something went wrong while generating a reply. Please try again in a moment.',
+          "Sorry, I'm having trouble connecting to the server. Please try again.",
         ),
       ])
     } finally {
@@ -251,7 +296,7 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
         setIsAwaitingReply(false)
       }
     }
-  }, [attachments, draft, isAwaitingReply, pageContext, revokeAttachmentUrls])
+  }, [attachments, draft, isAwaitingReply, revokeAttachmentUrls])
 
   useEffect(() => {
     setMessages((prev) => {
