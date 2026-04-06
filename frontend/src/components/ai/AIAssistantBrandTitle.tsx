@@ -4,7 +4,7 @@ type AIAssistantBrandTitleProps = {
 }
 
 /**
- * Institutional title: Cinzel “AMU” + system “AI Assist” (not consumer chat styling).
+ * Institutional title: Cinzel “AMU” (medium weight) + bold “AI Assist” in portal red.
  */
 export function AIAssistantBrandTitle({ variant }: AIAssistantBrandTitleProps) {
   const base =
@@ -15,7 +15,7 @@ export function AIAssistantBrandTitle({ variant }: AIAssistantBrandTitleProps) {
   return (
     <span className={base}>
       <span className="portal-ai-assistant-brand-title__mark">AMU</span>
-      <span className="portal-ai-assistant-brand-title__rest"> AI Assist</span>
+      <span className="portal-ai-assistant-brand-title__rest">AI Assist</span>
     </span>
   )
 }

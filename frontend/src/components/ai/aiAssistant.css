@@ -345,7 +345,7 @@
 
 .portal-ai-assistant-brand-title {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   white-space: nowrap;
 }
 
@@ -361,15 +361,21 @@
 
 .portal-ai-assistant-brand-title__mark {
   font-family: 'Cinzel', ui-serif, Georgia, 'Times New Roman', serif;
-  font-weight: 600;
+  font-weight: 500;
   color: #000000;
   letter-spacing: 0.06em;
+  margin-right: 8px;
 }
 
-/* Panel header: “AI Assist” matches portal accent red + surrounding UI typography */
+.portal-ai-assistant-brand-title--panel .portal-ai-assistant-brand-title__mark {
+  /* Cinzel sits slightly high vs UI sans; nudge for optical vertical balance with bold “AI Assist” */
+  margin-top: 1px;
+}
+
+/* Panel header: “AI Assist” — portal red, bold; emphasis on label over “AMU” */
 .portal-ai-assistant-brand-title--panel .portal-ai-assistant-brand-title__rest {
   font-family: inherit;
-  font-weight: inherit;
+  font-weight: 700;
   letter-spacing: inherit;
   color: var(--portal-ai-red);
 }
