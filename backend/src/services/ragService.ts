@@ -11,13 +11,13 @@ const MAX_HISTORY_MESSAGES = 4;
 const MAX_HISTORY_CONTENT_CHARS = 500;
 const MAX_REWRITE_OUTPUT_CHARS = 320;
 
-type RagIntent = "direct" | "strict" | "guidance";
+type RagIntent = "direct" | "strict" | "guidance" | "out_of_scope";
 
 type DirectKind = "greeting" | "language" | "capability" | "thanks";
 
 const STRICT_SYSTEM_PROMPT_BASE = `You are an assistant for Alhambra Medical University (AMU).
 Answer ONLY using the retrieved AMU catalog excerpts provided.
-Do NOT use outside knowledge.
+Do NOT use outside knowledge or guess beyond the excerpts.
 If the answer is not clearly supported by the provided excerpts, say:
 "I could not find a clear answer in the AMU catalog excerpts provided."
 When possible, mention which catalog/source the answer came from (using the source labels shown in the excerpts).`;
@@ -203,10 +203,10 @@ Maximum ${MAX_REWRITE_OUTPUT_CHARS} characters.`,
 }
 
 const GUIDANCE_FALLBACK_EN =
-  "I could not find a clear, explicit answer in the AMU catalog excerpts provided. Based on the available catalog context, I can help explain related topics such as tuition payment rules, installment options, refund policy, or program structure, but you should confirm final academic or payment decisions with AMU registrar/advisor.";
+  "I couldn't find a clear, direct answer in the AMU catalog excerpts I have right now. Based on the available catalog material, I can still help explain related topics such as tuition payment rules, refund policy, graduation requirements, course planning, or registration procedures. For final academic or payment decisions, you should confirm with AMU registrar/advisor.";
 
 const GUIDANCE_FALLBACK_ZH =
-  "我无法在当前提供的 AMU 目录摘录中找到明确、直接的答案。根据现有目录内容，我可以继续帮助你解释相关主题，例如学费支付规则、分期付款、退费政策或课程结构；但最终的选课、缴费或学术决定，仍建议你向 AMU registrar/advisor 确认。";
+  "我目前无法在现有 AMU 目录摘录中找到明确、直接的答案。根据现有目录内容，我仍可以继续帮助你解释相关主题，例如学费支付规则、退费政策、毕业要求、课程规划或注册流程；但涉及最终的选课、缴费或学术决定时，仍建议你向 AMU registrar/advisor 确认。";
 
 function looksLikeStrictCatalogRefusal(answer: string): boolean {
   if (/could not find a clear answer in the amu catalog excerpts/i.test(answer)) {
@@ -308,6 +308,75 @@ function isGuidanceQuestion(trimmed: string, lower: string): boolean {
   return guidanceEn || guidanceZh;
 }
 
+/**
+ * If the question plausibly relates to catalog, policy, or school academic/financial support,
+ * do not mark it out-of-scope.
+ */
+function isPlausiblyAmuCatalogOrSupport(trimmed: string, lower: string): boolean {
+  if (hasSubstantiveCatalogCue(trimmed, lower)) return true;
+  if (isDefinitionalPolicyQuestion(lower)) return true;
+  if (isGuidanceQuestion(trimmed, lower)) return true;
+  return false;
+}
+
+/**
+ * Conservative: clearly unrelated to AMU catalog / academic support.
+ * Call only when isPlausiblyAmuCatalogOrSupport is false.
+ */
+function isOutOfScopeQuestion(question: string): boolean {
+  const trimmed = question.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (
+    /\b(find a girlfriend|find a boyfriend|get a girlfriend|get a boyfriend|will i find a girlfriend|will i find a boyfriend|dating at|dating in|romantic relationship)\b/i.test(
+      lower,
+    ) ||
+    /\b(will anyone like me|people like me|become popular (at|in))\b/i.test(
+      lower,
+    ) ||
+    /\b(invest in amu|invest in the university|invest in alhambra|buy (a |an )?(part|stake|share|piece) of (amu|the university|alhambra medical)|business opportunity|good (business )?investment)\b/i.test(
+      lower,
+    ) ||
+    /\b(who is the (richest|wealthiest)|most attractive student|hottest student|best[- ]looking student|nicest.{0,30}romantically)\b/i.test(
+      lower,
+    ) ||
+    /\b(how (do i|to) (get |become )rich|get rich quick|should i break up|break up with my (boyfriend|girlfriend))\b/i.test(
+      lower,
+    ) ||
+    /\bwhat should i do with my life\b/i.test(lower)
+  ) {
+    return true;
+  }
+
+  if (
+    /找到(了)?(女朋友|男朋友)|谈恋爱|找对象|脱单|谁会喜欢我|有人喜欢我|喜欢我吗/.test(
+      trimmed,
+    ) ||
+    /变(得)?(受欢迎|有名)|谁最有钱|哪个.{0,8}最(漂亮|帅|美)|最有(魅力|吸引力)/.test(
+      trimmed,
+    ) ||
+    /给.{0,6}AMU.{0,6}投资|投资.{0,6}AMU|买下.{0,10}(学校|大学)|入股.{0,10}(学校|大学)/.test(
+      trimmed,
+    ) ||
+    /怎么变有钱|如何变有钱|发财|暴富/.test(trimmed) ||
+    /我的人生.{0,8}怎么办|人生.{0,8}该怎么办|人生.{0,8}该如何/.test(
+      trimmed,
+    ) ||
+    /(该|要不要|该不该).{0,6}分手|和(男|女)朋友分手/.test(trimmed)
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function buildOutOfScopeReply(question: string): string {
+  if (isMostlyChinese(question)) {
+    return "我目前主要帮助回答 AMU 的课程、学费、退费政策、毕业要求、出勤规定、选课规划和注册流程等问题。这个问题不属于我能根据 AMU 目录可靠回答的范围。如果你想了解，也可以问我有关 AMU 学费、课程规划、毕业要求或注册规则等方面的问题。";
+  }
+  return "I'm mainly designed to help with AMU catalog and academic support questions, such as tuition, refund policy, graduation requirements, course planning, attendance rules, and registration procedures. I can't reliably answer that question based on the AMU catalog. If you want, you can ask me about AMU tuition, course planning, graduation requirements, or registration rules.";
+}
+
 function classifyDirectKind(trimmed: string, lower: string): DirectKind {
   const haystack = trimmed + lower;
 
@@ -405,6 +474,12 @@ function detectIntent(question: string): RagIntent {
   const lower = trimmed.toLowerCase();
 
   if (isDirectIntent(trimmed, lower)) return "direct";
+  if (
+    !isPlausiblyAmuCatalogOrSupport(trimmed, lower) &&
+    isOutOfScopeQuestion(trimmed)
+  ) {
+    return "out_of_scope";
+  }
   if (isGuidanceQuestion(trimmed, lower)) return "guidance";
   return "strict";
 }
@@ -432,6 +507,14 @@ export async function answerAmuQuestion(
     return {
       question: q,
       answer: buildDirectReply(q),
+      sources: [],
+    };
+  }
+
+  if (intent === "out_of_scope") {
+    return {
+      question: q,
+      answer: buildOutOfScopeReply(q),
       sources: [],
     };
   }
