@@ -1,6 +1,12 @@
+import { useRegistrationTermSearchParam } from './registrationTermSearch'
+
 export function CourseBinCheckoutPage() {
+  const registrationTermId = useRegistrationTermSearchParam()
   return (
-    <main className="portal-page">
+    <main
+      className="portal-page"
+      data-registration-term={registrationTermId ?? undefined}
+    >
       <section className="portal-card portal-stack" aria-labelledby="course-bin-checkout-heading">
         <h2 id="course-bin-checkout-heading" className="portal-section-heading">
           Checkout

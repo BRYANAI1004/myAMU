@@ -1052,6 +1052,19 @@ export async function fetchCurrentAcademicTerm(options?: {
   return term
 }
 
+/** Registration module URL query key for academic term id (see `RegistrationLayout`). */
+export const REGISTRATION_TERM_QUERY_KEY = 'term'
+
+/** Read trimmed academic term id from router search params, or `null` if absent. */
+export function readRegistrationTermIdFromSearch(
+  searchParams: URLSearchParams,
+): string | null {
+  const v = searchParams.get(REGISTRATION_TERM_QUERY_KEY)
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
 export type CreateAcademicTermBody = {
   year: number
   term_name: AcademicTermName

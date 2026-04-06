@@ -1,9 +1,15 @@
+import { useRegistrationTermSearchParam } from './registrationTermSearch'
+
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] as const
 const SLOTS = ['8:00', '10:00', '12:00', '2:00', '4:00'] as const
 
 export function SchedulePage() {
+  const registrationTermId = useRegistrationTermSearchParam()
   return (
-    <main className="portal-page">
+    <main
+      className="portal-page"
+      data-registration-term={registrationTermId ?? undefined}
+    >
       <section className="portal-card portal-stack" aria-labelledby="timetable-heading">
         <h2 id="timetable-heading" className="portal-section-heading">
           My Timetable

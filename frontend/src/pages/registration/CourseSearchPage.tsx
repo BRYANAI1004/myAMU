@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApiJson } from '../../lib/api'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
+import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 /** Courses with no leading alphabetic prefix share this grouping key so none are dropped. */
 const NO_PREFIX_KEY = '__NO_PREFIX__'
@@ -300,6 +301,7 @@ function panelIdForPrefix(prefixKey: string): string {
 }
 
 export function CourseSearchPage() {
+  const registrationTermId = useRegistrationTermSearchParam()
   const { addToCourseBin } = useCourseBin()
   const [courses, setCourses] = useState<CourseCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -466,7 +468,10 @@ export function CourseSearchPage() {
   }
 
   return (
-    <main className="portal-page">
+    <main
+      className="portal-page"
+      data-registration-term={registrationTermId ?? undefined}
+    >
       <section className="portal-card portal-stack" aria-labelledby="course-search-heading">
         <h2 id="course-search-heading" className="portal-section-heading">
           Course Search

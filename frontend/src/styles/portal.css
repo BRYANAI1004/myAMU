@@ -1150,6 +1150,48 @@ button.portal-tab {
   margin-bottom: 1.25rem;
 }
 
+/* Registration module: compact term selector above tab nav */
+.portal-registration-layout-term {
+  margin: 0 0 1rem;
+  padding: 0;
+  min-width: 0;
+}
+
+.portal-registration-layout-term__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.portal-registration-layout-term__title {
+  font-size: var(--portal-body-font-size);
+  font-weight: 600;
+  color: var(--portal-text);
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.portal-registration-layout-term__select {
+  min-width: min(100%, 14rem);
+  max-width: 22rem;
+  min-height: 2.25rem;
+  box-sizing: border-box;
+}
+
+.portal-registration-layout-term__status {
+  margin: 0;
+  font-size: var(--portal-body-font-size);
+  line-height: var(--portal-body-line-height);
+}
+
+.portal-registration-layout-term__hint {
+  margin: 0.4rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  max-width: 36rem;
+}
+
 .portal-finances-outlet,
 .portal-registration-outlet,
 .portal-academics-outlet,

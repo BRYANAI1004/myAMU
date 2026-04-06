@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
+import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 function binRowKey(item: CourseBinItem): string {
   return `${item.course_code.trim().toLowerCase()}|${item.section.trim().toLowerCase()}`
 }
 
 export function MyCourseBinPage() {
+  const registrationTermId = useRegistrationTermSearchParam()
   const navigate = useNavigate()
   const { items, removeFromCourseBin } = useCourseBin()
   const hasItems = items.length > 0
@@ -15,7 +17,10 @@ export function MyCourseBinPage() {
   }
 
   return (
-    <main className="portal-page portal-course-bin-page">
+    <main
+      className="portal-page portal-course-bin-page"
+      data-registration-term={registrationTermId ?? undefined}
+    >
       <section className="portal-card portal-stack" aria-labelledby="course-bin-heading">
         <div className="portal-course-bin-card-header">
           <div className="portal-course-bin-card-header-text">

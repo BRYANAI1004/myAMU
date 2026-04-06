@@ -10,13 +10,16 @@ const ITEMS = [
   { to: 'schedule', label: 'My Timetable' },
 ] as const
 
-export function RegistrationNav() {
+export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) {
   return (
     <nav className="portal-registration-nav" aria-label="Registration">
       <ul className="portal-tab-group">
         {ITEMS.map((item) => (
           <li key={item.to}>
-            <NavLink to={item.to} className={({ isActive }) => linkClass(isActive)}>
+            <NavLink
+              to={`${item.to}${termLinkSearch}`}
+              className={({ isActive }) => linkClass(isActive)}
+            >
               {item.label}
             </NavLink>
           </li>

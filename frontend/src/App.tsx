@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAccount } from './context/AccountContext'
 import { useAdminAuth } from './context/AdminAuthContext'
 import { AdminLayout } from './components/admin/AdminLayout'
@@ -57,6 +57,11 @@ function RequireAdminAuth() {
   return <Outlet />
 }
 
+function RegistrationIndexRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: 'search', search }} replace />
+}
+
 export default function App() {
   return (
     <Routes>
@@ -77,7 +82,7 @@ export default function App() {
         <Route element={<PortalLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/registration" element={<RegistrationLayout />}>
-            <Route index element={<Navigate to="search" replace />} />
+            <Route index element={<RegistrationIndexRedirect />} />
             <Route path="search" element={<CourseSearchPage />} />
             <Route path="course-bin" element={<MyCourseBinPage />} />
             <Route path="checkout" element={<CourseBinCheckoutPage />} />
