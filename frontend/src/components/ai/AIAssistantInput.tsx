@@ -113,6 +113,8 @@ export function AIAssistantInput({
         }}
       />
 
+      <p className="portal-ai-assistant-attribution">Powered by AHMC WanPanel AI</p>
+
       <div className="portal-ai-assistant-compose">
         <div className="portal-ai-assistant-compose__leading" role="group" aria-label="Add attachments">
           <button
