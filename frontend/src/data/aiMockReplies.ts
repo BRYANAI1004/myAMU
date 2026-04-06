@@ -23,37 +23,30 @@ const WELCOME_LINES: Record<AIAssistantPageContext, readonly string[]> = {
   registration: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with course search, your course bin, timetable planning, syllabi, prerequisites, and registration steps.',
-    'I am a demo helper for now, so please confirm important dates and policies with the registrar.',
   ],
   finances: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help explain tuition, billing, payments, installment plans, and general account questions.',
-    'I am a demo helper for now, so please confirm important deadlines and policies with the finance office.',
   ],
   academics: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with grades, transcripts, GPA, academic progress, enrollment verification, and academics navigation in myAMU.',
-    'I am a demo helper for now, so please confirm official records and policies with the registrar or academic affairs.',
   ],
   clinical: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with clinical scheduling, hours, evaluations, compliance pages, and how to use this part of the portal.',
-    'I am a demo helper for now, so please confirm requirements and deadlines with your clinical coordinator or program office.',
   ],
   documents: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with registration forms, agreements, quizzes, and finding documents in this section of the portal.',
-    'I am a demo helper for now, so please confirm submissions and policies with the registrar or appropriate office.',
   ],
   account: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with profile settings, student contact information, and general myAMU navigation.',
-    'I am a demo helper for now, so please confirm critical updates with student services or the registrar.',
   ],
   general: [
     'Hi — I am the AMU AI Assistant cat.',
     'I can help with course planning, student portal guidance, billing questions, documents, and general navigation.',
-    'I am a demo helper for now, so please confirm official policies with the appropriate office.',
   ],
 }
 

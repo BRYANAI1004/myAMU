@@ -6,7 +6,7 @@ type AIAssistantWelcomeMessageProps = {
   lottieSize?: number
 }
 
-export function AIAssistantWelcomeMessage({ lines, lottieSize = 56 }: AIAssistantWelcomeMessageProps) {
+export function AIAssistantWelcomeMessage({ lines, lottieSize = 68 }: AIAssistantWelcomeMessageProps) {
   const data = useCatLottieData()
   const [title, ...rest] = lines
 

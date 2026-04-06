@@ -35,7 +35,7 @@
   display: flex;
   flex-direction: row;
   align-items: flex-end;
-  gap: 10px;
+  gap: 6px;
   right: max(1rem, env(safe-area-inset-right));
   bottom: max(1rem, env(safe-area-inset-bottom));
   left: auto;
@@ -84,8 +84,8 @@
 
 .portal-ai-assistant-welcome {
   display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
+  gap: 0.625rem;
+  align-items: center;
   text-align: left;
 }
 
@@ -103,14 +103,14 @@
 }
 
 .portal-ai-assistant-welcome__title {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.3rem;
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--portal-ai-text);
 }
 
 .portal-ai-assistant-welcome__p {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.25rem;
   font-size: 0.8125rem;
   line-height: 1.45;
   color: var(--portal-ai-muted);
@@ -122,15 +122,15 @@
 
 .portal-ai-assistant-bubble--welcome {
   max-width: 100%;
-  padding: 0.65rem 0.75rem;
+  padding: 0.55rem 0.65rem;
 }
 
 .portal-ai-assistant-launcher {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 3.25rem;
+  height: 3.25rem;
   margin: 0;
   padding: 0;
   border: none;
@@ -262,10 +262,10 @@
 
 .portal-ai-assistant-panel__header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  padding: 0.875rem 1rem;
+  padding: 0.65rem 1rem;
   background: linear-gradient(
     180deg,
     rgba(242, 195, 0, 0.14) 0%,
@@ -284,12 +284,6 @@
   font-weight: 700;
   color: var(--portal-ai-red);
   letter-spacing: 0.01em;
-}
-
-.portal-ai-assistant-panel__subtitle {
-  margin: 0.2rem 0 0;
-  font-size: 0.8125rem;
-  color: var(--portal-ai-muted);
 }
 
 .portal-ai-assistant-panel__header-actions {

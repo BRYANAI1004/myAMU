@@ -58,7 +58,7 @@ export function AIAssistantLauncher() {
             onPointerCancel={dragEnabled ? onCatPointerCancel : undefined}
             onClick={!dragEnabled ? () => openPanel() : undefined}
           >
-            <AIAssistantPet size={78} aria-hidden={true} />
+            <AIAssistantPet size={104} aria-hidden={true} />
           </div>
           <button
             type="button"
@@ -68,7 +68,7 @@ export function AIAssistantLauncher() {
             aria-haspopup="dialog"
           >
             <span className="portal-ai-assistant-launcher__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="26" height="26" fill="none" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
                 <path
                   d="M12 3C7.03 3 3 6.58 3 11c0 2.13 1.04 4.06 2.72 5.35L4.5 20.5l4.45-1.18A8.94 8.94 0 0012 19c4.97 0 9-3.58 9-8s-4.03-8-9-8z"
                   stroke="currentColor"

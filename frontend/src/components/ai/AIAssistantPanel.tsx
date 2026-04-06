@@ -50,7 +50,6 @@ export function AIAssistantPanel({
       role="dialog"
       aria-modal="false"
       aria-labelledby="portal-ai-assistant-title"
-      aria-describedby="portal-ai-assistant-subtitle"
     >
       <header
         className={
@@ -64,9 +63,6 @@ export function AIAssistantPanel({
           <h2 id="portal-ai-assistant-title" className="portal-ai-assistant-panel__title">
             AMU AI Assistant
           </h2>
-          <p id="portal-ai-assistant-subtitle" className="portal-ai-assistant-panel__subtitle">
-            Course &amp; Payment Guidance
-          </p>
         </div>
         <div className="portal-ai-assistant-panel__header-actions">
           <button
@@ -121,7 +117,7 @@ export function AIAssistantPanel({
                 }
               >
                 {m.welcomeLines?.length ? (
-                  <AIAssistantWelcomeMessage lines={m.welcomeLines} lottieSize={56} />
+                  <AIAssistantWelcomeMessage lines={m.welcomeLines} lottieSize={68} />
                 ) : (
                   m.content
                 )}
