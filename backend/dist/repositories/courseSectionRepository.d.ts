@@ -39,6 +39,12 @@ export type CourseSectionTermFilter = {
 export declare function listCourseSectionsByCourseCode(courseCode: string, termFilter?: CourseSectionTermFilter): Promise<CourseSectionDetail[]>;
 /** All sections offered in a legacy term + year (for admin timetable). */
 export declare function listCourseSectionsByTermYear(term: string, year: number): Promise<CourseSectionDetail[]>;
+/** Course-level section counts for one legacy term + year (admin open-registration rollup). */
+export type CourseSectionCountByCourse = {
+    course_code: string;
+    section_count: number;
+};
+export declare function countCourseSectionsByCourseForTermYear(term: string, year: number): Promise<CourseSectionCountByCourse[]>;
 export declare function createCourseSection(input: CourseSectionCreateInput): Promise<CourseSectionDetail>;
 /**
  * Applies a partial update. Returns `null` if the row does not exist.

@@ -87,6 +87,23 @@ export async function listCourseSectionsByTermYear(term, year) {
     ]);
     return rows.map((r) => normalizeRow(r));
 }
+export async function countCourseSectionsByCourseForTermYear(term, year) {
+    const sql = `
+    SELECT course_code, COUNT(*) AS section_count
+    FROM course_sections
+    WHERE term = ? AND year = ?
+    GROUP BY course_code
+    ORDER BY course_code ASC
+  `;
+    const [rows] = await pool.query(sql, [
+        term.trim(),
+        year,
+    ]);
+    return rows.map((r) => ({
+        course_code: String(r.course_code ?? ""),
+        section_count: Number(r.section_count ?? 0),
+    }));
+}
 export async function createCourseSection(input) {
     const sql = `
     INSERT INTO course_sections (

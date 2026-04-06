@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getAdminStudent, getAdminStudents, getNextAdminStudentId, postAdminStudent, postDeleteSelectedAdminStudents, putAdminStudent, } from "../controllers/adminStudentController.js";
 import { deleteAdminCourseSection, getAdminCourseSections, patchAdminCourseSection, postAdminCourseSection, } from "../controllers/adminCourseSectionController.js";
+import { getAdminCoursesOpenForRegistration } from "../controllers/adminOpenRegistrationCoursesController.js";
 import { deleteCourseBinItemHandler, getCourseBin, postCourseBin, } from "../controllers/courseBinController.js";
 import { getCourseSections, getCourses } from "../controllers/courseController.js";
 import { getHealth, getHealthDb } from "../controllers/healthController.js";
@@ -34,6 +35,7 @@ adminRouter.post("/students", postAdminStudent);
 adminRouter.post("/students/delete-selected", postDeleteSelectedAdminStudents);
 adminRouter.get("/students/:studentId", getAdminStudent);
 adminRouter.put("/students/:studentId", putAdminStudent);
+adminRouter.get("/courses/open-for-registration", getAdminCoursesOpenForRegistration);
 adminRouter.get("/course-sections", getAdminCourseSections);
 adminRouter.post("/course-sections", postAdminCourseSection);
 adminRouter.patch("/course-sections/:id", patchAdminCourseSection);
