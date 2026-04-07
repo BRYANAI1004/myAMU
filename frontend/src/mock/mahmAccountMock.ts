@@ -40,6 +40,16 @@ export type MahmRegistration = {
   emptyReason?: string
 }
 
+/** Populated for legacy real students via GET /account (`clinicalProgress`); omitted for catalog demo. */
+export type MahmClinicalProgress = {
+  level: number
+  completedHours: number
+  requiredHours: number
+  completedCourses: string[]
+  readiness: 'ready' | 'not_ready'
+  missing: string[]
+}
+
 export type MahmAccountMock = {
   program: string
   student: {
@@ -76,6 +86,7 @@ export type MahmAccountMock = {
   availableScheduleTerms?: Array<{ term: string; year: number; label: string }>
   recentActivity: MahmRecentActivityEntry[]
   statements: MahmStatementEntry[]
+  clinicalProgress?: MahmClinicalProgress
 }
 
 /**

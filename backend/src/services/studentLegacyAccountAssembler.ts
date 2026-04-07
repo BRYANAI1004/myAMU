@@ -6,6 +6,7 @@ import type {
 import type { CourseTranscriptLookupEntry } from "../repositories/studentTranscriptRepository.js";
 import type {
   AccountScheduleTermOption,
+  ClinicalProgress,
   PaymentRecord,
   StudentAccountPayload,
 } from "../types/studentAccount.js";
@@ -49,6 +50,7 @@ export type AssembleLegacyStudentAccountOptions = {
   /** True active enrollment term (latest open registration on marks); drives `currentTerm` on the payload. */
   portalActiveTerm: { term: string; year: number } | null;
   availableScheduleTerms: AccountScheduleTermOption[];
+  clinicalProgress: ClinicalProgress;
 };
 
 export function assembleLegacyStudentAccountPayload(
@@ -110,7 +112,7 @@ export function assembleLegacyStudentAccountPayload(
   }
 
   const browseTerm = { term: snap.term, year: snap.year };
-  const { portalActiveTerm, availableScheduleTerms } = options;
+  const { portalActiveTerm, availableScheduleTerms, clinicalProgress } = options;
 
   const marksRowsForBrowse = allMarksRows.filter(
     (m) => m.year === browseTerm.year && termsMatch(m.term, browseTerm.term),
@@ -181,5 +183,6 @@ export function assembleLegacyStudentAccountPayload(
     installmentPolicy: [],
     billingStatus: null,
     termChargeEffectiveDate: null,
+    clinicalProgress,
   };
 }

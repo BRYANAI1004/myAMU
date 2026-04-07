@@ -22,6 +22,7 @@ import {
   resolveRegistrationAnchoredAcademicTerm,
   termSortOrder,
 } from "./studentAcademicCourseRecords.js";
+import { buildClinicalProgress } from "./clinicalProgressService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
 import { buildAccountCurrentTerm } from "./studentAccountDashboard.js";
 import { assembleStudentAccountPayload } from "./studentAccountAssembler.js";
@@ -182,12 +183,13 @@ async function getRealStudentAccountPayload(
   if (!snap) {
     return null;
   }
-  const [accountingRows, allMarksRows, courseLookup, latestReg] =
+  const [accountingRows, allMarksRows, courseLookup, latestReg, clinicalProgress] =
     await Promise.all([
       loadLegacyAccountingRows(pool, studentId, term, year),
       listMarksForStudent(pool, studentId),
       loadCoursesTranscriptLookup(pool),
       findLatestLegacyTermYear(pool, studentId),
+      buildClinicalProgress(pool, studentId),
     ]);
 
   let portalActiveTerm: { term: string; year: number } | null = null;
@@ -212,7 +214,7 @@ async function getRealStudentAccountPayload(
     accountingRows,
     allMarksRows,
     courseLookup,
-    { portalActiveTerm, availableScheduleTerms },
+    { portalActiveTerm, availableScheduleTerms, clinicalProgress },
   );
 }
 

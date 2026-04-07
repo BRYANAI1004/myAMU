@@ -11,6 +11,7 @@ import { fetchStudentAccount, fetchStudentProfile } from '../lib/api'
 import { mahmAccountMock } from '../mock/mahmAccountMock'
 import type {
   MahmAccountMock,
+  MahmClinicalProgress,
   MahmCurrentTerm,
   MahmRegistration,
 } from '../mock/mahmAccountMock'
@@ -173,6 +174,29 @@ function parseAvailableScheduleTermsFromApi(
     return [{ term: st, year: sy, label: cap && sy ? `${cap} ${sy}` : cap || String(sy) }]
   }
   return []
+}
+
+function parseClinicalProgressFromApi(raw: unknown): MahmClinicalProgress | undefined {
+  if (raw == null || typeof raw !== 'object') return undefined
+  const p = raw as Record<string, unknown>
+  const level = Number(p.level)
+  const completedHours = Number(p.completedHours)
+  const requiredHours = Number(p.requiredHours)
+  const readinessRaw = String(p.readiness ?? '')
+  const readiness: MahmClinicalProgress['readiness'] =
+    readinessRaw === 'ready' || readinessRaw === 'not_ready' ? readinessRaw : 'not_ready'
+  const completedCourses = Array.isArray(p.completedCourses)
+    ? p.completedCourses.map((x) => String(x))
+    : []
+  const missing = Array.isArray(p.missing) ? p.missing.map((x) => String(x)) : []
+  return {
+    level: Number.isFinite(level) ? level : 0,
+    completedHours: Number.isFinite(completedHours) ? completedHours : 0,
+    requiredHours: Number.isFinite(requiredHours) ? requiredHours : 0,
+    completedCourses,
+    readiness,
+    missing,
+  }
 }
 
 function parseRegistrationFromApi(
@@ -400,6 +424,7 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
     registration,
     recentActivity,
     statements: [],
+    clinicalProgress: parseClinicalProgressFromApi(o.clinicalProgress),
   })
 }
 
