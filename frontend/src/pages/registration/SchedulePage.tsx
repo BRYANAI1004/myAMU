@@ -64,10 +64,16 @@ export function SchedulePage() {
   const displayItems = useMemo(() => {
     const map = new Map<string, CourseBinItem>()
     for (const it of enrolledItems) {
-      map.set(courseBinSectionKey(it.course_code, it.section), it)
+      map.set(
+        courseBinSectionKey(it.course_code, it.section, it.schedule_track),
+        it,
+      )
     }
     for (const it of items) {
-      map.set(courseBinSectionKey(it.course_code, it.section), it)
+      map.set(
+        courseBinSectionKey(it.course_code, it.section, it.schedule_track),
+        it,
+      )
     }
     return [...map.values()]
   }, [enrolledItems, items])

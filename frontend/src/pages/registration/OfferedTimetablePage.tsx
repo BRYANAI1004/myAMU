@@ -16,6 +16,7 @@ import {
   formatWeekdaysLongFromStored,
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
+import { offeredTimetableHeading, scheduleTrackDetailLabel } from '../../lib/scheduleTrack'
 import {
   courseBinSectionKey,
   useCourseBin,
@@ -43,8 +44,114 @@ function cellText(value: string | number | null | undefined): string {
 }
 
 function isSectionInBin(items: CourseBinItem[], sec: AdminCourseSection): boolean {
-  const k = courseBinSectionKey(sec.course_code, sec.section_code)
-  return items.some((x) => courseBinSectionKey(x.course_code, x.section) === k)
+  const k = courseBinSectionKey(sec.course_code, sec.section_code, sec.schedule_track)
+  return items.some(
+    (x) => courseBinSectionKey(x.course_code, x.section, x.schedule_track) === k,
+  )
+}
+
+type OfferedWeekGridProps = {
+  placedWeekdays: ReturnType<typeof buildTimetablePlacedBlocksByDay>
+  hourRows: number[]
+  bodyHeightPx: number
+  binItems: CourseBinItem[]
+  onSelectSection: (sec: AdminCourseSection) => void
+}
+
+function OfferedTimetableWeekGrid({
+  placedWeekdays,
+  hourRows,
+  bodyHeightPx,
+  binItems,
+  onSelectSection,
+}: OfferedWeekGridProps) {
+  const placed = placedWeekdays.slice(0, DAY_HEADERS.length)
+  return (
+    <div className="admin-timetable-wrap">
+      <div
+        className="admin-timetable-v2"
+        style={
+          {
+            '--admin-tt-slot': `${TIMETABLE_ROW_HEIGHT_PX}px`,
+          } as CSSProperties
+        }
+      >
+        <div className="admin-timetable-v2__head">
+          <div className="admin-timetable-v2__corner" aria-hidden />
+          {DAY_HEADERS.map((d) => (
+            <div key={d.full} className="admin-timetable-v2__day-head">
+              {d.label}
+            </div>
+          ))}
+        </div>
+        <div className="admin-timetable-v2__main">
+          <div
+            className="admin-timetable-v2__times"
+            style={{ height: bodyHeightPx }}
+          >
+            {hourRows.map((h) => (
+              <div key={h} className="admin-timetable-v2__time-cell">
+                {formatTimeHmsForDisplay(`${h}:00:00`)}
+              </div>
+            ))}
+          </div>
+          {DAY_HEADERS.map((d, di) => (
+            <div key={d.full} className="admin-timetable-v2__day-col">
+              <div
+                className="admin-timetable-v2__day-track"
+                style={{ height: bodyHeightPx }}
+              >
+                {placed[di]!.map((b) => {
+                  const colW = 100 / b.colCount
+                  const insetPx = 3
+                  const inBin = isSectionInBin(binItems, b.section)
+                  return (
+                    <button
+                      key={`${b.section.id}-${d.full}-${b.startMin}-${b.colIndex}`}
+                      type="button"
+                      className={[
+                        'admin-timetable-v2__block',
+                        'portal-offered-timetable__block',
+                        inBin ? 'portal-offered-timetable__block--in-bin' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      style={{
+                        top: b.topPx,
+                        height: b.heightPx,
+                        left: `calc(${colW * b.colIndex}% + ${insetPx}px)`,
+                        width: `calc(${colW}% - ${insetPx * 2}px)`,
+                      }}
+                      onClick={() => onSelectSection(b.section)}
+                      aria-label={
+                        inBin
+                          ? `${b.section.course_code} section ${b.section.section_code}, in CourseBin — open details`
+                          : `View details for ${b.section.course_code} section ${b.section.section_code}`
+                      }
+                    >
+                      <span className="admin-timetable-v2__block-title">
+                        {b.section.course_code} {b.section.section_code}
+                        {inBin ? (
+                          <span className="portal-offered-timetable__badge"> Added</span>
+                        ) : null}
+                      </span>
+                      <span className="admin-timetable-v2__block-meta">
+                        {formatTimeHmsForDisplay(b.section.start_time)} –{' '}
+                        {formatTimeHmsForDisplay(b.section.end_time)}
+                      </span>
+                      <span className="admin-timetable-v2__block-meta">
+                        {formatDeliveryModeForDisplay(b.section.delivery_mode)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function OfferedTimetablePage() {
@@ -140,14 +247,22 @@ export function OfferedTimetablePage() {
     return Array.from({ length: eh - sh + 1 }, (_, i) => sh + i)
   }, [])
 
-  const placedByDayFull = useMemo(
-    () => buildTimetablePlacedBlocksByDay(sections ?? [], OFFERED_GRID),
+  const enSections = useMemo(
+    () => (sections ?? []).filter((s) => s.schedule_track !== 'CN'),
+    [sections],
+  )
+  const cnSections = useMemo(
+    () => (sections ?? []).filter((s) => s.schedule_track === 'CN'),
     [sections],
   )
 
-  const placedWeekdays = useMemo(
-    () => placedByDayFull.slice(0, DAY_HEADERS.length),
-    [placedByDayFull],
+  const placedEn = useMemo(
+    () => buildTimetablePlacedBlocksByDay(enSections, OFFERED_GRID),
+    [enSections],
+  )
+  const placedCn = useMemo(
+    () => buildTimetablePlacedBlocksByDay(cnSections, OFFERED_GRID),
+    [cnSections],
   )
 
   const bodyHeightPx = timetableBodyHeightPx(OFFERED_GRID)
@@ -163,7 +278,11 @@ export function OfferedTimetablePage() {
 
   const handleConfirmRemoveFromModal = useCallback(() => {
     if (detailSection == null) return
-    removeFromCourseBin(detailSection.course_code, detailSection.section_code)
+    removeFromCourseBin(
+      detailSection.course_code,
+      detailSection.section_code,
+      detailSection.schedule_track,
+    )
     showToast('Removed from CourseBin')
     setDetailSection(null)
   }, [detailSection, removeFromCourseBin, showToast])
@@ -228,94 +347,62 @@ export function OfferedTimetablePage() {
         )}
 
         {!termMissing && !loading && sections != null && sections.length === 0 && error == null && (
-          <p className="portal-text-muted" role="status">
-            No sections are scheduled for this term yet.
-          </p>
+          <>
+            <p className="portal-text-muted" role="status">
+              No sections are scheduled for this term yet.
+            </p>
+            <h3 className="portal-section-heading" style={{ marginTop: '1.25rem' }}>
+              {offeredTimetableHeading('EN')}
+            </h3>
+            <p className="portal-text-muted" role="status">
+              No English timetable sections scheduled for this term.
+            </p>
+            <h3 className="portal-section-heading" style={{ marginTop: '1.25rem' }}>
+              {offeredTimetableHeading('CN')}
+            </h3>
+            <p className="portal-text-muted" role="status">
+              No Chinese timetable sections scheduled for this term.
+            </p>
+          </>
         )}
 
         {!termMissing && !loading && sections != null && sections.length > 0 && (
-          <div className="admin-timetable-wrap">
-            <div
-              className="admin-timetable-v2"
-              style={
-                {
-                  '--admin-tt-slot': `${TIMETABLE_ROW_HEIGHT_PX}px`,
-                } as CSSProperties
-              }
-            >
-              <div className="admin-timetable-v2__head">
-                <div className="admin-timetable-v2__corner" aria-hidden />
-                {DAY_HEADERS.map((d) => (
-                  <div key={d.full} className="admin-timetable-v2__day-head">
-                    {d.label}
-                  </div>
-                ))}
-              </div>
-              <div className="admin-timetable-v2__main">
-                <div
-                  className="admin-timetable-v2__times"
-                  style={{ height: bodyHeightPx }}
-                >
-                  {hourRows.map((h) => (
-                    <div key={h} className="admin-timetable-v2__time-cell">
-                      {formatTimeHmsForDisplay(`${h}:00:00`)}
-                    </div>
-                  ))}
-                </div>
-                {DAY_HEADERS.map((d, di) => (
-                  <div key={d.full} className="admin-timetable-v2__day-col">
-                    <div
-                      className="admin-timetable-v2__day-track"
-                      style={{ height: bodyHeightPx }}
-                    >
-                      {placedWeekdays[di]!.map((b) => {
-                        const colW = 100 / b.colCount
-                        const insetPx = 3
-                        const inBin = isSectionInBin(binItems, b.section)
-                        return (
-                          <button
-                            key={`${b.section.id}-${d.full}-${b.startMin}-${b.colIndex}`}
-                            type="button"
-                            className={[
-                              'admin-timetable-v2__block',
-                              'portal-offered-timetable__block',
-                              inBin ? 'portal-offered-timetable__block--in-bin' : '',
-                            ]
-                              .filter(Boolean)
-                              .join(' ')}
-                            style={{
-                              top: b.topPx,
-                              height: b.heightPx,
-                              left: `calc(${colW * b.colIndex}% + ${insetPx}px)`,
-                              width: `calc(${colW}% - ${insetPx * 2}px)`,
-                            }}
-                            onClick={() => setDetailSection(b.section)}
-                            aria-label={
-                              inBin
-                                ? `${b.section.course_code} section ${b.section.section_code}, in CourseBin — open details`
-                                : `View details for ${b.section.course_code} section ${b.section.section_code}`
-                            }
-                          >
-                            <span className="admin-timetable-v2__block-title">
-                              {b.section.course_code} {b.section.section_code}
-                              {inBin ? (
-                                <span className="portal-offered-timetable__badge"> Added</span>
-                              ) : null}
-                            </span>
-                            <span className="admin-timetable-v2__block-meta">
-                              {formatTimeHmsForDisplay(b.section.start_time)} –{' '}
-                              {formatTimeHmsForDisplay(b.section.end_time)}
-                            </span>
-                            <span className="admin-timetable-v2__block-meta">
-                              {formatDeliveryModeForDisplay(b.section.delivery_mode)}
-                            </span>
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="portal-stack" style={{ gap: '2rem' }}>
+            <div>
+              <h3 className="portal-section-heading" style={{ marginBottom: '0.5rem' }}>
+                {offeredTimetableHeading('EN')}
+              </h3>
+              {enSections.length === 0 ? (
+                <p className="portal-text-muted" role="status">
+                  No English timetable sections scheduled for this term.
+                </p>
+              ) : (
+                <OfferedTimetableWeekGrid
+                  placedWeekdays={placedEn}
+                  hourRows={hourRows}
+                  bodyHeightPx={bodyHeightPx}
+                  binItems={binItems}
+                  onSelectSection={setDetailSection}
+                />
+              )}
+            </div>
+            <div>
+              <h3 className="portal-section-heading" style={{ marginBottom: '0.5rem' }}>
+                {offeredTimetableHeading('CN')}
+              </h3>
+              {cnSections.length === 0 ? (
+                <p className="portal-text-muted" role="status">
+                  No Chinese timetable sections scheduled for this term.
+                </p>
+              ) : (
+                <OfferedTimetableWeekGrid
+                  placedWeekdays={placedCn}
+                  hourRows={hourRows}
+                  bodyHeightPx={bodyHeightPx}
+                  binItems={binItems}
+                  onSelectSection={setDetailSection}
+                />
+              )}
             </div>
           </div>
         )}
@@ -349,6 +436,10 @@ export function OfferedTimetablePage() {
                   <dd>{detailEngTitle}</dd>
                 </div>
               ) : null}
+              <div>
+                <dt>Timetable track</dt>
+                <dd>{scheduleTrackDetailLabel(detailSection.schedule_track)}</dd>
+              </div>
               <div>
                 <dt>Section</dt>
                 <dd>{detailSection.section_code}</dd>

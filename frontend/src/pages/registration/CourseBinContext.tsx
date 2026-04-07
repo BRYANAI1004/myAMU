@@ -16,6 +16,8 @@ export type CourseBinItem = {
   chi_name: string
   units: string
   section: string
+  /** Disambiguates same section code on EN vs CN offered timetables; omitted/legacy = EN. */
+  schedule_track?: 'EN' | 'CN'
   session: string
   type: string
   registered: string
@@ -32,14 +34,27 @@ export type CourseBinItem = {
 type CourseBinContextValue = {
   items: CourseBinItem[]
   addToCourseBin: (item: CourseBinItem) => void
-  removeFromCourseBin: (courseCode: string, section: string) => void
+  removeFromCourseBin: (
+    courseCode: string,
+    section: string,
+    scheduleTrack?: 'EN' | 'CN',
+  ) => void
   clearCourseBin: () => void
 }
 
 const CourseBinContext = createContext<CourseBinContextValue | null>(null)
 
-export function courseBinSectionKey(courseCode: string, section: string): string {
-  return `${courseCode.trim().toLowerCase()}|${section.trim().toLowerCase()}`
+function normalizeBinTrack(track: 'EN' | 'CN' | undefined): 'EN' | 'CN' {
+  return track === 'CN' ? 'CN' : 'EN'
+}
+
+export function courseBinSectionKey(
+  courseCode: string,
+  section: string,
+  scheduleTrack?: 'EN' | 'CN',
+): string {
+  const tr = normalizeBinTrack(scheduleTrack)
+  return `${courseCode.trim().toLowerCase()}|${section.trim().toLowerCase()}|${tr}`
 }
 
 function storageKeyForTerm(registrationTermId: string): string | null {
@@ -50,6 +65,13 @@ function storageKeyForTerm(registrationTermId: string): string | null {
 function isCourseBinItemRecord(v: unknown): v is CourseBinItem {
   if (v == null || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
+  if (
+    o.schedule_track !== undefined &&
+    o.schedule_track !== 'EN' &&
+    o.schedule_track !== 'CN'
+  ) {
+    return false
+  }
   return (
     typeof o.course_code === 'string' &&
     typeof o.eng_name === 'string' &&
@@ -114,18 +136,35 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
     if (code === '') return
 
     setItems((prev) => {
-      const key = courseBinSectionKey(item.course_code, item.section)
-      if (prev.some((x) => courseBinSectionKey(x.course_code, x.section) === key)) {
+      const key = courseBinSectionKey(
+        item.course_code,
+        item.section,
+        item.schedule_track,
+      )
+      if (
+        prev.some(
+          (x) =>
+            courseBinSectionKey(x.course_code, x.section, x.schedule_track) ===
+            key,
+        )
+      ) {
         return prev
       }
       return [...prev, item]
     })
   }, [])
 
-  const removeFromCourseBin = useCallback((courseCode: string, section: string) => {
-    const key = courseBinSectionKey(courseCode, section)
-    setItems((prev) => prev.filter((x) => courseBinSectionKey(x.course_code, x.section) !== key))
-  }, [])
+  const removeFromCourseBin = useCallback(
+    (courseCode: string, section: string, scheduleTrack?: 'EN' | 'CN') => {
+      const key = courseBinSectionKey(courseCode, section, scheduleTrack)
+      setItems((prev) =>
+        prev.filter(
+          (x) => courseBinSectionKey(x.course_code, x.section, x.schedule_track) !== key,
+        ),
+      )
+    },
+    [],
+  )
 
   const clearCourseBin = useCallback(() => {
     setItems([])

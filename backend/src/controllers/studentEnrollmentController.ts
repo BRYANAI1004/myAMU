@@ -38,7 +38,22 @@ function parseEnrollBody(
     const section_code =
       typeof s.section_code === "string" ? s.section_code.trim() : "";
     if (!course_code || !section_code) return null;
-    sections.push({ course_code, section_code });
+    let schedule_track: "EN" | "CN" | undefined;
+    if (Object.prototype.hasOwnProperty.call(s, "schedule_track")) {
+      const raw = s.schedule_track;
+      if (raw !== null && typeof raw !== "string") return null;
+      if (typeof raw === "string") {
+        const t = raw.trim().toUpperCase();
+        if (t === "") schedule_track = undefined;
+        else if (t === "EN" || t === "CN") schedule_track = t;
+        else return null;
+      }
+    }
+    sections.push({
+      course_code,
+      section_code,
+      ...(schedule_track !== undefined ? { schedule_track } : {}),
+    });
   }
   return { studentId, academic_term_id, sections };
 }
@@ -60,7 +75,7 @@ export async function postStudentEnroll(
     if (!parsed) {
       res.status(400).json({
         error:
-          "Invalid body: require studentId, academic_term_id, and sections[{ course_code, section_code }].",
+          "Invalid body: require studentId, academic_term_id, and sections[{ course_code, section_code, schedule_track? }]. schedule_track must be EN or CN when provided.",
       });
       return;
     }

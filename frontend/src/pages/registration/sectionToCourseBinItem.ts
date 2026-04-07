@@ -52,6 +52,7 @@ export function adminSectionToCourseBinItem(
     chi_name: chi,
     units: unitsCat === '' ? '—' : unitsCat,
     section: secCode === '' ? '—' : secCode,
+    schedule_track: sec.schedule_track,
     session: sessionLabelFromSection(sec),
     type: typeLabelForCourseBin(sec),
     registered: PLACEHOLDER_REGISTERED,

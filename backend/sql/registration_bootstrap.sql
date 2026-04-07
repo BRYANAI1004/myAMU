@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS course_sections (
   term VARCHAR(16) NOT NULL,
   year INT NOT NULL,
   section_code VARCHAR(32) NOT NULL,
+  schedule_track VARCHAR(16) NOT NULL DEFAULT 'EN' COMMENT 'Offered timetable: EN or CN',
   weekday VARCHAR(128) NOT NULL,
   start_time TIME NULL,
   end_time TIME NULL,
@@ -60,7 +61,8 @@ CREATE TABLE IF NOT EXISTS course_sections (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
-  UNIQUE KEY uq_course_sections_offer (course_code, term, year, section_code),
+  CONSTRAINT chk_course_sections_schedule_track CHECK (schedule_track IN ('EN', 'CN')),
+  UNIQUE KEY uq_course_sections_offer_track (course_code, term, year, schedule_track, section_code),
   KEY idx_course_sections_course (course_code),
   KEY idx_course_sections_course_term_year (course_code, term, year)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

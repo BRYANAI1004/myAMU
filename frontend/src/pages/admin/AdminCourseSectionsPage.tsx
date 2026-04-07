@@ -34,6 +34,7 @@ import {
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
 import { AdminSectionEnrolledStudentsModal } from '../../components/admin/AdminSectionEnrolledStudentsModal'
+import { scheduleTrackTableLabel } from '../../lib/scheduleTrack'
 
 function displayCell(value: string | null | undefined): string {
   if (value == null || String(value).trim() === '') return '—'
@@ -42,6 +43,7 @@ function displayCell(value: string | null | undefined): string {
 
 type FormState = {
   section_code: string
+  schedule_track: 'EN' | 'CN'
   weekdays: WeekdayFull[]
   start_time: string
   end_time: string
@@ -53,6 +55,7 @@ type FormState = {
 
 const emptyForm = (): FormState => ({
   section_code: '',
+  schedule_track: 'EN',
   weekdays: ['Monday'],
   start_time: '',
   end_time: '',
@@ -209,6 +212,15 @@ export function AdminCourseSectionsPage() {
     return () => ac.abort()
   }, [academicTermId, courseCode, listVersion])
 
+  const enSectionRows = useMemo(
+    () => (sections ?? []).filter((s) => s.schedule_track !== 'CN'),
+    [sections],
+  )
+  const cnSectionRows = useMemo(
+    () => (sections ?? []).filter((s) => s.schedule_track === 'CN'),
+    [sections],
+  )
+
   const sortedCourses = useMemo(() => {
     if (courses == null) return []
     return [...courses].sort((a, b) => a.code.localeCompare(b.code))
@@ -239,6 +251,7 @@ export function AdminCourseSectionsPage() {
     const parsed = parseStoredWeekdaysToFullNames(row.weekday)
     setForm({
       section_code: row.section_code,
+      schedule_track: row.schedule_track === 'CN' ? 'CN' : 'EN',
       weekdays: parsed.length > 0 ? parsed : ['Monday'],
       start_time: timeToInputValue(row.start_time),
       end_time: timeToInputValue(row.end_time),
@@ -377,6 +390,7 @@ export function AdminCourseSectionsPage() {
         academic_term_id: tid,
         course_code: code,
         section_code: form.section_code.trim(),
+        schedule_track: form.schedule_track,
         weekday: wd,
         start_time: inputTimeToApi(form.start_time),
         end_time: inputTimeToApi(form.end_time),
@@ -416,6 +430,7 @@ export function AdminCourseSectionsPage() {
         academic_term_id: tid,
         course_code: courseCode.trim(),
         section_code: form.section_code.trim(),
+        schedule_track: form.schedule_track,
         weekday: wd,
         start_time: inputTimeToApi(form.start_time),
         end_time: inputTimeToApi(form.end_time),
@@ -610,6 +625,7 @@ export function AdminCourseSectionsPage() {
           <thead>
             <tr>
               <th scope="col">Section</th>
+              <th scope="col">Track</th>
               <th scope="col">Weekday</th>
               <th scope="col">Start</th>
               <th scope="col">End</th>
@@ -625,62 +641,142 @@ export function AdminCourseSectionsPage() {
           <tbody>
             {sectionsLoading && (
               <tr>
-                <td colSpan={11}>Loading sections…</td>
+                <td colSpan={12}>Loading sections…</td>
               </tr>
             )}
             {!sectionsLoading && sections != null && sections.length === 0 && (
               <tr>
-                <td colSpan={11}>No sections for this term and course.</td>
+                <td colSpan={12}>No sections for this term and course.</td>
               </tr>
             )}
-            {!sectionsLoading &&
-              sections?.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.section_code}</td>
-                  <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
-                  <td>{formatTimeHmsForDisplay(row.start_time)}</td>
-                  <td>{formatTimeHmsForDisplay(row.end_time)}</td>
-                  <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
-                  <td>{displayCell(row.room)}</td>
-                  <td>{displayCell(row.instructor)}</td>
-                  <td>{row.enrolled_count}</td>
-                  <td>
-                    {row.enrolled_count > 0 ? (
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy}
-                        onClick={() => setEnrolledModalSection(row)}
-                      >
-                        View students
-                      </button>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{displayCell(row.notes)}</td>
-                  <td>
-                    <div className="admin-inline-actions">
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy}
-                        onClick={() => beginEdit(row)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy}
-                        onClick={() => void onDeleteRow(row)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+            {!sectionsLoading && sections != null && sections.length > 0 && (
+              <>
+                <tbody>
+                  <tr>
+                    <td colSpan={12}>
+                      <strong>English Timetable Sections</strong>
+                    </td>
+                  </tr>
+                  {enSectionRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="portal-text-muted">
+                        None for this course in this term.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {enSectionRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.section_code}</td>
+                      <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
+                      <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
+                      <td>{formatTimeHmsForDisplay(row.start_time)}</td>
+                      <td>{formatTimeHmsForDisplay(row.end_time)}</td>
+                      <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
+                      <td>{displayCell(row.room)}</td>
+                      <td>{displayCell(row.instructor)}</td>
+                      <td>{row.enrolled_count}</td>
+                      <td>
+                        {row.enrolled_count > 0 ? (
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => setEnrolledModalSection(row)}
+                          >
+                            View students
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{displayCell(row.notes)}</td>
+                      <td>
+                        <div className="admin-inline-actions">
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => beginEdit(row)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => void onDeleteRow(row)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tbody>
+                  <tr>
+                    <td colSpan={12}>
+                      <strong>Chinese Timetable Sections</strong>
+                    </td>
+                  </tr>
+                  {cnSectionRows.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="portal-text-muted">
+                        None for this course in this term.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {cnSectionRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>{row.section_code}</td>
+                      <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
+                      <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
+                      <td>{formatTimeHmsForDisplay(row.start_time)}</td>
+                      <td>{formatTimeHmsForDisplay(row.end_time)}</td>
+                      <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
+                      <td>{displayCell(row.room)}</td>
+                      <td>{displayCell(row.instructor)}</td>
+                      <td>{row.enrolled_count}</td>
+                      <td>
+                        {row.enrolled_count > 0 ? (
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => setEnrolledModalSection(row)}
+                          >
+                            View students
+                          </button>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{displayCell(row.notes)}</td>
+                      <td>
+                        <div className="admin-inline-actions">
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => beginEdit(row)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busy}
+                            onClick={() => void onDeleteRow(row)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </>
+            )}
           </tbody>
         </table>
       </div>
@@ -715,6 +811,24 @@ export function AdminCourseSectionsPage() {
               }
               autoComplete="off"
             />
+          </label>
+          <label className="admin-field">
+            <span className="admin-field__label">Schedule track</span>
+            <select
+              className="admin-input"
+              value={form.schedule_track}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  schedule_track: e.target.value === 'CN' ? 'CN' : 'EN',
+                }))
+              }
+              disabled={busy}
+              aria-label="Schedule track"
+            >
+              <option value="EN">English timetable</option>
+              <option value="CN">Chinese timetable</option>
+            </select>
           </label>
           <fieldset className="admin-field admin-field--weekdays">
             <legend className="admin-field__label">Weekdays</legend>

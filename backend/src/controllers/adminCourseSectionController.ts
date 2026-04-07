@@ -44,6 +44,25 @@ function isMysqlDuplicateKey(e: unknown): boolean {
   return code === "ER_DUP_ENTRY" || errno === 1062;
 }
 
+/**
+ * Optional on create (defaults EN). On patch, omit key to leave unchanged.
+ * Invalid non-empty values must be rejected with 400 (handled by callers).
+ */
+function parseScheduleTrackInput(
+  v: unknown,
+):
+  | { ok: true; value: "EN" | "CN" | undefined }
+  | { ok: false; error: string } {
+  if (v === undefined) return { ok: true, value: undefined };
+  if (typeof v !== "string") {
+    return { ok: false, error: "schedule_track must be EN or CN." };
+  }
+  const t = v.trim().toUpperCase();
+  if (t === "") return { ok: true, value: undefined };
+  if (t === "EN" || t === "CN") return { ok: true, value: t };
+  return { ok: false, error: "schedule_track must be EN or CN." };
+}
+
 function parseQueryString(req: Request, key: string): string | null {
   const raw = req.query[key];
   const v = Array.isArray(raw) ? raw[0] : raw;
@@ -142,6 +161,14 @@ function parsePatchBody(
     patch.instructor = optionalStrOrNull(o.instructor);
   if (o.notes !== undefined) patch.notes = optionalStrOrNull(o.notes);
 
+  if (Object.prototype.hasOwnProperty.call(o, "schedule_track")) {
+    if (o.schedule_track !== null) {
+      const tr = parseScheduleTrackInput(o.schedule_track);
+      if (!tr.ok) return null;
+      if (tr.value !== undefined) patch.schedule_track = tr.value;
+    }
+  }
+
   return { academic_term_id, patch };
 }
 
@@ -158,9 +185,20 @@ export async function postAdminCourseSection(
       });
       return;
     }
+    const tr = parseScheduleTrackInput(
+      (req.body as Record<string, unknown>).schedule_track,
+    );
+    if (!tr.ok) {
+      res.status(400).json({ error: tr.error });
+      return;
+    }
+    const inputWithTrack = {
+      ...parsed.input,
+      ...(tr.value !== undefined ? { schedule_track: tr.value } : {}),
+    };
     const section = await createCourseSectionWithAcademicTermId(
       parsed.academic_term_id,
-      parsed.input,
+      inputWithTrack,
     );
     res.status(201).json(section);
   } catch (e) {
@@ -174,7 +212,7 @@ export async function postAdminCourseSection(
     if (isMysqlDuplicateKey(e)) {
       res.status(400).json({
         error:
-          "A section with this code already exists for this course in that term.",
+          "A section with this code already exists for this course, term, and schedule track.",
       });
       return;
     }
@@ -200,7 +238,8 @@ export async function patchAdminCourseSection(
     const parsed = parsePatchBody(req.body);
     if (!parsed) {
       res.status(400).json({
-        error: "Invalid body: academic_term_id is required.",
+        error:
+          "Invalid body: academic_term_id is required, and schedule_track must be EN or CN when provided.",
       });
       return;
     }
@@ -225,7 +264,7 @@ export async function patchAdminCourseSection(
     if (isMysqlDuplicateKey(e)) {
       res.status(400).json({
         error:
-          "A section with this code already exists for this course in that term.",
+          "A section with this code already exists for this course, term, and schedule track.",
       });
       return;
     }

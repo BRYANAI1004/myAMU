@@ -28,11 +28,15 @@ export function CourseBinCheckoutPage() {
       )
       return
     }
-    const sections = items
-      .map((i) => ({
+    const sections = items.map((i) => {
+      const schedule_track: 'EN' | 'CN' =
+        i.schedule_track === 'CN' ? 'CN' : 'EN'
+      return {
         course_code: i.course_code.trim(),
         section_code: i.section.trim(),
-      }))
+        schedule_track,
+      }
+    })
       .filter(
         (s) =>
           s.course_code !== '' &&

@@ -1669,6 +1669,8 @@ export type AdminCourseSection = {
   term: string
   year: number
   section_code: string
+  /** Offered timetable group (English vs Chinese scheduling), not student identity. */
+  schedule_track: 'EN' | 'CN'
   weekday: string
   start_time: string | null
   end_time: string | null
@@ -1717,6 +1719,12 @@ function parseAdminCourseSectionRow(
   const year =
     typeof yearRaw === 'number' ? yearRaw : Number(yearRaw)
   if (!Number.isFinite(year)) return null
+  const stRaw = row.schedule_track ?? row.scheduleTrack
+  const stStr =
+    stRaw == null || stRaw === ''
+      ? 'EN'
+      : String(stRaw).trim().toUpperCase()
+  const schedule_track: 'EN' | 'CN' = stStr === 'CN' ? 'CN' : 'EN'
   const ecRaw = row.enrolled_count ?? row.enrolledCount
   let enrolled_count = 0
   if (typeof ecRaw === 'number' && Number.isFinite(ecRaw)) {
@@ -1749,6 +1757,7 @@ function parseAdminCourseSectionRow(
     term: term.trim(),
     year: Math.trunc(year),
     section_code: section_code.trim(),
+    schedule_track,
     weekday: weekday.trim(),
     start_time: parseNullableStringField(row.start_time),
     end_time: parseNullableStringField(row.end_time),
@@ -1782,7 +1791,12 @@ function parseAdminCourseSectionList(data: unknown): AdminCourseSection[] {
 export type PostStudentEnrollBody = {
   studentId: string
   academic_term_id: string
-  sections: Array<{ course_code: string; section_code: string }>
+  sections: Array<{
+    course_code: string
+    section_code: string
+    /** Required when the same section_code exists on both EN and CN timetables. */
+    schedule_track?: 'EN' | 'CN'
+  }>
 }
 
 export type PostStudentEnrollResponse = {
@@ -1859,6 +1873,7 @@ export type AdminCourseSectionCreatePayload = {
   academic_term_id: string
   course_code: string
   section_code: string
+  schedule_track?: 'EN' | 'CN'
   weekday: string
   start_time?: string | null
   end_time?: string | null

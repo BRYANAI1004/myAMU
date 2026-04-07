@@ -32,6 +32,7 @@ function courseBinItemToSyntheticSection(
     term: '',
     year: 0,
     section_code: sec === '' ? '—' : sec,
+    schedule_track: item.schedule_track === 'CN' ? 'CN' : 'EN',
     weekday,
     start_time: start,
     end_time: end,

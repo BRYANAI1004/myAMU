@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { AdminCourseSection } from '../../lib/api'
+import { scheduleTrackDetailLabel } from '../../lib/scheduleTrack'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatWeekdaysLongFromStored } from '../../lib/weekdaySchedule'
@@ -65,6 +66,7 @@ export function AdminCourseSectionDetailModal({
         )}
         <dl className="admin-section-detail-modal__dl">
           {row('Course code', section.course_code)}
+          {row('Timetable track', scheduleTrackDetailLabel(section.schedule_track))}
           {row('Section code', section.section_code)}
           {row('Academic term', termLine)}
           {row('Weekdays', formatWeekdaysLongFromStored(section.weekday))}

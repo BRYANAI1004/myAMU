@@ -95,7 +95,13 @@ export function MyCourseBinPage() {
                       <button
                         type="button"
                         className="portal-btn portal-btn--course-search-bin"
-                        onClick={() => removeFromCourseBin(item.course_code, item.section)}
+                        onClick={() =>
+                          removeFromCourseBin(
+                            item.course_code,
+                            item.section,
+                            item.schedule_track,
+                          )
+                        }
                       >
                         Remove
                       </button>
