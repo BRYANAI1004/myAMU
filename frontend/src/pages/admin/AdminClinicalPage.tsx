@@ -233,7 +233,7 @@ export function AdminClinicalPage() {
                         </td>
                         <td>
                           <Link
-                            to={`/admin/students/${encodeURIComponent(r.studentId)}`}
+                            to={`/admin/clinical/${encodeURIComponent(r.studentId)}`}
                             className="portal-btn portal-btn--secondary"
                             style={{
                               display: 'inline-flex',
