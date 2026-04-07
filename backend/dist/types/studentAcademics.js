@@ -1,3 +1,3 @@
-/** GET /api/students/:studentId/academics — Phase 1, sourced from legacy `marks` only. */
+/** GET /api/students/:studentId/academics — legacy `marks` + merged `portal_enrollments` (transcript list stays marks/clinic-only). */
 export {};
 //# sourceMappingURL=studentAcademics.js.map

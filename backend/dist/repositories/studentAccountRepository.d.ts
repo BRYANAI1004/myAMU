@@ -17,4 +17,9 @@ export declare function listPortalScheduleTermsForStudent(pool: Pool, studentExt
     year: number;
 }[]>;
 export declare function loadAccountContext(pool: Pool, studentId: string, term: string, year: number): Promise<AccountContext | null>;
+/**
+ * Portal billing context for a term/year, including empty enrollments (payments/adjustments only).
+ * Used to synthesize a ledger when legacy `accounting` has no rows for that quarter.
+ */
+export declare function loadPortalTermBillingContext(pool: Pool, studentId: string, term: string, year: number): Promise<AccountContext>;
 //# sourceMappingURL=studentAccountRepository.d.ts.map

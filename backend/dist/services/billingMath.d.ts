@@ -8,6 +8,8 @@ export declare const STANDARD_TERM_FEES: BillingLineItem[];
 export declare function calculateCourseCharge(course: CourseRecord): number;
 export declare function lineItemCategoryForCourse(course: CourseRecord): BillingCategory;
 export declare function formatCourseLineDescription(course: CourseRecord): string;
+/** Ledger / finance display: course code + title + units or clock hours. */
+export declare function formatPortalLedgerCourseMemo(course: CourseRecord): string;
 export declare function buildStudentAccountSummary(lineItems: BillingLineItem[], paymentsTotal: number): StudentAccountSummary;
 export declare function calculateInstallmentServiceFee(pref: StudentTermPreference): {
     amount: number;

@@ -4,8 +4,8 @@ export const INSTALLMENT_SERVICE_FEE_PER_INSTALLMENT = 15;
 export const MAX_INSTALLMENTS_PER_QUARTER = 3;
 export const MAX_INSTALLMENT_SERVICE_FEE_PER_QUARTER = INSTALLMENT_SERVICE_FEE_PER_INSTALLMENT * MAX_INSTALLMENTS_PER_QUARTER;
 export const STANDARD_TERM_FEES = [
-    { description: "Student Services Fee", amount: 150, category: "fees" },
-    { description: "Technology Fee", amount: 75, category: "fees" },
+    { description: "Technology / Facility Fee", amount: 50, category: "fees" },
+    { description: "Malpractice Insurance", amount: 50, category: "fees" },
 ];
 const sum = (items) => items.reduce((acc, i) => acc + i.amount, 0);
 export function calculateCourseCharge(course) {
@@ -30,12 +30,22 @@ export function lineItemCategoryForCourse(course) {
 }
 export function formatCourseLineDescription(course) {
     if (course.type === "didactic" || course.type === "lab") {
-        return `${course.title} (${course.units} unit${course.units === 1 ? "" : "s"})`;
+        const u = course.units != null && Number.isFinite(Number(course.units))
+            ? Number(course.units).toFixed(1)
+            : "0.0";
+        return `${course.courseCode} ${course.title} (${u} units)`;
     }
     if (course.type === "clinical") {
-        return `${course.title} (${course.hours} hrs)`;
+        const h = course.hours != null && Number.isFinite(Number(course.hours))
+            ? Number(course.hours).toFixed(1)
+            : "0.0";
+        return `${course.courseCode} ${course.title} (${h} hrs)`;
     }
-    return String(course.title);
+    return `${course.courseCode} ${course.title}`.trim();
+}
+/** Ledger / finance display: course code + title + units or clock hours. */
+export function formatPortalLedgerCourseMemo(course) {
+    return formatCourseLineDescription(course);
 }
 export function buildStudentAccountSummary(lineItems, paymentsTotal) {
     const tuitionTotal = sum(lineItems.filter((i) => i.category === "tuition"));
@@ -62,7 +72,7 @@ export function calculateInstallmentServiceFee(pref) {
     const n = Math.min(Math.max(Number(pref.installmentCount) || 2, 2), MAX_INSTALLMENTS_PER_QUARTER);
     const raw = n * INSTALLMENT_SERVICE_FEE_PER_INSTALLMENT;
     const amount = Math.min(raw, MAX_INSTALLMENT_SERVICE_FEE_PER_QUARTER);
-    const description = `Tuition installment plan service fee (${n} installment${n === 1 ? "" : "s"} × $${INSTALLMENT_SERVICE_FEE_PER_INSTALLMENT}; non-refundable)`;
+    const description = `Tuition Installment Service Fee (${n} installment${n === 1 ? "" : "s"} × $${INSTALLMENT_SERVICE_FEE_PER_INSTALLMENT}; non-refundable)`;
     return { amount, description };
 }
 export function buildEnrollmentLineItems(enrollments, courseById) {
@@ -138,8 +148,7 @@ export function buildInstallmentSchedule(outstanding, count, dueDates) {
 export function getInstallmentPlanPolicyText() {
     return [
         "If tuition is paid in full by the end of the registration period, no installment service fee applies.",
-        "If you elect a quarterly installment plan, a non-refundable $15 service fee applies per installment (up to three installments per quarter, maximum $45).",
-        "Missed or late payments may affect enrollment standing per bursar policy.",
+        "If you elect a quarterly installment plan, a non-refundable $15 installment service fee applies per installment (up to three installments per quarter; maximum $45 per quarter).",
     ];
 }
 //# sourceMappingURL=billingMath.js.map
