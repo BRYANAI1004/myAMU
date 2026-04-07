@@ -20,6 +20,7 @@ import type {
   StudentAcademicCourseStatus,
 } from "../types/studentAcademics.js";
 import type { ClinicalProgress } from "../types/studentAccount.js";
+import type { StudentTranscriptRow } from "../types/studentTranscript.js";
 
 /** Portal registration + section schedule metadata (sources: `portal_enrollments`, `portal_courses`, `course_sections`). */
 export type RegistrationRecord = {
@@ -52,19 +53,10 @@ export type AcademicAttempt = {
 };
 
 /**
- * Display-ready academic history line (derived from attempts + optional portal rows for UI consistency).
+ * Display-ready academic history line (derived from attempts; same shape as `StudentTranscriptRow`).
  * **Not** the source of truth for degree progress or official registration.
  */
-export type TranscriptRecord = {
-  courseCode: string;
-  courseTitle: string;
-  term: string;
-  year: number;
-  grade: string | null;
-  numericGrade: number | null;
-  credits: number | null;
-  source: "marks" | "clinic" | "portal";
-};
+export type TranscriptRecord = StudentTranscriptRow;
 
 export type DegreeAuditComputedStatus =
   | "unknown"
@@ -110,6 +102,25 @@ export function isRegistrationPortalRow(
   r: StudentAcademicCourseRecord,
 ): r is StudentAcademicCourseRecord & { source: "portal" } {
   return r.source === "portal";
+}
+
+/** Narrows a transport row to {@link AcademicAttempt} when `source` is `marks` or `clinic`. */
+export function academicCourseRecordToAcademicAttempt(
+  r: StudentAcademicCourseRecord,
+): AcademicAttempt | null {
+  if (!isAcademicAttemptRow(r)) return null;
+  return {
+    studentId: r.studentId,
+    courseCode: r.courseCode,
+    courseTitle: r.courseTitle,
+    term: r.term,
+    year: r.year,
+    credits: r.credits,
+    grade: r.grade,
+    numericGrade: r.numericGrade,
+    status: r.status,
+    source: r.source,
+  };
 }
 
 /**

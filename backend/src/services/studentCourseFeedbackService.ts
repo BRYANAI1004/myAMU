@@ -37,7 +37,7 @@ export function feedbackSubmittedAtMapFromDbRows(
   return m;
 }
 
-/** For merging into GET /academics `enrollmentHistory` (skips DB for demo / empty id). */
+/** For merging into GET /academics `enrollmentHistory` (combined registration + attempts; skips DB for demo / empty id). */
 export async function getFeedbackSubmittedAtMapForStudent(
   studentId: string,
 ): Promise<Map<string, string>> {

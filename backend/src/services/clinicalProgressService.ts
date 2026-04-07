@@ -1,5 +1,10 @@
+/**
+ * **Clinical progress** domain: legacy `clinic` rows + `requirements.clinic_hours`. Independent of academic attempts
+ * and transcript display rows — do not derive this from `marks` or merge clinic transcript lines into academic units.
+ */
+
 import type { Pool, RowDataPacket } from "mysql2/promise";
-import type { ClinicalProgress } from "../types/studentAccount.js";
+import type { ClinicalProgressDomain } from "../domain/studentDomainModels.js";
 
 function str(v: unknown): string {
   if (v == null) return "";
@@ -55,11 +60,11 @@ function assembleClinicalProgress(
   completedCourses: string[],
   completedHours: number,
   requiredHours: number,
-): ClinicalProgress {
+): ClinicalProgressDomain {
   const level = clinicalLevelFromCodes(completedCourses);
   const has211 = hasClinicalPrefix(completedCourses, "CL211");
   const has311 = hasClinicalPrefix(completedCourses, "CL311");
-  const readiness: ClinicalProgress["readiness"] =
+  const readiness: ClinicalProgressDomain["readiness"] =
     completedHours >= requiredHours ? "ready" : "not_ready";
   const missing: string[] = [];
   if (!has211) missing.push("Complete CL211");
@@ -84,13 +89,13 @@ function assembleClinicalProgress(
 export async function batchBuildClinicalProgressForStudentIds(
   pool: Pool,
   studentIds: string[],
-): Promise<Map<string, ClinicalProgress>> {
+): Promise<Map<string, ClinicalProgressDomain>> {
   const normalized = [
     ...new Set(
       studentIds.map((s) => s.trim()).filter((s) => s.length > 0),
     ),
   ];
-  const out = new Map<string, ClinicalProgress>();
+  const out = new Map<string, ClinicalProgressDomain>();
   if (normalized.length === 0) return out;
 
   const placeholders = normalized.map(() => "?").join(",");
@@ -154,7 +159,7 @@ export async function batchBuildClinicalProgressForStudentIds(
 export async function buildClinicalProgress(
   pool: Pool,
   studentId: string,
-): Promise<ClinicalProgress> {
+): Promise<ClinicalProgressDomain> {
   const sid = studentId.trim();
 
   const [clinicRows] = await pool.query<RowDataPacket[]>(

@@ -1,3 +1,10 @@
+/**
+ * Read models for **transcript title lookup** (`courses`) and **clinic transcript lines** (`clinic`).
+ *
+ * - `clinic` rows here feed transcript **display** and attempt-shaped mappers — not academic unit totals for degree audit.
+ * - Catalog `courses` map supports normalized English titles only; it is not registration or marks.
+ */
+
 import type { Pool, RowDataPacket } from "mysql2/promise";
 import { MARKS_ORDER_BY_NEWEST } from "./studentAcademicsRepository.js";
 
