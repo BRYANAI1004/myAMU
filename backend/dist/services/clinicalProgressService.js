@@ -2,6 +2,8 @@
  * **Clinical progress** domain: legacy `clinic` rows + `requirements.clinic_hours`. Independent of academic attempts
  * and transcript display rows — do not derive this from `marks` or merge clinic transcript lines into academic units.
  */
+/** When `requirements.clinic_hours` is missing, null, or non-positive, avoid implying 0 required / "ready". */
+const DEFAULT_CLINIC_REQUIRED_HOURS = 960;
 function str(v) {
     if (v == null)
         return "";
@@ -48,17 +50,34 @@ function aggregateClinicCodesFromRows(rows) {
     const completedCourses = [...codeSet].sort((a, b) => normCode(a).localeCompare(normCode(b)));
     return { completedHours, completedCourses };
 }
+/**
+ * Resolves program clinic hour requirement from DB. Any missing or unusable value falls back to
+ * {@link DEFAULT_CLINIC_REQUIRED_HOURS} so progress UI does not show 0 required or spurious readiness.
+ */
+function resolveRequiredClinicHoursFromRaw(hasRequirementJoinRow, clinicHoursRaw) {
+    if (!hasRequirementJoinRow) {
+        return DEFAULT_CLINIC_REQUIRED_HOURS;
+    }
+    if (clinicHoursRaw == null) {
+        return DEFAULT_CLINIC_REQUIRED_HOURS;
+    }
+    const rh = Number(clinicHoursRaw);
+    if (!Number.isFinite(rh) || rh <= 0) {
+        return DEFAULT_CLINIC_REQUIRED_HOURS;
+    }
+    return rh;
+}
 function assembleClinicalProgress(completedCourses, completedHours, requiredHours) {
     const level = clinicalLevelFromCodes(completedCourses);
     const has211 = hasClinicalPrefix(completedCourses, "CL211");
     const has311 = hasClinicalPrefix(completedCourses, "CL311");
-    const readiness = completedHours >= requiredHours ? "ready" : "not_ready";
+    const readiness = requiredHours > 0 && completedHours >= requiredHours ? "ready" : "not_ready";
     const missing = [];
     if (!has211)
         missing.push("Complete CL211");
     if (!has311)
         missing.push("Complete CL311");
-    if (requiredHours > 0 && completedHours < requiredHours) {
+    if (completedHours < requiredHours) {
         missing.push(`Remaining ${requiredHours - completedHours} hours`);
     }
     return {
@@ -93,9 +112,9 @@ export async function batchBuildClinicalProgressForStudentIds(pool, studentIds) 
     for (const row of reqRows) {
         const r = row;
         const sid = str(r.student_id);
-        const rh = Number(r.clinic_hours);
-        const requiredHours = Number.isFinite(rh) && rh >= 0 ? rh : 0;
-        requiredByStudent.set(sid, requiredHours);
+        if (sid === "")
+            continue;
+        requiredByStudent.set(sid, resolveRequiredClinicHoursFromRaw(true, r.clinic_hours));
     }
     const clinicByStudent = new Map();
     for (const row of clinicRows) {
@@ -112,7 +131,8 @@ export async function batchBuildClinicalProgressForStudentIds(pool, studentIds) 
     }
     for (const sid of normalized) {
         const agg = aggregateClinicCodesFromRows(clinicByStudent.get(sid) ?? []);
-        const requiredHours = requiredByStudent.get(sid) ?? 0;
+        const requiredHours = requiredByStudent.get(sid) ??
+            resolveRequiredClinicHoursFromRaw(false, undefined);
         out.set(sid, assembleClinicalProgress(agg.completedCourses, agg.completedHours, requiredHours));
     }
     return out;
@@ -130,11 +150,9 @@ export async function buildClinicalProgress(pool, studentId) {
      FROM requirements
      INNER JOIN students ON students.requirements_id = requirements.id
      WHERE TRIM(students.id) = TRIM(?)`, [sid]);
-    let requiredHours = 0;
-    if (reqRows.length > 0) {
-        const rh = Number(reqRows[0].clinic_hours);
-        requiredHours = Number.isFinite(rh) && rh >= 0 ? rh : 0;
-    }
+    const requiredHours = reqRows.length > 0
+        ? resolveRequiredClinicHoursFromRaw(true, reqRows[0].clinic_hours)
+        : resolveRequiredClinicHoursFromRaw(false, undefined);
     return assembleClinicalProgress(agg.completedCourses, agg.completedHours, requiredHours);
 }
 //# sourceMappingURL=clinicalProgressService.js.map
