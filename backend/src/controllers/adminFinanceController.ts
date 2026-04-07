@@ -132,8 +132,8 @@ export async function getFinanceQuarterSettings(
     console.error("[admin/finance/quarter-settings get]", e);
     const note =
       env.nodeEnv === "development"
-        ? `Quarter settings could not be loaded (${devMessage(e)}). Save DDL and late fee check stay disabled until this succeeds.`
-        : "Quarter settings could not be loaded. Save DDL and late fee check stay disabled until this succeeds.";
+        ? `Quarter settings could not be loaded (${devMessage(e)}). Configure payment due dates under Academic Terms.`
+        : "Quarter settings could not be loaded. Configure payment due dates under Academic Terms.";
     res.status(200).json({
       term: term.trim(),
       year: y,

@@ -2,14 +2,10 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { AdminFinanceLedgerPanel } from '../../components/admin/AdminFinanceLedgerPanel'
 import {
   fetchAdminFinanceStudents,
-  fetchFinanceQuarterSettings,
   fetchGlobalFinanceQuarters,
   formatMoney,
-  postAdminRunLateFee,
-  putFinanceQuarterSettings,
   type AdminFinanceGlobalQuarter,
   type AdminFinanceStudentRow,
-  type FinanceQuarterSettingsResponse,
 } from '../../lib/api'
 
 export function AdminFinancePage() {
@@ -23,15 +19,6 @@ export function AdminFinancePage() {
   const [quarters, setQuarters] = useState<AdminFinanceGlobalQuarter[]>([])
   const [quartersErr, setQuartersErr] = useState<string | null>(null)
   const [qi, setQi] = useState(0)
-  const [settings, setSettings] = useState<FinanceQuarterSettingsResponse | null>(
-    null,
-  )
-  const [settingsErr, setSettingsErr] = useState<string | null>(null)
-  const [ddlInput, setDdlInput] = useState('')
-  const [settingsBusy, setSettingsBusy] = useState(false)
-  const [saveDdlBusy, setSaveDdlBusy] = useState(false)
-  const [lateFeeBusy, setLateFeeBusy] = useState(false)
-  const [banner, setBanner] = useState<string | null>(null)
 
   useEffect(() => {
     const ac = new AbortController()
@@ -56,44 +43,6 @@ export function AdminFinancePage() {
 
   const safeQi = Math.min(qi, Math.max(0, quarters.length - 1))
   const selectedQuarter = quarters[safeQi] ?? null
-
-  useEffect(() => {
-    if (selectedQuarter == null) {
-      setSettings(null)
-      setDdlInput('')
-      setSettingsErr(null)
-      return
-    }
-    const ac = new AbortController()
-    setSettingsBusy(true)
-    setSettingsErr(null)
-    ;(async () => {
-      try {
-        const s = await fetchFinanceQuarterSettings(
-          selectedQuarter.term,
-          selectedQuarter.year,
-          { signal: ac.signal },
-        )
-        if (ac.signal.aborted) return
-        setSettings(s)
-        setDdlInput(s.paymentDueDate ?? '')
-        setSettingsErr(null)
-      } catch (e) {
-        if (!ac.signal.aborted) {
-          setSettings(null)
-          setDdlInput('')
-          setSettingsErr(
-            e instanceof Error
-              ? e.message
-              : 'Could not load quarter settings.',
-          )
-        }
-      } finally {
-        if (!ac.signal.aborted) setSettingsBusy(false)
-      }
-    })()
-    return () => ac.abort()
-  }, [selectedQuarter?.term, selectedQuarter?.year])
 
   useEffect(() => {
     const ac = new AbortController()
@@ -144,27 +93,6 @@ export function AdminFinancePage() {
 
   const sectionLoading = loading && rows === null && error === null
   const noQuarter = quarters.length === 0 && quartersErr == null
-  const settingsOkForDdl =
-    settingsErr == null &&
-    settings != null &&
-    !settingsBusy
-  const canSaveDdl =
-    settingsOkForDdl &&
-    settings.ddlPersistenceAvailable === true &&
-    selectedQuarter != null &&
-    quartersErr == null
-  const hasPaymentDdl = Boolean(settings?.paymentDueDate?.trim())
-  const canRunLateFee =
-    settingsOkForDdl &&
-    selectedQuarter != null &&
-    quartersErr == null &&
-    hasPaymentDdl &&
-    settings?.ddlPersistenceAvailable === true
-  const ddlControlsDisabled =
-    selectedQuarter == null ||
-    quartersErr != null ||
-    settingsBusy ||
-    settingsErr != null
 
   function toggleLedger(studentId: string) {
     setExpandedId((cur) => (cur === studentId ? null : studentId))
@@ -172,65 +100,6 @@ export function AdminFinancePage() {
 
   function bumpRoster() {
     setReloadKey((k) => k + 1)
-  }
-
-  async function saveDdl() {
-    if (selectedQuarter == null) return
-    setSaveDdlBusy(true)
-    setBanner(null)
-    try {
-      const paymentDueDate =
-        ddlInput.trim() === '' ? null : ddlInput.trim().slice(0, 10)
-      const putRes = await putFinanceQuarterSettings({
-        term: selectedQuarter.term,
-        year: selectedQuarter.year,
-        paymentDueDate,
-        lateFeeEnabled: settings?.lateFeeEnabled ?? true,
-        lateFeeAmount: settings?.lateFeeAmount ?? 30,
-      })
-      if (!putRes.ok) {
-        setBanner(putRes.message)
-        return
-      }
-      setBanner('Payment due date saved.')
-      const s = await fetchFinanceQuarterSettings(
-        selectedQuarter.term,
-        selectedQuarter.year,
-      )
-      setSettings(s)
-      setDdlInput(s.paymentDueDate ?? '')
-    } catch (e) {
-      setBanner(
-        e instanceof Error ? e.message : 'Could not save payment due date.',
-      )
-    } finally {
-      setSaveDdlBusy(false)
-    }
-  }
-
-  async function runLateFee() {
-    if (selectedQuarter == null) return
-    setLateFeeBusy(true)
-    setBanner(null)
-    try {
-      const res = await postAdminRunLateFee(
-        selectedQuarter.term,
-        selectedQuarter.year,
-      )
-      const parts = [
-        `Inserted: ${res.insertedCount}`,
-        `Skipped: ${res.skippedCount}`,
-      ]
-      if (res.message) parts.push(res.message)
-      setBanner(parts.join(' · '))
-      bumpRoster()
-    } catch (e) {
-      setBanner(
-        e instanceof Error ? e.message : 'Late fee check failed.',
-      )
-    } finally {
-      setLateFeeBusy(false)
-    }
   }
 
   return (
@@ -254,69 +123,6 @@ export function AdminFinancePage() {
               ))}
             </select>
           </label>
-          <label className="admin-finance-page-controls__field">
-            <span className="portal-text-muted admin-form-hint">
-              Payment due (DDL)
-            </span>
-            <input
-              type="date"
-              className="admin-input"
-              value={ddlInput}
-              onChange={(e) => setDdlInput(e.target.value)}
-              disabled={ddlControlsDisabled}
-              aria-label="Payment due date for selected quarter"
-            />
-          </label>
-          <div className="admin-finance-page-controls__actions">
-            <button
-              type="button"
-              className="portal-btn portal-btn--secondary portal-btn--compact"
-              disabled={!canSaveDdl || saveDdlBusy}
-              onClick={() => void saveDdl()}
-            >
-              {saveDdlBusy ? 'Saving…' : 'Save DDL'}
-            </button>
-            <button
-              type="button"
-              className="portal-btn portal-btn--secondary portal-btn--compact"
-              disabled={!canRunLateFee || lateFeeBusy}
-              onClick={() => void runLateFee()}
-              title={
-                canRunLateFee
-                  ? undefined
-                  : settingsErr != null
-                    ? 'Fix quarter settings first, then set a payment due date if needed.'
-                    : !settings?.ddlPersistenceAvailable
-                      ? 'DDL is not persisted for this quarter (see note below).'
-                      : 'Set a payment due date for this academic term before running late fee check.'
-              }
-            >
-              {lateFeeBusy ? 'Running…' : 'Run Late Fee Check'}
-            </button>
-          </div>
-          {settingsErr != null && selectedQuarter != null ? (
-            <p className="portal-text-muted admin-form-hint" role="status">
-              {settingsErr}
-            </p>
-          ) : null}
-          {settings != null &&
-          settings.ddlSaveNote != null &&
-          settings.ddlSaveNote !== '' ? (
-            <p className="portal-text-muted admin-form-hint">
-              {settings.ddlSaveNote}
-            </p>
-          ) : null}
-          {settings != null &&
-          !hasPaymentDdl &&
-          selectedQuarter != null &&
-          quartersErr == null &&
-          !settingsBusy &&
-          settingsErr == null ? (
-            <p className="portal-text-muted admin-form-hint">
-              Set a payment due date for this academic term before running late
-              fee check.
-            </p>
-          ) : null}
           <div className="admin-page__toolbar-actions admin-page__toolbar-actions--wrap admin-finance-page-controls__search">
             <input
               type="search"
@@ -341,22 +147,12 @@ export function AdminFinancePage() {
         </section>
       ) : null}
 
-      {banner != null && quartersErr == null ? (
-        <p
-          className="admin-finance-banner portal-text-muted"
-          role="status"
-        >
-          {banner}
-        </p>
-      ) : null}
-
       {noQuarter && quartersErr == null ? (
         <section className="portal-card portal-profile-state">
           <p className="portal-profile-state__title">No finance quarters yet</p>
           <p className="portal-profile-state__detail">
             Quarters come from academic terms plus enrollments, legacy accounting,
-            or portal billing activity. Configure terms under Academic Terms; payment
-            due dates attach to those rows when supported by the database.
+            or portal billing activity. Configure academic terms under Academic Terms.
           </p>
         </section>
       ) : null}
