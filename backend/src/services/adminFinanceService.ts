@@ -22,7 +22,6 @@ import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRe
 import {
   getAccountingLedgerPayload,
   getAccountingQuartersPayload,
-  getStudentQuarterBalance,
 } from "./studentLedgerService.js";
 
 export type AdminFinanceStudentRow = {
@@ -138,42 +137,15 @@ export async function putQuarterSettings(input: {
   return { ok: true };
 }
 
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  limit: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let i = 0;
-  async function worker(): Promise<void> {
-    for (;;) {
-      const idx = i++;
-      if (idx >= items.length) return;
-      out[idx] = await fn(items[idx]!);
-    }
-  }
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
-    worker(),
-  );
-  await Promise.all(workers);
-  return out;
-}
-
 export async function listAdminFinanceStudentsForQuarter(
-  term: string,
-  year: number,
+  _term: string,
+  _year: number,
 ): Promise<AdminFinanceStudentRow[]> {
   const roster = await listFinanceRosterRows(pool);
-  const t = term.trim();
-  const y = Math.trunc(year);
-  const balances = await mapWithConcurrency(roster, 16, async (r) => {
-    const bal = await getStudentQuarterBalance(r.studentId, t, y);
-    return roundMoney(bal);
-  });
-  return roster.map((r, idx) => ({
+  return roster.map((r) => ({
     studentId: r.studentId,
     name: r.name,
-    balance: balances[idx] ?? 0,
+    balance: null,
   }));
 }
 

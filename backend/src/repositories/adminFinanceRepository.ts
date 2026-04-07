@@ -86,17 +86,35 @@ export async function listGlobalFinanceQuarters(
 ): Promise<{ term: string; year: number }[]> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT term, year FROM (
-       SELECT DISTINCT term, year FROM portal_enrollments
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM portal_enrollments
        UNION
-       SELECT DISTINCT term, year FROM portal_billing_adjustments
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM portal_billing_adjustments
        UNION
-       SELECT DISTINCT term, year FROM portal_payments
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM portal_payments
        UNION
-       SELECT DISTINCT TRIM(term) AS term, year FROM registration
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM registration
        UNION
-       SELECT DISTINCT TRIM(term) AS term, year FROM accounting
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM accounting
        UNION
-       SELECT DISTINCT TRIM(term_name) AS term, year FROM academic_terms
+       SELECT DISTINCT
+         CONVERT(TRIM(COALESCE(term_name, '')) USING utf8mb4) AS term,
+         CAST(year AS SIGNED) AS year
+       FROM academic_terms
      ) q
      WHERE TRIM(term) <> ''`,
   );
