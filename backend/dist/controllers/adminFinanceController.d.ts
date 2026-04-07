@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 /**
- * GET /api/admin/finance/students?term=&year=
+ * GET /api/admin/finance/students?term=&year=&page=&pageSize=&search=&balance=
  */
 export declare function getAdminFinanceStudents(req: Request, res: Response): Promise<void>;
 /**

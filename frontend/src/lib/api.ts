@@ -820,16 +820,26 @@ export async function fetchAccountingLedger(
   throw new Error('Unexpected accounting ledger response')
 }
 
-/** GET /api/admin/finance/students?term=&year= — roster with quarter balance. */
-export type AdminFinanceStudentRow = {
+/** GET /api/admin/finance/students — paginated roster with quarter balance. */
+export type AdminFinanceStudentListItem = {
   studentId: string
   name: string
   balance: number
 }
 
-function parseAdminFinanceStudentRow(
+/** @deprecated Use {@link AdminFinanceStudentListItem} */
+export type AdminFinanceStudentRow = AdminFinanceStudentListItem
+
+export type AdminFinanceStudentsListResponse = {
+  items: AdminFinanceStudentListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function parseAdminFinanceStudentListItem(
   o: Record<string, unknown>,
-): AdminFinanceStudentRow {
+): AdminFinanceStudentListItem {
   if (typeof o.studentId !== 'string' || typeof o.name !== 'string') {
     throw new Error('Unexpected admin finance students response')
   }
@@ -847,16 +857,38 @@ function parseAdminFinanceStudentRow(
   return { studentId: o.studentId, name: o.name, balance }
 }
 
+export type AdminFinanceStudentsQuery = {
+  page?: number
+  pageSize?: number
+  search?: string
+  balance?: 'all' | 'positive' | 'negative' | 'zero'
+}
+
+/** GET /api/admin/finance/students?term=&year=&page=&pageSize=&search=&balance= */
 export async function fetchAdminFinanceStudents(
   term: string,
   year: number,
   options?: {
     signal?: AbortSignal
+    query?: AdminFinanceStudentsQuery
   },
-): Promise<AdminFinanceStudentRow[]> {
+): Promise<AdminFinanceStudentsListResponse> {
   const params = new URLSearchParams()
   params.set('term', term.trim())
   params.set('year', String(year))
+  const q = options?.query
+  if (q?.page != null && Number.isFinite(q.page) && q.page > 0) {
+    params.set('page', String(Math.trunc(q.page)))
+  }
+  if (q?.pageSize != null && Number.isFinite(q.pageSize) && q.pageSize > 0) {
+    params.set('pageSize', String(Math.trunc(q.pageSize)))
+  }
+  if (q?.search != null && q.search.trim() !== '') {
+    params.set('search', q.search.trim())
+  }
+  if (q?.balance != null && q.balance !== 'all') {
+    params.set('balance', q.balance)
+  }
   const data = (await fetchApiJson(
     `/api/admin/finance/students?${params.toString()}`,
     {
@@ -866,18 +898,31 @@ export async function fetchAdminFinanceStudents(
   if (data == null || typeof data !== 'object') {
     throw new Error('Unexpected admin finance students response')
   }
-  const raw = (data as { students?: unknown }).students
-  if (!Array.isArray(raw)) {
+  const d = data as Record<string, unknown>
+  const rawItems = d.items
+  if (!Array.isArray(rawItems)) {
     throw new Error('Unexpected admin finance students response')
   }
-  const students: AdminFinanceStudentRow[] = []
-  for (const row of raw) {
+  const items: AdminFinanceStudentListItem[] = []
+  for (const row of rawItems) {
     if (row == null || typeof row !== 'object') {
       throw new Error('Unexpected admin finance students response')
     }
-    students.push(parseAdminFinanceStudentRow(row as Record<string, unknown>))
+    items.push(parseAdminFinanceStudentListItem(row as Record<string, unknown>))
   }
-  return students
+  const total = d.total
+  const page = d.page
+  const pageSize = d.pageSize
+  if (typeof total !== 'number' || !Number.isFinite(total)) {
+    throw new Error('Unexpected admin finance students response')
+  }
+  if (typeof page !== 'number' || !Number.isFinite(page)) {
+    throw new Error('Unexpected admin finance students response')
+  }
+  if (typeof pageSize !== 'number' || !Number.isFinite(pageSize)) {
+    throw new Error('Unexpected admin finance students response')
+  }
+  return { items, total, page, pageSize }
 }
 
 /** GET /api/admin/finance/:studentId/quarters — same shape as student accounting quarters. */

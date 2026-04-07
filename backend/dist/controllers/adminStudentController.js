@@ -1,4 +1,4 @@
-import { createAdminStudent, deleteSelectedAdminStudents, getAdminStudentDetail, listAdminStudents, previewNextAdminStudentId, updateAdminStudent, } from "../services/adminStudentService.js";
+import { createAdminStudent, deleteSelectedAdminStudents, getAdminStudentDetail, listAdminStudentsPage, previewNextAdminStudentId, updateAdminStudent, } from "../services/adminStudentService.js";
 function isRecord(v) {
     return v != null && typeof v === "object" && !Array.isArray(v);
 }
@@ -90,18 +90,51 @@ function parseCreateBody(raw) {
     };
 }
 const STUDENT_ID_PARAM = /^[A-Za-z0-9._-]{1,64}$/;
+const ADMIN_STUDENT_LIST_DEFAULT_PAGE = 1;
+const ADMIN_STUDENT_LIST_DEFAULT_PAGE_SIZE = 25;
+const ADMIN_STUDENT_LIST_MAX_PAGE_SIZE = 100;
 function normalizeStudentIdParam(raw) {
     const s = raw?.trim() ?? "";
     if (s === "" || !STUDENT_ID_PARAM.test(s))
         return null;
     return s;
 }
+function parsePositiveIntParam(raw, fallback, max) {
+    if (typeof raw !== "string")
+        return fallback;
+    const t = raw.trim();
+    if (t === "")
+        return fallback;
+    const n = Number.parseInt(t, 10);
+    if (!Number.isFinite(n) || n < 1)
+        return fallback;
+    const truncated = Math.trunc(n);
+    if (max != null && truncated > max)
+        return max;
+    return truncated;
+}
 export async function getAdminStudents(req, res) {
     try {
-        const raw = req.query.clinicalSummary;
-        const includeClinicalSummary = raw === "1" || raw === "true" || raw === "yes";
-        const students = await listAdminStudents({ includeClinicalSummary });
-        res.json({ students });
+        const rawClinical = req.query.clinicalSummary;
+        const includeClinicalSummary = rawClinical === "1" || rawClinical === "true" || rawClinical === "yes";
+        const page = parsePositiveIntParam(req.query.page, ADMIN_STUDENT_LIST_DEFAULT_PAGE);
+        const pageSize = parsePositiveIntParam(req.query.pageSize, ADMIN_STUDENT_LIST_DEFAULT_PAGE_SIZE, ADMIN_STUDENT_LIST_MAX_PAGE_SIZE);
+        const searchRaw = req.query.search;
+        const search = typeof searchRaw === "string"
+            ? searchRaw.trim().slice(0, 200)
+            : "";
+        const result = await listAdminStudentsPage({
+            page,
+            pageSize,
+            search,
+            includeClinicalSummary,
+        });
+        res.json({
+            items: result.items,
+            total: result.total,
+            page: result.page,
+            pageSize: result.pageSize,
+        });
     }
     catch (e) {
         console.error(e);

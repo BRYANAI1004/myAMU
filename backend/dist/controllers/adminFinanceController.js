@@ -1,5 +1,5 @@
 import { env } from "../config/env.js";
-import { deleteAdminFinanceCharge, deleteAdminFinancePayment, getAdminFinanceLedger, getAdminFinanceQuarters, getQuarterSettingsPayload, listAdminFinanceStudentsForQuarter, listGlobalQuartersPayload, postAdminFinanceCharge, postAdminFinancePayment, putAdminFinanceCharge, putAdminFinancePayment, putQuarterSettings, runLateFeeCheckForQuarter, validatePostChargeBody, validatePostPaymentBody, validatePutChargeBody, validatePutPaymentBody, verifyManualChargeForStudentTerm, verifyPaymentForStudentTerm, } from "../services/adminFinanceService.js";
+import { deleteAdminFinanceCharge, deleteAdminFinancePayment, getAdminFinanceLedger, getAdminFinanceQuarters, getQuarterSettingsPayload, listAdminFinanceStudentsPaginated, parseBalanceFilterParam, listGlobalQuartersPayload, postAdminFinanceCharge, postAdminFinancePayment, putAdminFinanceCharge, putAdminFinancePayment, putQuarterSettings, runLateFeeCheckForQuarter, validatePostChargeBody, validatePostPaymentBody, validatePutChargeBody, validatePutPaymentBody, verifyManualChargeForStudentTerm, verifyPaymentForStudentTerm, } from "../services/adminFinanceService.js";
 function devMessage(e) {
     return e instanceof Error ? e.message : typeof e === "string" ? e : String(e);
 }
@@ -8,6 +8,13 @@ function pathStudentId(req) {
     if (Array.isArray(v))
         return (v[0] ?? "").trim();
     return (v ?? "").trim();
+}
+function queryFirstString(raw) {
+    if (typeof raw === "string")
+        return raw;
+    if (Array.isArray(raw) && typeof raw[0] === "string")
+        return raw[0];
+    return undefined;
 }
 function parsePositiveIntParam(raw) {
     const s = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
@@ -18,7 +25,7 @@ function parsePositiveIntParam(raw) {
     return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
 }
 /**
- * GET /api/admin/finance/students?term=&year=
+ * GET /api/admin/finance/students?term=&year=&page=&pageSize=&search=&balance=
  */
 export async function getAdminFinanceStudents(req, res) {
     try {
@@ -37,8 +44,20 @@ export async function getAdminFinanceStudents(req, res) {
             });
             return;
         }
-        const students = await listAdminFinanceStudentsForQuarter(term, year);
-        res.json({ students });
+        const pageParam = parsePositiveIntParam(queryFirstString(req.query.page));
+        const pageSizeParam = parsePositiveIntParam(queryFirstString(req.query.pageSize));
+        const page = pageParam ?? 1;
+        const pageSize = pageSizeParam ?? 25;
+        const search = queryFirstString(req.query.search) ?? "";
+        const balanceStr = queryFirstString(req.query.balance);
+        const balanceFilter = parseBalanceFilterParam(balanceStr);
+        const payload = await listAdminFinanceStudentsPaginated(term, year, {
+            page,
+            pageSize,
+            search,
+            balanceFilter,
+        });
+        res.json(payload);
     }
     catch (e) {
         console.error("[admin/finance/students]", e);

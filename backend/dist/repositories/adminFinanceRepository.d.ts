@@ -5,6 +5,33 @@ export type FinanceRosterRow = {
     studentId: string;
     name: string;
 };
+/** Balance sign filter for admin finance roster (applied in SQL with legacy quarter balance). */
+export type AdminFinanceRosterBalanceFilter = "all" | "positive" | "negative" | "zero";
+export type AdminFinanceRosterPageRow = {
+    studentId: string;
+    name: string;
+    balance: number;
+};
+/**
+ * Count of finance roster rows after search + balance filter (same rules as list page).
+ */
+export declare function countAdminFinanceRosterPage(pool: Pool, params: {
+    term: string;
+    year: number;
+    searchTrimmed: string;
+    balanceFilter: AdminFinanceRosterBalanceFilter;
+}): Promise<number>;
+/**
+ * One page of finance roster with legacy `accounting` net balance for the quarter.
+ */
+export declare function listAdminFinanceRosterPage(pool: Pool, params: {
+    term: string;
+    year: number;
+    searchTrimmed: string;
+    balanceFilter: AdminFinanceRosterBalanceFilter;
+    limit: number;
+    offset: number;
+}): Promise<AdminFinanceRosterPageRow[]>;
 /**
  * Legacy `students` roster plus `portal_students` rows that are not yet in `students`
  * (same external id key used across portal billing tables).

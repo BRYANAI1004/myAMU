@@ -1,7 +1,16 @@
 import type { AdminStudentCreateBody, AdminStudentDetail, AdminStudentListItem, AdminStudentUpdateBody } from "../types/adminStudent.js";
-export declare function listAdminStudents(options?: {
+export type AdminStudentListPageResult = {
+    items: AdminStudentListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+};
+export declare function listAdminStudentsPage(options: {
+    page: number;
+    pageSize: number;
+    search: string;
     includeClinicalSummary?: boolean;
-}): Promise<AdminStudentListItem[]>;
+}): Promise<AdminStudentListPageResult>;
 export declare function getAdminStudentDetail(studentIdRaw: string): Promise<AdminStudentDetail | null>;
 export type AdminStudentUpdateResult = {
     ok: true;

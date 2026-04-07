@@ -1,9 +1,16 @@
-import { type PortalBillingCategory } from "../repositories/adminFinanceRepository.js";
-export type AdminFinanceStudentRow = {
+import { type AdminFinanceRosterBalanceFilter, type PortalBillingCategory } from "../repositories/adminFinanceRepository.js";
+/** One row in the paginated admin finance student list. */
+export type AdminFinanceStudentListItem = {
     studentId: string;
     name: string;
-    /** Net balance for the selected quarter (legacy `accounting` and/or portal rules). */
+    /** Net balance for the selected quarter from legacy `accounting` only (same as prior roster). */
     balance: number;
+};
+export type AdminFinanceStudentsListResponse = {
+    items: AdminFinanceStudentListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
 };
 export declare function listGlobalQuartersPayload(): Promise<{
     quarters: {
@@ -34,7 +41,17 @@ export declare function putQuarterSettings(input: {
     ok: false;
     message: string;
 }>;
-export declare function listAdminFinanceStudentsForQuarter(term: string, year: number): Promise<AdminFinanceStudentRow[]>;
+export declare function parseBalanceFilterParam(raw: string | undefined): AdminFinanceRosterBalanceFilter;
+/**
+ * Paginated finance roster: search and balance filters run in SQL; balances are aggregated
+ * in `quarter_bal` (no per-student queries).
+ */
+export declare function listAdminFinanceStudentsPaginated(term: string, year: number, query: {
+    page: number;
+    pageSize: number;
+    search: string;
+    balanceFilter: AdminFinanceRosterBalanceFilter;
+}): Promise<AdminFinanceStudentsListResponse>;
 export declare function getAdminFinanceQuarters(studentId: string): Promise<{
     studentId: string;
     quarters: import("./studentLedgerService.js").LedgerQuarterOption[];

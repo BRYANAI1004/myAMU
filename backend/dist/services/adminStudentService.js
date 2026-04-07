@@ -1,7 +1,7 @@
 import { pool } from "../lib/db.js";
-import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, listLegacyAdminStudentRows, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
+import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, countLegacyAdminStudentListRows, listLegacyAdminStudentListRowsPage, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
 import { combineAddressLine, legacyDbDateToIso, resolveEnrollmentDate, } from "./studentProfileService.js";
-import { buildClinicalProgress } from "./clinicalProgressService.js";
+import { batchBuildClinicalProgressForStudentIds, buildClinicalProgress, } from "./clinicalProgressService.js";
 function str(v) {
     if (v == null)
         return "";
@@ -91,25 +91,42 @@ function mapRowToListItem(r) {
         latestRegistrationTerm: formatLatestRegistrationTerm(r.latest_term, r.latest_year),
     };
 }
-export async function listAdminStudents(options) {
-    const rows = await listLegacyAdminStudentRows(pool);
+export async function listAdminStudentsPage(options) {
+    const page = Math.max(1, Math.trunc(options.page));
+    const pageSize = Math.max(1, Math.trunc(options.pageSize));
+    const search = options.search.trim();
+    const offset = (page - 1) * pageSize;
+    const total = await countLegacyAdminStudentListRows(pool, { search });
+    const rows = await listLegacyAdminStudentListRowsPage(pool, {
+        search,
+        limit: pageSize,
+        offset,
+    });
     const base = rows.map((row) => mapRowToListItem(row));
-    if (!options?.includeClinicalSummary) {
-        return base;
+    let items;
+    if (!options.includeClinicalSummary) {
+        items = base;
     }
-    return Promise.all(base.map(async (item) => {
+    else {
         try {
-            const cp = await buildClinicalProgress(pool, item.studentId);
-            return {
-                ...item,
-                clinicalProgressSummary: clinicalProgressToListSummary(cp),
-            };
+            const byId = await batchBuildClinicalProgressForStudentIds(pool, base.map((b) => b.studentId));
+            items = base.map((item) => {
+                const cp = byId.get(item.studentId.trim());
+                if (!cp) {
+                    return item;
+                }
+                return {
+                    ...item,
+                    clinicalProgressSummary: clinicalProgressToListSummary(cp),
+                };
+            });
         }
         catch (e) {
-            console.error("[admin] buildClinicalProgress failed (list)", item.studentId, e);
-            return item;
+            console.error("[admin] batch clinical progress failed (list)", e);
+            items = base;
         }
-    }));
+    }
+    return { items, total, page, pageSize };
 }
 function mapProfileRowToAdminDetail(row, latestRegistrationTerm) {
     const studentId = str(row.id);

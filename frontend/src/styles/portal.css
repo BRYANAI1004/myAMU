@@ -7213,6 +7213,32 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   max-width: 22rem;
 }
 
+.admin-table-wrap--refreshing {
+  opacity: 0.65;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.admin-finance-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+  padding: 0 0.25rem;
+}
+
+.admin-finance-pagination__meta {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.admin-finance-pagination__actions {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
 .admin-finance-banner {
   margin: 0 0 0.75rem;
   font-size: 0.875rem;

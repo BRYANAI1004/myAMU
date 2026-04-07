@@ -6,7 +6,8 @@ import {
   getAdminFinanceLedger,
   getAdminFinanceQuarters,
   getQuarterSettingsPayload,
-  listAdminFinanceStudentsForQuarter,
+  listAdminFinanceStudentsPaginated,
+  parseBalanceFilterParam,
   listGlobalQuartersPayload,
   postAdminFinanceCharge,
   postAdminFinancePayment,
@@ -32,7 +33,17 @@ function pathStudentId(req: Request): string {
   return (v ?? "").trim();
 }
 
-function parsePositiveIntParam(raw: string | string[] | undefined): number | null {
+function queryFirstString(
+  raw: unknown,
+): string | undefined {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw) && typeof raw[0] === "string") return raw[0];
+  return undefined;
+}
+
+function parsePositiveIntParam(
+  raw: string | string[] | undefined | null,
+): number | null {
   const s = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
   const t = typeof s === "string" ? s.trim() : "";
   if (t === "") return null;
@@ -41,7 +52,7 @@ function parsePositiveIntParam(raw: string | string[] | undefined): number | nul
 }
 
 /**
- * GET /api/admin/finance/students?term=&year=
+ * GET /api/admin/finance/students?term=&year=&page=&pageSize=&search=&balance=
  */
 export async function getAdminFinanceStudents(
   req: Request,
@@ -67,8 +78,25 @@ export async function getAdminFinanceStudents(
       return;
     }
 
-    const students = await listAdminFinanceStudentsForQuarter(term, year);
-    res.json({ students });
+    const pageParam = parsePositiveIntParam(queryFirstString(req.query.page));
+    const pageSizeParam = parsePositiveIntParam(
+      queryFirstString(req.query.pageSize),
+    );
+    const page = pageParam ?? 1;
+    const pageSize = pageSizeParam ?? 25;
+
+    const search = queryFirstString(req.query.search) ?? "";
+
+    const balanceStr = queryFirstString(req.query.balance);
+    const balanceFilter = parseBalanceFilterParam(balanceStr);
+
+    const payload = await listAdminFinanceStudentsPaginated(term, year, {
+      page,
+      pageSize,
+      search,
+      balanceFilter,
+    });
+    res.json(payload);
   } catch (e) {
     console.error("[admin/finance/students]", e);
     const body: { error: string; message?: string } = {

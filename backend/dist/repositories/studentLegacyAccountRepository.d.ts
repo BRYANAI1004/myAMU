@@ -88,11 +88,23 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
     latest_term: unknown;
     latest_year: unknown;
 };
+export type LegacyAdminStudentListQuery = {
+    /** Trimmed search string; matches student id, name, email, and program (`requirements_id`) case-insensitively. */
+    search: string;
+};
 /**
- * All legacy `students` rows with latest registration term/year (same ordering as
- * `findLatestLegacyTermYear`). Used for the admin student roster.
+ * Count of students matching the admin roster search (before pagination).
  */
-export declare function listLegacyAdminStudentRows(pool: Pool): Promise<LegacyAdminStudentListRow[]>;
+export declare function countLegacyAdminStudentListRows(pool: Pool, query: LegacyAdminStudentListQuery): Promise<number>;
+export type LegacyAdminStudentListPageQuery = LegacyAdminStudentListQuery & {
+    limit: number;
+    offset: number;
+};
+/**
+ * One page of legacy `students` rows with latest registration term/year (admin roster).
+ * Search is applied in SQL before `LIMIT` / `OFFSET`.
+ */
+export declare function listLegacyAdminStudentListRowsPage(pool: Pool, query: LegacyAdminStudentListPageQuery): Promise<LegacyAdminStudentListRow[]>;
 export type LegacyStudentMasterUpdate = {
     name: string;
     email: string;

@@ -10,28 +10,35 @@ import {
   insertPortalBillingAdjustment,
   insertPortalPayment,
   insertSystemLateFee,
-  listFinanceRosterRows,
+  listAdminFinanceRosterPage,
+  countAdminFinanceRosterPage,
   listGlobalFinanceQuarters,
   listStudentIdsWithPortalQuarterActivity,
+  type AdminFinanceRosterBalanceFilter,
   type PortalBillingCategory,
   setFinanceQuarterDdlOnAcademicTerms,
   updateManualBillingAdjustment,
   updatePortalPayment,
 } from "../repositories/adminFinanceRepository.js";
-import {
-  loadLegacyAccountingRows,
-  sumLegacyAccountingBalanceByStudentForQuarter,
-} from "../repositories/studentLegacyAccountRepository.js";
+import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRepository.js";
 import {
   getAccountingLedgerPayload,
   getAccountingQuartersPayload,
 } from "./studentLedgerService.js";
 
-export type AdminFinanceStudentRow = {
+/** One row in the paginated admin finance student list. */
+export type AdminFinanceStudentListItem = {
   studentId: string;
   name: string;
-  /** Net balance for the selected quarter (legacy `accounting` and/or portal rules). */
+  /** Net balance for the selected quarter from legacy `accounting` only (same as prior roster). */
   balance: number;
+};
+
+export type AdminFinanceStudentsListResponse = {
+  items: AdminFinanceStudentListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 };
 
 const CHARGE_CATEGORIES: PortalBillingCategory[] = [
@@ -141,31 +148,66 @@ export async function putQuarterSettings(input: {
   return { ok: true };
 }
 
-export async function listAdminFinanceStudentsForQuarter(
+export function parseBalanceFilterParam(
+  raw: string | undefined,
+): AdminFinanceRosterBalanceFilter {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (
+    s === "positive" ||
+    s === "negative" ||
+    s === "zero" ||
+    s === "all"
+  ) {
+    return s;
+  }
+  return "all";
+}
+
+/**
+ * Paginated finance roster: search and balance filters run in SQL; balances are aggregated
+ * in `quarter_bal` (no per-student queries).
+ */
+export async function listAdminFinanceStudentsPaginated(
   term: string,
   year: number,
-): Promise<AdminFinanceStudentRow[]> {
-  const roster = await listFinanceRosterRows(pool);
+  query: {
+    page: number;
+    pageSize: number;
+    search: string;
+    balanceFilter: AdminFinanceRosterBalanceFilter;
+  },
+): Promise<AdminFinanceStudentsListResponse> {
   const t = term.trim();
   const y = Math.trunc(year);
-  const legacyByStudent = await sumLegacyAccountingBalanceByStudentForQuarter(
-    pool,
-    t,
-    y,
-  );
+  const page = Math.max(1, Math.trunc(query.page));
+  const pageSize = Math.min(100, Math.max(1, Math.trunc(query.pageSize)));
+  const offset = (page - 1) * pageSize;
+  const searchTrimmed = query.search.trim();
 
-  const out: AdminFinanceStudentRow[] = [];
-  for (const r of roster) {
-    const legacy = legacyByStudent.get(r.studentId);
-    const balance =
-      legacy !== undefined ? roundMoney(legacy) : 0;
-    out.push({
-      studentId: r.studentId,
-      name: r.name,
-      balance,
-    });
-  }
-  return out;
+  const [total, rawRows] = await Promise.all([
+    countAdminFinanceRosterPage(pool, {
+      term: t,
+      year: y,
+      searchTrimmed,
+      balanceFilter: query.balanceFilter,
+    }),
+    listAdminFinanceRosterPage(pool, {
+      term: t,
+      year: y,
+      searchTrimmed,
+      balanceFilter: query.balanceFilter,
+      limit: pageSize,
+      offset,
+    }),
+  ]);
+
+  const items: AdminFinanceStudentListItem[] = rawRows.map((r) => ({
+    studentId: r.studentId,
+    name: r.name,
+    balance: roundMoney(r.balance),
+  }));
+
+  return { items, total, page, pageSize };
 }
 
 export async function getAdminFinanceQuarters(studentId: string) {

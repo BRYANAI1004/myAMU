@@ -1,6 +1,6 @@
 import { pool } from "../lib/db.js";
-import { academicTermsPaymentDueDateColumnExists, deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getFinanceQuarterDdlFromAcademicTerms, getPortalPaymentById, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listFinanceRosterRows, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, setFinanceQuarterDdlOnAcademicTerms, updateManualBillingAdjustment, updatePortalPayment, } from "../repositories/adminFinanceRepository.js";
-import { loadLegacyAccountingRows, sumLegacyAccountingBalanceByStudentForQuarter, } from "../repositories/studentLegacyAccountRepository.js";
+import { academicTermsPaymentDueDateColumnExists, deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getFinanceQuarterDdlFromAcademicTerms, getPortalPaymentById, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listAdminFinanceRosterPage, countAdminFinanceRosterPage, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, setFinanceQuarterDdlOnAcademicTerms, updateManualBillingAdjustment, updatePortalPayment, } from "../repositories/adminFinanceRepository.js";
+import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRepository.js";
 import { getAccountingLedgerPayload, getAccountingQuartersPayload, } from "./studentLedgerService.js";
 const CHARGE_CATEGORIES = [
     "fees",
@@ -75,22 +75,49 @@ export async function putQuarterSettings(input) {
     }
     return { ok: true };
 }
-export async function listAdminFinanceStudentsForQuarter(term, year) {
-    const roster = await listFinanceRosterRows(pool);
+export function parseBalanceFilterParam(raw) {
+    const s = (raw ?? "").trim().toLowerCase();
+    if (s === "positive" ||
+        s === "negative" ||
+        s === "zero" ||
+        s === "all") {
+        return s;
+    }
+    return "all";
+}
+/**
+ * Paginated finance roster: search and balance filters run in SQL; balances are aggregated
+ * in `quarter_bal` (no per-student queries).
+ */
+export async function listAdminFinanceStudentsPaginated(term, year, query) {
     const t = term.trim();
     const y = Math.trunc(year);
-    const legacyByStudent = await sumLegacyAccountingBalanceByStudentForQuarter(pool, t, y);
-    const out = [];
-    for (const r of roster) {
-        const legacy = legacyByStudent.get(r.studentId);
-        const balance = legacy !== undefined ? roundMoney(legacy) : 0;
-        out.push({
-            studentId: r.studentId,
-            name: r.name,
-            balance,
-        });
-    }
-    return out;
+    const page = Math.max(1, Math.trunc(query.page));
+    const pageSize = Math.min(100, Math.max(1, Math.trunc(query.pageSize)));
+    const offset = (page - 1) * pageSize;
+    const searchTrimmed = query.search.trim();
+    const [total, rawRows] = await Promise.all([
+        countAdminFinanceRosterPage(pool, {
+            term: t,
+            year: y,
+            searchTrimmed,
+            balanceFilter: query.balanceFilter,
+        }),
+        listAdminFinanceRosterPage(pool, {
+            term: t,
+            year: y,
+            searchTrimmed,
+            balanceFilter: query.balanceFilter,
+            limit: pageSize,
+            offset,
+        }),
+    ]);
+    const items = rawRows.map((r) => ({
+        studentId: r.studentId,
+        name: r.name,
+        balance: roundMoney(r.balance),
+    }));
+    return { items, total, page, pageSize };
 }
 export async function getAdminFinanceQuarters(studentId) {
     return getAccountingQuartersPayload(studentId);
