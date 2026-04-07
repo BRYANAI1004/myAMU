@@ -70,6 +70,11 @@ export type LegacyStudentProfileRow = RowDataPacket;
  */
 export declare function loadLegacyStudentProfileRow(pool: Pool, studentId: string): Promise<LegacyStudentProfileRow | null>;
 export declare function loadLegacyAccountingRows(pool: Pool, studentId: string, term: string, year: number): Promise<LegacyAccountingRow[]>;
+/**
+ * Per-student net balance from legacy `accounting` for one quarter:
+ * `SUM(debit - credit)` (same sign convention as the finance ledger).
+ */
+export declare function sumLegacyAccountingBalanceByStudentForQuarter(pool: Pool, term: string, year: number): Promise<Map<string, number>>;
 /** Raw row for admin student list: legacy `students` + latest `registration` term/year. */
 export type LegacyAdminStudentListRow = RowDataPacket & {
     id: string;

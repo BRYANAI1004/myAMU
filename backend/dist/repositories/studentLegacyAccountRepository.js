@@ -159,6 +159,28 @@ export async function loadLegacyAccountingRows(pool, studentId, term, year) {
     }));
 }
 /**
+ * Per-student net balance from legacy `accounting` for one quarter:
+ * `SUM(debit - credit)` (same sign convention as the finance ledger).
+ */
+export async function sumLegacyAccountingBalanceByStudentForQuarter(pool, term, year) {
+    const t = term.trim();
+    const y = Math.trunc(year);
+    const [rows] = await pool.query(`SELECT TRIM(id) AS studentId,
+            COALESCE(SUM(debit - credit), 0) AS balance
+     FROM accounting
+     WHERE LOWER(TRIM(term)) = LOWER(TRIM(?))
+       AND CAST(year AS SIGNED) = ?
+     GROUP BY TRIM(id)`, [t, y]);
+    const out = new Map();
+    for (const r of rows) {
+        const id = String(r.studentId ?? "").trim();
+        if (id === "")
+            continue;
+        out.set(id, num(r.balance));
+    }
+    return out;
+}
+/**
  * All legacy `students` rows with latest registration term/year (same ordering as
  * `findLatestLegacyTermYear`). Used for the admin student roster.
  */

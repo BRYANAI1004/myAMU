@@ -2,7 +2,8 @@ import { type PortalBillingCategory } from "../repositories/adminFinanceReposito
 export type AdminFinanceStudentRow = {
     studentId: string;
     name: string;
-    balance: number | null;
+    /** Net balance for the selected quarter (legacy `accounting` and/or portal rules). */
+    balance: number;
 };
 export declare function listGlobalQuartersPayload(): Promise<{
     quarters: {
@@ -33,7 +34,7 @@ export declare function putQuarterSettings(input: {
     ok: false;
     message: string;
 }>;
-export declare function listAdminFinanceStudentsForQuarter(_term: string, _year: number): Promise<AdminFinanceStudentRow[]>;
+export declare function listAdminFinanceStudentsForQuarter(term: string, year: number): Promise<AdminFinanceStudentRow[]>;
 export declare function getAdminFinanceQuarters(studentId: string): Promise<{
     studentId: string;
     quarters: import("./studentLedgerService.js").LedgerQuarterOption[];

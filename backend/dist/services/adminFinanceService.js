@@ -1,7 +1,7 @@
 import { pool } from "../lib/db.js";
 import { academicTermsPaymentDueDateColumnExists, deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getFinanceQuarterDdlFromAcademicTerms, getPortalPaymentById, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listFinanceRosterRows, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, setFinanceQuarterDdlOnAcademicTerms, updateManualBillingAdjustment, updatePortalPayment, } from "../repositories/adminFinanceRepository.js";
-import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRepository.js";
-import { getAccountingLedgerPayload, getAccountingQuartersPayload, } from "./studentLedgerService.js";
+import { loadLegacyAccountingRows, sumLegacyAccountingBalanceByStudentForQuarter, } from "../repositories/studentLegacyAccountRepository.js";
+import { getAccountingLedgerPayload, getAccountingQuartersPayload, getStudentQuarterBalance, } from "./studentLedgerService.js";
 const CHARGE_CATEGORIES = [
     "fees",
     "other",
@@ -75,13 +75,27 @@ export async function putQuarterSettings(input) {
     }
     return { ok: true };
 }
-export async function listAdminFinanceStudentsForQuarter(_term, _year) {
+export async function listAdminFinanceStudentsForQuarter(term, year) {
     const roster = await listFinanceRosterRows(pool);
-    return roster.map((r) => ({
-        studentId: r.studentId,
-        name: r.name,
-        balance: null,
-    }));
+    const t = term.trim();
+    const y = Math.trunc(year);
+    const legacyByStudent = await sumLegacyAccountingBalanceByStudentForQuarter(pool, t, y);
+    const out = [];
+    for (const r of roster) {
+        let balance;
+        if (legacyByStudent.has(r.studentId)) {
+            balance = roundMoney(legacyByStudent.get(r.studentId) ?? 0);
+        }
+        else {
+            balance = roundMoney(await getStudentQuarterBalance(r.studentId, t, y));
+        }
+        out.push({
+            studentId: r.studentId,
+            name: r.name,
+            balance,
+        });
+    }
+    return out;
 }
 export async function getAdminFinanceQuarters(studentId) {
     return getAccountingQuartersPayload(studentId);
