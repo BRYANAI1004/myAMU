@@ -28,6 +28,7 @@ export function PortalLayout() {
           showSidebar={showSidebar}
           showPortalBanner={showPortalBanner}
           dashboardHome={isDashboard}
+          sidebarNavVariant="internal"
         >
           <Outlet />
         </PortalShell>

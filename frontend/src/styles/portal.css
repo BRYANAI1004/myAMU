@@ -5254,6 +5254,11 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   transform: translateY(0.0625rem);
 }
 
+/* Dashboard Services: brand red icons (not gray / muted currentColor from tile body). */
+.portal-dashboard-service-tile .portal-dashboard-service-icon-root {
+  color: #a6192e;
+}
+
 .portal-dashboard-service-icon-root svg {
   display: block;
   width: 100%;

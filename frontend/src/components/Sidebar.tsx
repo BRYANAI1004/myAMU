@@ -28,17 +28,28 @@ const MAIN_NAV_ITEMS: readonly {
   { to: '/profile', label: 'My Account', icon: IconMyAccount },
 ]
 
+/** `dashboard` = module icons (e.g. entry nav). `internal` = text-only sidebar / drawer. */
+export type SidebarNavVariant = 'dashboard' | 'internal'
+
 type SidebarNavListProps = {
   onItemClick?: () => void
+  variant?: SidebarNavVariant
 }
 
-export function SidebarNavList({ onItemClick }: SidebarNavListProps) {
+export function SidebarNavList({ onItemClick, variant = 'internal' }: SidebarNavListProps) {
   const handleClick = () => {
     onItemClick?.()
   }
 
+  const listClass = [
+    'portal-sidebar-nav-list',
+    variant === 'internal' ? 'portal-sidebar-nav-list--text-only' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <ul className="portal-sidebar-nav-list">
+    <ul className={listClass}>
       {MAIN_NAV_ITEMS.map((item) => {
         const Icon = item.icon
         return (
@@ -48,9 +59,11 @@ export function SidebarNavList({ onItemClick }: SidebarNavListProps) {
               className={({ isActive }) => navClassName(isActive)}
               onClick={handleClick}
             >
-              <span className="portal-nav-link-icon">
-                <Icon width={20} height={20} />
-              </span>
+              {variant === 'dashboard' ? (
+                <span className="portal-nav-link-icon">
+                  <Icon width={20} height={20} />
+                </span>
+              ) : null}
               {item.label}
             </NavLink>
           </li>
@@ -60,12 +73,19 @@ export function SidebarNavList({ onItemClick }: SidebarNavListProps) {
   )
 }
 
+type SidebarProps = {
+  variant?: SidebarNavVariant
+}
+
 /** Fixed left sidebar — visible on desktop only (see `portal.css`). */
-export function Sidebar() {
+export function Sidebar({ variant = 'internal' }: SidebarProps) {
   return (
-    <aside className="portal-sidebar portal-sidebar--desktop" aria-label="Main navigation">
+    <aside
+      className={['portal-sidebar', 'portal-sidebar--desktop', `portal-sidebar--nav-${variant}`].join(' ')}
+      aria-label="Main navigation"
+    >
       <nav className="portal-sidebar-nav" aria-label="Portal modules">
-        <SidebarNavList />
+        <SidebarNavList variant={variant} />
       </nav>
     </aside>
   )

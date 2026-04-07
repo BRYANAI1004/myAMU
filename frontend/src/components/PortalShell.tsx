@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PORTAL_MOBILE_DRAWER_CLOSE_ID, PortalMobileNavDrawer } from './PortalSidebar'
-import { Sidebar, SidebarNavList } from './Sidebar'
+import { Sidebar, SidebarNavList, type SidebarNavVariant } from './Sidebar'
 import { TopBar } from './TopBar'
 import { PortalStudentInfoBar } from './PortalStudentInfoBar'
 
@@ -14,6 +14,8 @@ type PortalShellProps = {
   showPortalBanner?: boolean
   /** Homepage: content-height layout (no viewport filling / excess bottom gap). */
   dashboardHome?: boolean
+  /** Module sidebar / mobile drawer: `internal` text-only vs `dashboard` icon+label. */
+  sidebarNavVariant?: SidebarNavVariant
 }
 
 export function PortalShell({
@@ -22,6 +24,7 @@ export function PortalShell({
   showSidebar = true,
   showPortalBanner = false,
   dashboardHome = false,
+  sidebarNavVariant = 'internal',
 }: PortalShellProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
@@ -79,9 +82,9 @@ export function PortalShell({
         onMobileMenuToggle={toggleMobileNav}
         showPortalBanner={showPortalBanner}
       />
-      {showSidebar ? <Sidebar /> : null}
+      {showSidebar ? <Sidebar variant={sidebarNavVariant} /> : null}
       <PortalMobileNavDrawer open={mobileNavOpen} onClose={closeMobileNav}>
-        <SidebarNavList onItemClick={closeMobileNav} />
+        <SidebarNavList variant={sidebarNavVariant} onItemClick={closeMobileNav} />
       </PortalMobileNavDrawer>
       <div className="portal-main">
         {showStudentBar ? <PortalStudentInfoBar /> : null}
