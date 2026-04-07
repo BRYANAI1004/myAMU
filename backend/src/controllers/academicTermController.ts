@@ -7,6 +7,7 @@ import type {
   UpdateAcademicTermInput,
 } from "../types/academicTerm.js";
 import {
+  academicTermPaymentPolicyColumnsAvailable,
   createAcademicTerm,
   getCurrentRegistrationOpenTerm,
   listAllAcademicTerms,
@@ -177,12 +178,18 @@ function patchHasField(patch: UpdateAcademicTermInput): boolean {
   return Object.keys(patch).length > 0;
 }
 
+async function setAcademicTermPaymentColumnsHeader(res: Response): Promise<void> {
+  const available = await academicTermPaymentPolicyColumnsAvailable();
+  res.setHeader("X-Academic-Terms-Payment-Columns", available ? "1" : "0");
+}
+
 export async function getAcademicTerms(
   _req: Request,
   res: Response,
 ): Promise<void> {
   try {
     const terms = await listAllAcademicTerms();
+    await setAcademicTermPaymentColumnsHeader(res);
     res.json(terms);
   } catch (e) {
     console.error("[academic-terms] list failed:", e);
@@ -209,6 +216,7 @@ export async function getAcademicTermsRecent(
       limit = n;
     }
     const terms = await listRecentVisibleTerms(limit);
+    await setAcademicTermPaymentColumnsHeader(res);
     res.json(terms);
   } catch (e) {
     console.error("[academic-terms/recent] failed:", e);
@@ -224,6 +232,7 @@ export async function getAcademicTermsCurrent(
 ): Promise<void> {
   try {
     const term = await getCurrentRegistrationOpenTerm();
+    await setAcademicTermPaymentColumnsHeader(res);
     res.json(term);
   } catch (e) {
     console.error("[academic-terms/current] failed:", e);
@@ -247,6 +256,7 @@ export async function postAdminAcademicTerm(
       return;
     }
     const term = await createAcademicTerm(input);
+    await setAcademicTermPaymentColumnsHeader(res);
     res.status(201).json(term);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -291,6 +301,7 @@ export async function patchAdminAcademicTerm(
       res.status(404).json({ error: "Academic term not found" });
       return;
     }
+    await setAcademicTermPaymentColumnsHeader(res);
     res.json(term);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

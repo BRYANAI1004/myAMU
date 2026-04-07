@@ -1494,12 +1494,70 @@ function parseAcademicTermList(data: unknown): AcademicTerm[] {
   return out
 }
 
+/** Same JSON/body rules as `fetchApiJson`, but preserves access to response headers. */
+async function parseAcademicTermsFromResponse(res: Response): Promise<AcademicTerm[]> {
+  const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+  const text = await res.text()
+
+  if (!ct.includes('application/json')) {
+    const snippet =
+      text
+        .slice(0, JSON_SNIPPET_MAX)
+        .replace(/\s+/g, ' ')
+        .trim() || '(empty)'
+    const prefix = `Expected application/json but got "${ct || 'no content-type'}" (HTTP ${res.status}). Body starts with: ${snippet}`
+    if (!res.ok) {
+      throw new Error(`Request failed: ${prefix}`)
+    }
+    throw new Error(prefix)
+  }
+
+  const trimmed = text.trim()
+  if (trimmed === '') {
+    if (!res.ok) {
+      throw new Error(`Empty response body (HTTP ${res.status})`)
+    }
+    throw new Error('Unexpected academic terms response')
+  }
+
+  let data: unknown
+  try {
+    data = JSON.parse(trimmed) as unknown
+  } catch {
+    throw new Error(`Invalid JSON in response (HTTP ${res.status})`)
+  }
+
+  if (!res.ok) {
+    const body = data as { error?: string; message?: string }
+    const msg =
+      (typeof body.message === 'string' && body.message) ||
+      (typeof body.error === 'string' && body.error) ||
+      'Request failed'
+    throw new Error(`${msg} (HTTP ${res.status})`)
+  }
+
+  return parseAcademicTermList(data)
+}
+
 export async function fetchAcademicTerms(options?: {
   signal?: AbortSignal
-}): Promise<AcademicTerm[]> {
-  const data = (await fetchApiJson('/api/academic-terms', {
-    signal: options?.signal,
-  })) as unknown
+}): Promise<AcademicTerm[]>
+export async function fetchAcademicTerms(options: {
+  signal?: AbortSignal
+  includePaymentColumnAvailability: true
+}): Promise<{ terms: AcademicTerm[]; paymentPolicyColumnsAvailable: boolean }>
+export async function fetchAcademicTerms(
+  options?: { signal?: AbortSignal; includePaymentColumnAvailability?: boolean },
+): Promise<AcademicTerm[] | { terms: AcademicTerm[]; paymentPolicyColumnsAvailable: boolean }> {
+  const signal = options?.signal
+  if (options?.includePaymentColumnAvailability === true) {
+    const res = await apiFetch('/api/academic-terms', { signal })
+    const paymentPolicyColumnsAvailable =
+      (res.headers.get('X-Academic-Terms-Payment-Columns') ?? '0') === '1'
+    const terms = await parseAcademicTermsFromResponse(res)
+    return { terms, paymentPolicyColumnsAvailable }
+  }
+  const data = (await fetchApiJson('/api/academic-terms', { signal })) as unknown
   return parseAcademicTermList(data)
 }
 
