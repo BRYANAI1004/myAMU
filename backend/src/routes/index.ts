@@ -81,6 +81,12 @@ import {
   postStudentClinicalEnrollmentHandler,
 } from "../controllers/clinicalEnrollmentController.js";
 import {
+  deleteAdminClinicalSlotHandler,
+  getAdminClinicalSlotsHandler,
+  patchAdminClinicalSlotHandler,
+  postAdminClinicalSlotHandler,
+} from "../controllers/adminClinicalSlotController.js";
+import {
   getAdminClinicalTimetableHandler,
   getStudentClinicalScheduleHandler,
   postAdminClinicalAssignHandler,
@@ -149,6 +155,10 @@ adminRouter.get("/finance/:studentId/ledger", getAdminFinanceLedgerHandler);
 adminRouter.post("/academic-terms", postAdminAcademicTerm);
 adminRouter.patch("/academic-terms/:id", patchAdminAcademicTerm);
 adminRouter.get("/clinical/timetable", getAdminClinicalTimetableHandler);
+adminRouter.get("/clinical/slots", getAdminClinicalSlotsHandler);
+adminRouter.post("/clinical/slots", postAdminClinicalSlotHandler);
+adminRouter.patch("/clinical/slots/:id", patchAdminClinicalSlotHandler);
+adminRouter.delete("/clinical/slots/:id", deleteAdminClinicalSlotHandler);
 adminRouter.post("/clinical/assign", postAdminClinicalAssignHandler);
 adminRouter.get("/clinical/requests", getAdminClinicalRequestsHandler);
 adminRouter.post(

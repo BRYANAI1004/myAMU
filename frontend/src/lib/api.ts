@@ -1622,6 +1622,142 @@ export async function postAdminClinicalAssign(
   return { ok: true, id: o.id }
 }
 
+/** GET/POST/PATCH `/api/admin/clinical/slots` — legacy `clinic_timetable` CRUD (term via `academicTermId`). */
+export type AdminClinicalSlot = {
+  id: number
+  academicTermId: string | null
+  year: number
+  term: string
+  weekday: string
+  timeFrom: string
+  timeTo: string
+  slot: string
+  instructorId: string
+  instructor: string
+  cap100: number
+  cap200: number
+  cap300: number
+  cap123: number
+}
+
+export type CreateAdminClinicalSlotBody = {
+  academicTermId: string
+  weekday: string
+  timeFrom: string
+  timeTo: string
+  slot: string
+  instructor: string
+  instructorId?: string | null
+  cap100?: number
+  cap200?: number
+  cap300?: number
+  cap123?: number
+}
+
+export type UpdateAdminClinicalSlotBody = Partial<CreateAdminClinicalSlotBody>
+
+function isAdminClinicalSlot(x: unknown): x is AdminClinicalSlot {
+  if (x == null || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  return (
+    typeof o.id === 'number' &&
+    (o.academicTermId === null || typeof o.academicTermId === 'string') &&
+    typeof o.year === 'number' &&
+    typeof o.term === 'string' &&
+    typeof o.weekday === 'string' &&
+    typeof o.timeFrom === 'string' &&
+    typeof o.timeTo === 'string' &&
+    typeof o.slot === 'string' &&
+    typeof o.instructorId === 'string' &&
+    typeof o.instructor === 'string' &&
+    typeof o.cap100 === 'number' &&
+    typeof o.cap200 === 'number' &&
+    typeof o.cap300 === 'number' &&
+    typeof o.cap123 === 'number'
+  )
+}
+
+export async function fetchAdminClinicalSlots(options?: {
+  academicTermId?: string | null
+  signal?: AbortSignal
+}): Promise<AdminClinicalSlot[]> {
+  const params = new URLSearchParams()
+  if (
+    options?.academicTermId != null &&
+    String(options.academicTermId).trim() !== ''
+  ) {
+    params.set('academic_term_id', String(options.academicTermId).trim())
+  }
+  const q = params.toString()
+  const path =
+    q.length > 0
+      ? `/api/admin/clinical/slots?${q}`
+      : '/api/admin/clinical/slots'
+  const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected admin clinical slots response')
+  }
+  for (const row of data) {
+    if (!isAdminClinicalSlot(row)) {
+      throw new Error('Unexpected admin clinical slots response')
+    }
+  }
+  return data
+}
+
+export async function createAdminClinicalSlot(
+  body: CreateAdminClinicalSlotBody,
+  options?: { signal?: AbortSignal },
+): Promise<AdminClinicalSlot> {
+  const data = (await fetchApiJson('/api/admin/clinical/slots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (!isAdminClinicalSlot(data)) {
+    throw new Error('Unexpected admin clinical slot create response')
+  }
+  return data
+}
+
+export async function updateAdminClinicalSlot(
+  id: number,
+  body: UpdateAdminClinicalSlotBody,
+  options?: { signal?: AbortSignal },
+): Promise<AdminClinicalSlot> {
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(id))}`
+  const data = (await fetchApiJson(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (!isAdminClinicalSlot(data)) {
+    throw new Error('Unexpected admin clinical slot update response')
+  }
+  return data
+}
+
+export async function deleteAdminClinicalSlot(
+  id: number,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: true }> {
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(id))}`
+  const data = (await fetchApiJson(path, {
+    method: 'DELETE',
+    signal: options?.signal,
+  })) as unknown
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected admin clinical slot delete response')
+  }
+  const o = data as Record<string, unknown>
+  if (o.ok !== true) {
+    throw new Error('Unexpected admin clinical slot delete response')
+  }
+  return { ok: true }
+}
+
 /** GET /api/students/:studentId/clinical-requests */
 export type StudentClinicalRequestItem = {
   id: number

@@ -1,4 +1,4 @@
-import type { RowDataPacket } from "mysql2/promise";
+import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { pool } from "../lib/db.js";
 
 /** Row shape from legacy `clinic_timetable` (see school.sql). */
@@ -107,4 +107,175 @@ export async function getClinicTimetableById(
     return null;
   }
   return mapTimetableRow(rows[0]!);
+}
+
+export type ClinicTimetableAdminRow = ClinicTimetableDbRow & {
+  /** `academic_terms.id` when year + legacy term matches a portal term; otherwise null. */
+  academic_term_id: string | null;
+};
+
+function mapTimetableAdminRow(r: RowDataPacket): ClinicTimetableAdminRow {
+  const base = mapTimetableRow(r);
+  const row = r as Record<string, unknown>;
+  const aid = row.academic_term_id;
+  return {
+    ...base,
+    academic_term_id:
+      aid == null || aid === "" ? null : String(aid).trim() || null,
+  };
+}
+
+/**
+ * Admin list: same filters as `listClinicTimetableSlots`, plus optional `academic_terms.id` via join.
+ */
+export async function listClinicTimetableSlotsForAdmin(options?: {
+  year?: number | null;
+  term?: string | null;
+}): Promise<ClinicTimetableAdminRow[]> {
+  const y = options?.year;
+  const t = options?.term != null ? String(options.term).trim() : "";
+  const yearClause =
+    y != null && Number.isFinite(y) ? " AND ct.year = ? " : "";
+  const termClause = t !== "" ? " AND TRIM(ct.term) = TRIM(?) " : "";
+  const params: (string | number)[] = [];
+  if (y != null && Number.isFinite(y)) {
+    params.push(Number(y));
+  }
+  if (t !== "") {
+    params.push(t);
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT ct.seqNum AS id, ct.year, ct.term, ct.day AS weekday,
+            ct.time_from, ct.time_to, ct.slot, ct.instructor_id, ct.instructor,
+            ct.\`100Max\` AS cap_100, ct.\`200Max\` AS cap_200,
+            ct.\`300Max\` AS cap_300, ct.\`123Max\` AS cap_123,
+            at.id AS academic_term_id
+       FROM clinic_timetable ct
+       LEFT JOIN academic_terms at
+         ON at.year = ct.year AND at.term_name = TRIM(ct.term)
+      WHERE 1=1
+      ${yearClause}
+      ${termClause}
+      ORDER BY ct.year DESC, TRIM(ct.term) ASC, ct.day ASC, ct.time_from ASC, ct.seqNum ASC`,
+    params,
+  );
+  return rows.map(mapTimetableAdminRow);
+}
+
+export type ClinicTimetableWritePayload = {
+  year: number;
+  term: string;
+  day: string;
+  time_from: string;
+  time_to: string;
+  slot: string;
+  instructor_id: string;
+  instructor: string;
+  cap_100: number;
+  cap_200: number;
+  cap_300: number;
+  cap_123: number;
+};
+
+export async function createClinicTimetableSlot(
+  payload: ClinicTimetableWritePayload,
+): Promise<number> {
+  const [res] = await pool.query<ResultSetHeader>(
+    `INSERT INTO clinic_timetable (
+        year, term, day, time_from, time_to, slot,
+        instructor_id, instructor,
+        \`100Max\`, \`200Max\`, \`300Max\`, \`123Max\`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      payload.year,
+      payload.term,
+      payload.day,
+      payload.time_from,
+      payload.time_to,
+      payload.slot,
+      payload.instructor_id,
+      payload.instructor,
+      payload.cap_100,
+      payload.cap_200,
+      payload.cap_300,
+      payload.cap_123,
+    ],
+  );
+  return Number(res.insertId);
+}
+
+export async function updateClinicTimetableSlot(
+  seqNum: number,
+  payload: ClinicTimetableWritePayload,
+): Promise<boolean> {
+  if (!Number.isFinite(seqNum) || seqNum <= 0) {
+    return false;
+  }
+  const [res] = await pool.query<ResultSetHeader>(
+    `UPDATE clinic_timetable SET
+        year = ?, term = ?, day = ?, time_from = ?, time_to = ?, slot = ?,
+        instructor_id = ?, instructor = ?,
+        \`100Max\` = ?, \`200Max\` = ?, \`300Max\` = ?, \`123Max\` = ?
+      WHERE seqNum = ?`,
+    [
+      payload.year,
+      payload.term,
+      payload.day,
+      payload.time_from,
+      payload.time_to,
+      payload.slot,
+      payload.instructor_id,
+      payload.instructor,
+      payload.cap_100,
+      payload.cap_200,
+      payload.cap_300,
+      payload.cap_123,
+      seqNum,
+    ],
+  );
+  return res.affectedRows > 0;
+}
+
+export async function deleteClinicTimetableSlot(seqNum: number): Promise<boolean> {
+  if (!Number.isFinite(seqNum) || seqNum <= 0) {
+    return false;
+  }
+  const [res] = await pool.query<ResultSetHeader>(
+    `DELETE FROM clinic_timetable WHERE seqNum = ?`,
+    [seqNum],
+  );
+  return res.affectedRows > 0;
+}
+
+export type ClinicTimetableReferenceCounts = {
+  enrollments: number;
+  requests: number;
+  assignments: number;
+};
+
+/**
+ * Rows still pointing at this `clinic_timetable.seqNum` (enrollments, requests, assignments).
+ */
+export async function countClinicTimetableReferences(
+  seqNum: number,
+): Promise<ClinicTimetableReferenceCounts> {
+  if (!Number.isFinite(seqNum) || seqNum <= 0) {
+    return { enrollments: 0, requests: 0, assignments: 0 };
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+        (SELECT COUNT(*) FROM clinical_enrollments WHERE timetable_id = ?) AS enrollments,
+        (SELECT COUNT(*) FROM clinical_requests WHERE timetable_id = ?) AS requests,
+        (SELECT COUNT(*) FROM clinical_assignments WHERE timetable_id = ?) AS assignments`,
+    [seqNum, seqNum, seqNum],
+  );
+  const r = rows[0] as Record<string, unknown> | undefined;
+  if (!r) {
+    return { enrollments: 0, requests: 0, assignments: 0 };
+  }
+  return {
+    enrollments: Math.max(0, Math.trunc(Number(r.enrollments))),
+    requests: Math.max(0, Math.trunc(Number(r.requests))),
+    assignments: Math.max(0, Math.trunc(Number(r.assignments))),
+  };
 }
