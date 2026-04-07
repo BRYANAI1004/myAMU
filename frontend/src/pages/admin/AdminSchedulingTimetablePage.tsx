@@ -20,8 +20,9 @@ import {
   TIMETABLE_START_HOUR,
   timetableBodyHeightPx,
 } from '../../lib/timetableBlockLayout'
-import { adminTimetableHeading } from '../../lib/scheduleTrack'
 import { type WeekdayFull } from '../../lib/weekdaySchedule'
+
+type TimetableLangTab = 'en' | 'cn'
 
 function hourRowLabel(hour: number): string {
   return formatTimeHmsForDisplay(`${hour}:00:00`)
@@ -150,6 +151,7 @@ export function AdminSchedulingTimetablePage() {
     section: AdminCourseSection
     dayLabel: string
   } | null>(null)
+  const [langTab, setLangTab] = useState<TimetableLangTab>('en')
 
   useEffect(() => {
     const ac = new AbortController()
@@ -355,13 +357,6 @@ export function AdminSchedulingTimetablePage() {
         </div>
       </div>
 
-      <p className="portal-text-muted admin-form-hint" style={{ marginTop: 0 }}>
-        Read-only week view: each section is one continuous block by start/end
-        time (sub-hour alignment). Click a block for full details. Sections
-        without valid times or outside {hourRowLabel(TIMETABLE_START_HOUR)}–
-        {hourRowLabel(TIMETABLE_END_HOUR + 1)} are omitted.
-      </p>
-
       {error != null && (
         <p className="portal-text-muted" role="alert">
           {error}
@@ -370,70 +365,89 @@ export function AdminSchedulingTimetablePage() {
 
       {loading && <p className="portal-text-muted">Loading timetable…</p>}
 
-      {!loading && sections != null && sections.length === 0 && error == null && (
+      {!loading && sections != null && error == null && (
         <>
-          <h2 className="admin-page__subtitle" style={{ marginTop: '1rem' }}>
-            {adminTimetableHeading('EN')}
-          </h2>
-          <p className="portal-text-muted" role="status">
-            No English timetable sections scheduled for this term.
-          </p>
-          <h2 className="admin-page__subtitle" style={{ marginTop: '1.25rem' }}>
-            {adminTimetableHeading('CN')}
-          </h2>
-          <p className="portal-text-muted" role="status">
-            No Chinese timetable sections scheduled for this term.
-          </p>
-        </>
-      )}
+          <div className="portal-timetable-lang-head">
+            <div
+              className="portal-timetable-lang-tabs"
+              role="tablist"
+              aria-label="Timetable language"
+            >
+              <button
+                type="button"
+                role="tab"
+                id="admin-sched-tt-tab-en"
+                className="portal-timetable-lang-tab"
+                aria-selected={langTab === 'en'}
+                aria-controls="admin-sched-tt-panel-en"
+                onClick={() => setLangTab('en')}
+              >
+                English Timetable
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="admin-sched-tt-tab-cn"
+                className="portal-timetable-lang-tab"
+                aria-selected={langTab === 'cn'}
+                aria-controls="admin-sched-tt-panel-cn"
+                onClick={() => setLangTab('cn')}
+              >
+                Chinese Timetable
+              </button>
+            </div>
+          </div>
 
-      {!loading && sections != null && sections.length > 0 && (
-        <div className="portal-stack" style={{ gap: '2rem' }}>
-          <div>
-            <h2 className="admin-page__subtitle" style={{ marginBottom: '0.5rem' }}>
-              {adminTimetableHeading('EN')}
-            </h2>
-            {enSections.length === 0 ? (
-              <p className="portal-text-muted" role="status">
-                No English timetable sections scheduled for this term.
-              </p>
-            ) : (
-              <div className="admin-timetable-wrap">
-                <AdminTimetableWeekGrid
-                  placedByDay={placedByDayEn}
-                  hourRows={hourRows}
-                  bodyHeightPx={bodyHeightPx}
-                  catalogByCode={catalogByCode}
-                  onBlockClick={(section, dayLabel) =>
-                    setDetail({ section, dayLabel })
-                  }
-                />
-              </div>
-            )}
-          </div>
-          <div>
-            <h2 className="admin-page__subtitle" style={{ marginBottom: '0.5rem' }}>
-              {adminTimetableHeading('CN')}
-            </h2>
-            {cnSections.length === 0 ? (
-              <p className="portal-text-muted" role="status">
-                No Chinese timetable sections scheduled for this term.
-              </p>
-            ) : (
-              <div className="admin-timetable-wrap">
-                <AdminTimetableWeekGrid
-                  placedByDay={placedByDayCn}
-                  hourRows={hourRows}
-                  bodyHeightPx={bodyHeightPx}
-                  catalogByCode={catalogByCode}
-                  onBlockClick={(section, dayLabel) =>
-                    setDetail({ section, dayLabel })
-                  }
-                />
-              </div>
-            )}
-          </div>
-        </div>
+          {langTab === 'en' ? (
+            <div
+              role="tabpanel"
+              id="admin-sched-tt-panel-en"
+              aria-labelledby="admin-sched-tt-tab-en"
+            >
+              {sections.length === 0 || enSections.length === 0 ? (
+                <p className="portal-text-muted" role="status">
+                  No English timetable sections scheduled for this term.
+                </p>
+              ) : (
+                <div className="admin-timetable-wrap">
+                  <AdminTimetableWeekGrid
+                    placedByDay={placedByDayEn}
+                    hourRows={hourRows}
+                    bodyHeightPx={bodyHeightPx}
+                    catalogByCode={catalogByCode}
+                    onBlockClick={(section, dayLabel) =>
+                      setDetail({ section, dayLabel })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div
+              role="tabpanel"
+              id="admin-sched-tt-panel-cn"
+              aria-labelledby="admin-sched-tt-tab-cn"
+            >
+              {sections.length === 0 || cnSections.length === 0 ? (
+                <p className="portal-text-muted" role="status">
+                  No Chinese timetable sections scheduled for this term.
+                </p>
+              ) : (
+                <div className="admin-timetable-wrap">
+                  <AdminTimetableWeekGrid
+                    placedByDay={placedByDayCn}
+                    hourRows={hourRows}
+                    bodyHeightPx={bodyHeightPx}
+                    catalogByCode={catalogByCode}
+                    onBlockClick={(section, dayLabel) =>
+                      setDetail({ section, dayLabel })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {detail != null && (
