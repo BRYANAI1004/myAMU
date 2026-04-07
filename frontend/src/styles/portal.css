@@ -498,11 +498,11 @@
 
 .portal-shell--dashboard-home .portal-main-content {
   width: 100%;
-  max-width: 1680px;
+  max-width: 1760px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: 32px;
-  padding-right: 32px;
+  padding-left: 20px;
+  padding-right: 20px;
   box-sizing: border-box;
 }
 
@@ -4901,8 +4901,8 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-dashboard-home-grid {
   display: grid;
   width: 100%;
-  grid-template-columns: minmax(260px, 280px) minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 290px minmax(0, 1fr);
+  gap: 16px;
   align-items: stretch;
 }
 
