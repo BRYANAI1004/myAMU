@@ -79,6 +79,25 @@ function pendingRequestForTimetable(
   )
 }
 
+const ACADEMIC_TERM_ORDER = ['Winter', 'Spring', 'Summer', 'Fall'] as const
+
+function compareTermsAcademic(a: string, b: string): number {
+  const at = a.trim()
+  const bt = b.trim()
+  const ai = ACADEMIC_TERM_ORDER.findIndex(
+    (t) => t.toLowerCase() === at.toLowerCase(),
+  )
+  const bi = ACADEMIC_TERM_ORDER.findIndex(
+    (t) => t.toLowerCase() === bt.toLowerCase(),
+  )
+  const aKnown = ai >= 0
+  const bKnown = bi >= 0
+  if (aKnown && bKnown) return ai - bi
+  if (aKnown && !bKnown) return -1
+  if (!aKnown && bKnown) return 1
+  return at.localeCompare(bt, undefined, { sensitivity: 'base' })
+}
+
 export function ClinicalSchedulePage() {
   const { currentStudentId } = useAccount()
   const [rows, setRows] = useState<TableRow[]>([])
@@ -171,6 +190,23 @@ export function ClinicalSchedulePage() {
 
     return () => ac.abort()
   }, [currentStudentId, dataReloadKey])
+
+  const availableTerms = useMemo(() => {
+    const seen = new Set<string>()
+    for (const s of timetableSlots) {
+      const t = s.term.trim()
+      if (t !== '') seen.add(t)
+    }
+    return [...seen].sort(compareTermsAcademic)
+  }, [timetableSlots])
+
+  const availableYears = useMemo(() => {
+    const seen = new Set<number>()
+    for (const s of timetableSlots) {
+      if (Number.isFinite(s.year)) seen.add(s.year)
+    }
+    return [...seen].sort((a, b) => b - a)
+  }, [timetableSlots])
 
   const filteredTimetableSlots = useMemo(() => {
     return timetableSlots.filter((s) => {
@@ -282,25 +318,35 @@ export function ClinicalSchedulePage() {
             >
               <label className="portal-card-note" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <span>Term</span>
-                <input
-                  type="text"
-                  className="portal-registration-search-input"
+                <select
+                  className="portal-account-ledger__select"
                   value={filterTerm}
                   onChange={(e) => setFilterTerm(e.target.value)}
-                  placeholder="e.g. Spring"
                   aria-label="Filter timetable by term"
-                />
+                >
+                  <option value="">All terms</option>
+                  {availableTerms.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="portal-card-note" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                 <span>Year</span>
-                <input
-                  type="text"
-                  className="portal-registration-search-input"
+                <select
+                  className="portal-account-ledger__select"
                   value={filterYear}
                   onChange={(e) => setFilterYear(e.target.value)}
-                  placeholder="e.g. 2026"
                   aria-label="Filter timetable by year"
-                />
+                >
+                  <option value="">All years</option>
+                  {availableYears.map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label
                 className="portal-card-note"
