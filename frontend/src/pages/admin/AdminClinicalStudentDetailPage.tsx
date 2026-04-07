@@ -27,8 +27,11 @@ function clinicalHoursProgressPct(cp: ClinicalProgress): number {
   return cp.completedHours > 0 ? 100 : 0
 }
 
+const ISO_YMD = /^(\d{4})-(\d{2})-(\d{2})$/
+const TIMETABLE_PLACEHOLDER_DATE = '1900-01-01'
+
 function formatScheduleDate(isoYmd: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoYmd.trim())
+  const m = ISO_YMD.exec(isoYmd.trim())
   if (!m) return isoYmd
   const y = Number(m[1])
   const mo = Number(m[2])
@@ -47,6 +50,44 @@ function formatScheduleDate(isoYmd: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function isWeeklyTimetableSessionDate(sessionDate: string): boolean {
+  const s = sessionDate.trim()
+  return s.includes('· weekly') || s === TIMETABLE_PLACEHOLDER_DATE
+}
+
+/** Date column: real calendar dates formatted; weekly / placeholder never show 1900-01-01. */
+function formatAssignedSessionDateCell(sessionDate: string): string {
+  const s = sessionDate.trim()
+  if (s === TIMETABLE_PLACEHOLDER_DATE) {
+    return 'Weekly clinic (timetable)'
+  }
+  if (s.includes('· weekly')) {
+    return s
+  }
+  if (!ISO_YMD.test(s)) {
+    return s
+  }
+  return formatScheduleDate(s)
+}
+
+/** Site / faculty: unknown → —, explicit TBA preserved (normalized casing). */
+function displayClinicalSiteOrFaculty(value: string | null | undefined): string {
+  const raw = value?.trim() ?? ''
+  if (raw === '') return '—'
+  if (raw.toUpperCase() === 'TBA') return 'TBA'
+  return raw
+}
+
+function displayAssignedSessionName(
+  sessionDate: string,
+  sessionName: string | null | undefined,
+): string {
+  const name = sessionName?.trim() ?? ''
+  if (name !== '') return name
+  if (isWeeklyTimetableSessionDate(sessionDate)) return 'Weekly slot'
+  return '—'
 }
 
 function clinicalAssignmentStatusClass(status: string): string {
@@ -169,19 +210,10 @@ export function AdminClinicalStudentDetailPage() {
     }
   }, [filteredTimetableSlots, selectedSlotId])
 
-  const termYearOptions = useMemo(() => {
-    const map = new Map<string, { year: number; term: string }>()
-    for (const s of timetableSlots) {
-      const k = `${s.year}\t${s.term}`
-      if (!map.has(k)) {
-        map.set(k, { year: s.year, term: s.term })
-      }
-    }
-    return [...map.values()].sort((a, b) => {
-      if (b.year !== a.year) return b.year - a.year
-      return a.term.localeCompare(b.term)
-    })
-  }, [timetableSlots])
+  const slotAssignDisabled =
+    timetableLoading ||
+    timetableError != null ||
+    filteredTimetableSlots.length === 0
 
   useEffect(() => {
     if (!studentId.trim()) {
@@ -443,11 +475,14 @@ export function AdminClinicalStudentDetailPage() {
             >
               Assign clinical session
             </h2>
-            <p className="portal-inline-note portal-inline-note--flush" style={{ margin: 0 }}>
+            <p
+              className="portal-inline-note portal-inline-note--flush"
+              style={{ margin: 0, marginBottom: '0.25rem' }}
+            >
               Choose a published slot from the legacy clinic timetable. Course, site, and
               faculty details come from that record (site may be blank when not on file).
             </p>
-            <form className="portal-stack" style={{ gap: '1rem' }} onSubmit={onAssignSubmit}>
+            <form className="portal-stack" style={{ gap: '0.85rem' }} onSubmit={onAssignSubmit}>
               {assignError ? (
                 <p
                   className="portal-profile-state__detail portal-profile-state--error"
@@ -475,16 +510,7 @@ export function AdminClinicalStudentDetailPage() {
                   {timetableError}
                 </p>
               ) : null}
-              <fieldset
-                disabled={assignSubmitting}
-                className="portal-stack"
-                style={{
-                  gap: '0.85rem',
-                  border: 'none',
-                  margin: 0,
-                  padding: 0,
-                }}
-              >
+              <div className="portal-stack" style={{ gap: '0.75rem' }}>
                 <div className="admin-detail-field-row">
                   <label
                     htmlFor="admin-clinical-filter-year"
@@ -496,6 +522,7 @@ export function AdminClinicalStudentDetailPage() {
                     id="admin-clinical-filter-year"
                     className="admin-input"
                     value={filterYear}
+                    disabled={assignSubmitting}
                     onChange={(e) => {
                       setFilterYear(e.target.value)
                       setSelectedSlotId('')
@@ -523,6 +550,7 @@ export function AdminClinicalStudentDetailPage() {
                     id="admin-clinical-filter-term"
                     className="admin-input"
                     value={filterTerm}
+                    disabled={assignSubmitting}
                     onChange={(e) => {
                       setFilterTerm(e.target.value)
                       setSelectedSlotId('')
@@ -537,25 +565,6 @@ export function AdminClinicalStudentDetailPage() {
                     ))}
                   </select>
                 </div>
-                <p className="portal-inline-note portal-inline-note--flush" style={{ margin: 0 }}>
-                  Quick presets from loaded slots:
-                </p>
-                <div className="portal-actions" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {termYearOptions.slice(0, 12).map((o) => (
-                    <button
-                      key={`${o.year}-${o.term}`}
-                      type="button"
-                      className="portal-btn portal-btn--secondary"
-                      onClick={() => {
-                        setFilterYear(String(o.year))
-                        setFilterTerm(o.term)
-                        setSelectedSlotId('')
-                      }}
-                    >
-                      {o.term} {o.year}
-                    </button>
-                  ))}
-                </div>
                 <div className="admin-detail-field-row">
                   <label
                     htmlFor="admin-clinical-slot-select"
@@ -567,12 +576,18 @@ export function AdminClinicalStudentDetailPage() {
                     id="admin-clinical-slot-select"
                     className="admin-input"
                     value={selectedSlotId}
+                    disabled={assignSubmitting || slotAssignDisabled}
                     onChange={(e) => setSelectedSlotId(e.target.value)}
-                    required
                     aria-required="true"
                   >
                     <option value="">
-                      {timetableLoading ? 'Loading slots…' : 'Select a slot'}
+                      {timetableLoading
+                        ? 'Loading slots…'
+                        : timetableError
+                          ? 'Slots unavailable'
+                          : filteredTimetableSlots.length === 0
+                            ? 'No slots for these filters'
+                            : 'Select a slot'}
                     </option>
                     {filteredTimetableSlots.map((s) => (
                       <option key={s.id} value={String(s.id)}>
@@ -581,16 +596,31 @@ export function AdminClinicalStudentDetailPage() {
                     ))}
                   </select>
                 </div>
-                <div className="portal-actions" style={{ marginTop: '0.25rem' }}>
+                {!timetableLoading &&
+                !timetableError &&
+                filteredTimetableSlots.length === 0 ? (
+                  <p
+                    className="portal-inline-note portal-inline-note--flush"
+                    style={{ margin: 0, opacity: 0.85 }}
+                    role="status"
+                  >
+                    No clinic slots are available for the selected term.
+                  </p>
+                ) : null}
+                <div className="portal-actions" style={{ marginTop: '0.15rem' }}>
                   <button
                     type="submit"
                     className="portal-btn portal-btn--primary"
-                    disabled={assignSubmitting || timetableLoading}
+                    disabled={
+                      assignSubmitting ||
+                      slotAssignDisabled ||
+                      selectedSlotId.trim() === ''
+                    }
                   >
                     {assignSubmitting ? 'Assigning…' : 'Assign selected slot'}
                   </button>
                 </div>
-              </fieldset>
+              </div>
             </form>
           </section>
 
@@ -638,22 +668,32 @@ export function AdminClinicalStudentDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {scheduleSessions.map((row) => (
-                      <tr key={row.id}>
-                        <td>{formatScheduleDate(row.sessionDate)}</td>
-                        <td>{dashText(row.courseCode)}</td>
-                        <td>{dashText(row.sessionName)}</td>
-                        <td>{dashText(row.site)}</td>
-                        <td>{dashText(row.faculty)}</td>
-                        <td>
-                          <span
-                            className={clinicalAssignmentStatusClass(row.status)}
-                          >
-                            {row.status.trim() || 'Scheduled'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {scheduleSessions.map((row) => {
+                      const statusLabel = row.status.trim() || 'Scheduled'
+                      return (
+                        <tr key={row.id}>
+                          <td>{formatAssignedSessionDateCell(row.sessionDate)}</td>
+                          <td>{dashText(row.courseCode)}</td>
+                          <td>
+                            {displayAssignedSessionName(
+                              row.sessionDate,
+                              row.sessionName,
+                            )}
+                          </td>
+                          <td>{displayClinicalSiteOrFaculty(row.site)}</td>
+                          <td>{displayClinicalSiteOrFaculty(row.faculty)}</td>
+                          <td>
+                            <span
+                              className={clinicalAssignmentStatusClass(
+                                statusLabel,
+                              )}
+                            >
+                              {statusLabel}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

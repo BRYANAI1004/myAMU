@@ -150,16 +150,29 @@ function joinedRowSlotLabel(r: ClinicalAssignmentDbRow): string | null {
   });
 }
 
+/** Display-safe label for timetable-driven rows: "Spring 2026 · weekly". */
+function weeklySessionDateLabel(
+  term: string,
+  year: number | null | undefined,
+): string | null {
+  const t = term.trim();
+  if (t === "" || year == null || !Number.isFinite(year)) {
+    return null;
+  }
+  return `${t} ${year} · weekly`;
+}
+
 function assignmentRowToScheduleDto(
   r: ClinicalAssignmentDbRow,
 ): ClinicalScheduleSessionDto {
+  const isPlaceholderSessionDate =
+    r.session_date === TIMETABLE_ASSIGNMENT_SESSION_DATE_PLACEHOLDER;
+
   if (r.timetable_id != null) {
     const term = (r.tt_term ?? r.ca_term ?? "").trim();
     const year = r.tt_year ?? r.ca_year;
     const displayDate =
-      year != null && term !== ""
-        ? `${year} ${term} · weekly`
-        : "Weekly clinic (timetable)";
+      weeklySessionDateLabel(term, year) ?? "Weekly clinic (timetable)";
     const sessionName = joinedRowSlotLabel(r) ?? r.session_name;
     const faculty = r.tt_instructor ?? r.faculty;
     return {
@@ -173,6 +186,24 @@ function assignmentRowToScheduleDto(
       status: r.status,
     };
   }
+
+  if (isPlaceholderSessionDate) {
+    const term = (r.ca_term ?? "").trim();
+    const year = r.ca_year;
+    const displayDate =
+      weeklySessionDateLabel(term, year) ?? "Weekly clinic (timetable)";
+    return {
+      id: r.id,
+      studentId: r.student_id,
+      courseCode: r.course_code,
+      sessionDate: displayDate,
+      sessionName: r.session_name,
+      site: r.site,
+      faculty: r.faculty,
+      status: r.status,
+    };
+  }
+
   return {
     id: r.id,
     studentId: r.student_id,
