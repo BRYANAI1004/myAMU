@@ -25,7 +25,6 @@ import {
 import {
   getAccountingLedgerPayload,
   getAccountingQuartersPayload,
-  getStudentQuarterBalance,
 } from "./studentLedgerService.js";
 
 export type AdminFinanceStudentRow = {
@@ -157,12 +156,9 @@ export async function listAdminFinanceStudentsForQuarter(
 
   const out: AdminFinanceStudentRow[] = [];
   for (const r of roster) {
-    let balance: number;
-    if (legacyByStudent.has(r.studentId)) {
-      balance = roundMoney(legacyByStudent.get(r.studentId) ?? 0);
-    } else {
-      balance = roundMoney(await getStudentQuarterBalance(r.studentId, t, y));
-    }
+    const legacy = legacyByStudent.get(r.studentId);
+    const balance =
+      legacy !== undefined ? roundMoney(legacy) : 0;
     out.push({
       studentId: r.studentId,
       name: r.name,
