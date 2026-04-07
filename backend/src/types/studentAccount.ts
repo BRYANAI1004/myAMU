@@ -71,6 +71,7 @@ export type StudentTermPreference = {
 };
 
 export type PaymentRecord = {
+  id?: number;
   amount: number;
   paidAt: string;
   /** Demo/portal rows use stored method; legacy `accounting` rows use `"legacy"` when unknown. */
@@ -131,10 +132,15 @@ export type CourseRecord = {
   hours?: number;
 };
 
+export type BillingAdjustmentSource = "manual" | "system_late_fee";
+
 export type BillingAdjustmentRecord = {
+  id?: number;
   description: string;
   amount: number;
   category: BillingCategory;
+  /** From `portal_billing_adjustments.adjustment_source`; defaults to manual when column absent in old DBs. */
+  adjustmentSource?: BillingAdjustmentSource;
 };
 
 /** Raw rows loaded from MySQL for one student term */

@@ -1,13 +1,25 @@
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import {
+  deleteAdminFinanceCharge,
+  deleteAdminFinancePayment,
   getAdminFinanceLedger,
   getAdminFinanceQuarters,
-  listAdminFinanceStudents,
+  getQuarterSettingsPayload,
+  listAdminFinanceStudentsForQuarter,
+  listGlobalQuartersPayload,
   postAdminFinanceCharge,
   postAdminFinancePayment,
+  putAdminFinanceCharge,
+  putAdminFinancePayment,
+  putQuarterSettings,
+  runLateFeeCheckForQuarter,
   validatePostChargeBody,
   validatePostPaymentBody,
+  validatePutChargeBody,
+  validatePutPaymentBody,
+  verifyManualChargeForStudentTerm,
+  verifyPaymentForStudentTerm,
 } from "../services/adminFinanceService.js";
 
 function devMessage(e: unknown): string {
@@ -20,20 +32,229 @@ function pathStudentId(req: Request): string {
   return (v ?? "").trim();
 }
 
+function parsePositiveIntParam(raw: string | string[] | undefined): number | null {
+  const s = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
+  const t = typeof s === "string" ? s.trim() : "";
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
 /**
- * GET /api/admin/finance/students
+ * GET /api/admin/finance/students?term=&year=
  */
 export async function getAdminFinanceStudents(
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<void> {
   try {
-    const students = await listAdminFinanceStudents();
+    const termRaw = req.query.term;
+    const yearRaw = req.query.year;
+    const term =
+      typeof termRaw === "string" && termRaw.trim() !== ""
+        ? termRaw.trim()
+        : "";
+    const yearNum =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    const year = Number.isFinite(yearNum) ? yearNum : Number.NaN;
+
+    if (term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error: "Query parameters `term` and `year` are required",
+      });
+      return;
+    }
+
+    const students = await listAdminFinanceStudentsForQuarter(term, year);
     res.json({ students });
   } catch (e) {
     console.error("[admin/finance/students]", e);
     const body: { error: string; message?: string } = {
       error: "Failed to load finance student list",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * GET /api/admin/finance/quarters
+ */
+export async function getGlobalFinanceQuarters(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const payload = await listGlobalQuartersPayload();
+    res.json(payload);
+  } catch (e) {
+    console.error("[admin/finance/quarters-global]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to load finance quarters",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * GET /api/admin/finance/quarter-settings?term=&year=
+ */
+export async function getFinanceQuarterSettings(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const termRaw = req.query.term;
+    const yearRaw = req.query.year;
+    const term =
+      typeof termRaw === "string" && termRaw.trim() !== ""
+        ? termRaw.trim()
+        : "";
+    const yearNum =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    const year = Number.isFinite(yearNum) ? yearNum : Number.NaN;
+    if (term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error: "Query parameters `term` and `year` are required",
+      });
+      return;
+    }
+    const payload = await getQuarterSettingsPayload(term, year);
+    res.json(payload);
+  } catch (e) {
+    console.error("[admin/finance/quarter-settings get]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to load quarter settings",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * PUT /api/admin/finance/quarter-settings
+ */
+export async function putFinanceQuarterSettings(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const raw = req.body;
+    if (raw == null || typeof raw !== "object") {
+      res.status(400).json({ error: "Request body must be a JSON object." });
+      return;
+    }
+    const o = raw as Record<string, unknown>;
+    const term = typeof o.term === "string" ? o.term.trim() : "";
+    const yearRaw = o.year;
+    const year =
+      typeof yearRaw === "number"
+        ? yearRaw
+        : typeof yearRaw === "string"
+          ? Number(yearRaw)
+          : Number.NaN;
+    if (term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error: "term and year are required; year must be a finite number.",
+      });
+      return;
+    }
+
+    let paymentDueDate: string | null = null;
+    if (o.paymentDueDate === undefined || o.paymentDueDate === null) {
+      paymentDueDate = null;
+    } else if (
+      typeof o.paymentDueDate === "string" &&
+      o.paymentDueDate.trim() !== ""
+    ) {
+      paymentDueDate = o.paymentDueDate.trim().slice(0, 10);
+    } else if (o.paymentDueDate !== null) {
+      res.status(400).json({
+        error: "paymentDueDate must be YYYY-MM-DD, null, or omitted.",
+      });
+      return;
+    }
+
+    const lateFeeEnabled =
+      o.lateFeeEnabled === undefined
+        ? undefined
+        : Boolean(o.lateFeeEnabled);
+    const lateFeeAmount =
+      o.lateFeeAmount === undefined
+        ? undefined
+        : typeof o.lateFeeAmount === "number"
+          ? o.lateFeeAmount
+          : typeof o.lateFeeAmount === "string"
+            ? Number(o.lateFeeAmount)
+            : Number.NaN;
+    if (
+      o.lateFeeAmount !== undefined &&
+      !Number.isFinite(lateFeeAmount as number)
+    ) {
+      res.status(400).json({ error: "lateFeeAmount must be a number." });
+      return;
+    }
+
+    await putQuarterSettings({
+      term,
+      year: Math.trunc(year),
+      paymentDueDate,
+      lateFeeEnabled,
+      lateFeeAmount: Number.isFinite(lateFeeAmount as number)
+        ? (lateFeeAmount as number)
+        : undefined,
+      updatedBy: null,
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[admin/finance/quarter-settings put]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to save quarter settings",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * POST /api/admin/finance/run-late-fee
+ */
+export async function postRunLateFeeCheck(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const raw = req.body;
+    if (raw == null || typeof raw !== "object") {
+      res.status(400).json({ error: "Request body must be a JSON object." });
+      return;
+    }
+    const o = raw as Record<string, unknown>;
+    const term = typeof o.term === "string" ? o.term.trim() : "";
+    const yearRaw = o.year;
+    const year =
+      typeof yearRaw === "number"
+        ? yearRaw
+        : typeof yearRaw === "string"
+          ? Number(yearRaw)
+          : Number.NaN;
+    if (term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error: "term and year are required; year must be a finite number.",
+      });
+      return;
+    }
+    const result = await runLateFeeCheckForQuarter(term, Math.trunc(year));
+    res.json(result);
+  } catch (e) {
+    console.error("[admin/finance/run-late-fee]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to run late fee check",
     };
     if (env.nodeEnv === "development") body.message = devMessage(e);
     res.status(500).json(body);
@@ -157,6 +378,245 @@ export async function postAdminFinancePaymentHandler(
     console.error("[admin/finance/payment]", e);
     const body: { error: string; message?: string } = {
       error: "Failed to record payment",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * PUT /api/admin/finance/charge/:id
+ * Query: studentId, term, year (ledger context)
+ */
+export async function putAdminFinanceChargeByIdHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parsePositiveIntParam(req.params.id);
+    if (id == null) {
+      res.status(400).json({ error: "Invalid charge id." });
+      return;
+    }
+    const studentId =
+      typeof req.query.studentId === "string" ? req.query.studentId.trim() : "";
+    const term =
+      typeof req.query.term === "string" ? req.query.term.trim() : "";
+    const yearRaw = req.query.year;
+    const year =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    if (studentId === "" || term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error:
+          "Query parameters studentId, term, and year are required for charge updates.",
+      });
+      return;
+    }
+    const parsed = validatePutChargeBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    const ok = await verifyManualChargeForStudentTerm(
+      id,
+      studentId,
+      term,
+      year,
+    );
+    if (!ok) {
+      res.status(400).json({
+        error:
+          "Charge not found, not manual, or does not belong to this student and quarter.",
+      });
+      return;
+    }
+    await putAdminFinanceCharge(id, parsed.data);
+    res.json({ ok: true });
+  } catch (e) {
+    const status =
+      e instanceof Error && (e as Error & { statusCode?: number }).statusCode;
+    if (status === 400) {
+      res.status(400).json({ error: e instanceof Error ? e.message : "Bad request" });
+      return;
+    }
+    console.error("[admin/finance/charge put]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to update charge",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * DELETE /api/admin/finance/charge/:id
+ */
+export async function deleteAdminFinanceChargeByIdHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parsePositiveIntParam(req.params.id);
+    if (id == null) {
+      res.status(400).json({ error: "Invalid charge id." });
+      return;
+    }
+    const studentId =
+      typeof req.query.studentId === "string" ? req.query.studentId.trim() : "";
+    const term =
+      typeof req.query.term === "string" ? req.query.term.trim() : "";
+    const yearRaw = req.query.year;
+    const year =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    if (studentId === "" || term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error:
+          "Query parameters studentId, term, and year are required for charge deletes.",
+      });
+      return;
+    }
+    const ok = await verifyManualChargeForStudentTerm(
+      id,
+      studentId,
+      term,
+      year,
+    );
+    if (!ok) {
+      res.status(400).json({
+        error:
+          "Charge not found, not manual, or does not belong to this student and quarter.",
+      });
+      return;
+    }
+    await deleteAdminFinanceCharge(id);
+    res.json({ ok: true });
+  } catch (e) {
+    const status =
+      e instanceof Error && (e as Error & { statusCode?: number }).statusCode;
+    if (status === 400) {
+      res.status(400).json({ error: e instanceof Error ? e.message : "Bad request" });
+      return;
+    }
+    console.error("[admin/finance/charge delete]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to delete charge",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * PUT /api/admin/finance/payment/:id
+ */
+export async function putAdminFinancePaymentByIdHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parsePositiveIntParam(req.params.id);
+    if (id == null) {
+      res.status(400).json({ error: "Invalid payment id." });
+      return;
+    }
+    const studentId =
+      typeof req.query.studentId === "string" ? req.query.studentId.trim() : "";
+    const term =
+      typeof req.query.term === "string" ? req.query.term.trim() : "";
+    const yearRaw = req.query.year;
+    const year =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    if (studentId === "" || term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error:
+          "Query parameters studentId, term, and year are required for payment updates.",
+      });
+      return;
+    }
+    const parsed = validatePutPaymentBody(req.body);
+    if (!parsed.ok) {
+      res.status(400).json({ error: parsed.error });
+      return;
+    }
+    const vok = await verifyPaymentForStudentTerm(id, studentId, term, year);
+    if (!vok) {
+      res.status(400).json({
+        error: "Payment not found or does not belong to this student and quarter.",
+      });
+      return;
+    }
+    await putAdminFinancePayment(id, parsed.data);
+    res.json({ ok: true });
+  } catch (e) {
+    const status =
+      e instanceof Error && (e as Error & { statusCode?: number }).statusCode;
+    if (status === 400) {
+      res.status(400).json({ error: e instanceof Error ? e.message : "Bad request" });
+      return;
+    }
+    console.error("[admin/finance/payment put]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to update payment",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * DELETE /api/admin/finance/payment/:id
+ */
+export async function deleteAdminFinancePaymentByIdHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = parsePositiveIntParam(req.params.id);
+    if (id == null) {
+      res.status(400).json({ error: "Invalid payment id." });
+      return;
+    }
+    const studentId =
+      typeof req.query.studentId === "string" ? req.query.studentId.trim() : "";
+    const term =
+      typeof req.query.term === "string" ? req.query.term.trim() : "";
+    const yearRaw = req.query.year;
+    const year =
+      typeof yearRaw === "string" && yearRaw.trim() !== ""
+        ? Number(yearRaw)
+        : Number.NaN;
+    if (studentId === "" || term === "" || !Number.isFinite(year)) {
+      res.status(400).json({
+        error:
+          "Query parameters studentId, term, and year are required for payment deletes.",
+      });
+      return;
+    }
+    const vok = await verifyPaymentForStudentTerm(id, studentId, term, year);
+    if (!vok) {
+      res.status(400).json({
+        error: "Payment not found or does not belong to this student and quarter.",
+      });
+      return;
+    }
+    await deleteAdminFinancePayment(id);
+    res.json({ ok: true });
+  } catch (e) {
+    const status =
+      e instanceof Error && (e as Error & { statusCode?: number }).statusCode;
+    if (status === 400) {
+      res.status(400).json({ error: e instanceof Error ? e.message : "Bad request" });
+      return;
+    }
+    console.error("[admin/finance/payment delete]", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to delete payment",
     };
     if (env.nodeEnv === "development") body.message = devMessage(e);
     res.status(500).json(body);

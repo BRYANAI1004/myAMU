@@ -2,6 +2,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import type {
   AccountContext,
   BillingAdjustmentRecord,
+  BillingAdjustmentSource,
   BillingCategory,
   CourseRecord,
   EnrollmentRecord,
@@ -21,7 +22,7 @@ import type {
  * portal_student_term_prefs (student_external_id, term, year, use_installment_plan,
  *   tuition_paid_in_full_at_reg, installment_count, registration_period_ends)
  * portal_payments (student_external_id, term, year, amount, paid_at, method, description)
- * portal_billing_adjustments (student_external_id, term, year, description, amount, category)
+ * portal_billing_adjustments (..., adjustment_source manual|system_late_fee)
  */
 
 function formatSqlDate(value: unknown): string {
@@ -55,6 +56,12 @@ function asBillingCategory(raw: unknown): BillingCategory {
   return "other";
 }
 
+function asAdjustmentSource(raw: unknown): BillingAdjustmentSource {
+  const s = String(raw ?? "").trim().toLowerCase();
+  if (s === "system_late_fee") return "system_late_fee";
+  return "manual";
+}
+
 /**
  * Latest term/year for which the student has at least one enrollment row.
  * Ordering: highest calendar year first, then Fall > Summer > Spring > Winter within the year.
@@ -80,20 +87,11 @@ export async function findLatestTermYearForStudent(
   );
 
   if (rows.length === 0) {
-    console.debug(
-      "[account-debug] findLatestTermYearForStudent: none",
-      JSON.stringify({ studentExternalId }),
-    );
     return null;
   }
 
   const r = rows[0]!;
-  const out = { term: String(r.term), year: Number(r.year) };
-  console.debug(
-    "[account-debug] findLatestTermYearForStudent: ok",
-    JSON.stringify({ studentExternalId, ...out }),
-  );
-  return out;
+  return { term: String(r.term), year: Number(r.year) };
 }
 
 /**
@@ -181,14 +179,14 @@ async function loadPortalTermBillingContextCore(
       [studentId, term, year],
     ),
     pool.query<RowDataPacket[]>(
-      `SELECT amount, paid_at AS paidAt, method, description
+      `SELECT id, amount, paid_at AS paidAt, method, description
        FROM portal_payments
        WHERE student_external_id = ? AND term = ? AND year = ?
        ORDER BY paid_at ASC, id ASC`,
       [studentId, term, year],
     ),
     pool.query<RowDataPacket[]>(
-      `SELECT description, amount, category
+      `SELECT id, description, amount, category, adjustment_source AS adjustmentSource
        FROM portal_billing_adjustments
        WHERE student_external_id = ? AND term = ? AND year = ?`,
       [studentId, term, year],
@@ -225,6 +223,7 @@ async function loadPortalTermBillingContextCore(
   }
 
   const payments: PaymentRecord[] = paymentRowList.map((r) => ({
+    id: r.id != null ? Number(r.id) : undefined,
     amount: Number(r.amount),
     paidAt: formatSqlDate(r.paidAt),
     method: String(r.method),
@@ -233,9 +232,13 @@ async function loadPortalTermBillingContextCore(
 
   const adjustments: BillingAdjustmentRecord[] = adjustmentRowList.map(
     (r) => ({
+      id: r.id != null ? Number(r.id) : undefined,
       description: String(r.description),
       amount: Number(r.amount),
       category: asBillingCategory(r.category),
+      adjustmentSource: asAdjustmentSource(
+        (r as { adjustmentSource?: unknown }).adjustmentSource,
+      ),
     }),
   );
 
@@ -266,34 +269,16 @@ export async function loadAccountContext(
   );
 
   if (enrollmentRows.length === 0) {
-    console.debug(
-      "[account-debug] loadAccountContext: no enrollments",
-      JSON.stringify({ studentId, term, year }),
-    );
     return null;
   }
 
-  const ctx = await loadPortalTermBillingContextCore(
+  return loadPortalTermBillingContextCore(
     pool,
     studentId,
     term,
     year,
     enrollmentRows,
   );
-
-  console.debug(
-    "[account-debug] loadAccountContext: ok",
-    JSON.stringify({
-      studentId,
-      term,
-      year,
-      enrollmentCount: ctx.enrollments.length,
-      courseCount: ctx.courses.length,
-      hasDisplayName: Boolean(ctx.studentDisplayName),
-    }),
-  );
-
-  return ctx;
 }
 
 /**

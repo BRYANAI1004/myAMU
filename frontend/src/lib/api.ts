@@ -115,7 +115,6 @@ export async function fetchStudentAccount(
   }
   const qs = params.toString()
   const path = `/api/students/${encodeURIComponent(studentId)}/account${qs ? `?${qs}` : ''}`
-  console.debug('[account-debug] fetchStudentAccount', buildApiUrl(path))
   return fetchApiJson(path, { signal })
 }
 
@@ -601,6 +600,12 @@ export type AccountingQuartersResponse = {
   quarters: AccountingQuarterOption[]
 }
 
+export type LedgerRowSourceType =
+  | 'system'
+  | 'manual_charge'
+  | 'manual_payment'
+  | 'auto_late_fee'
+
 export type AccountingLedgerRow = {
   date: string
   type: string
@@ -608,6 +613,10 @@ export type AccountingLedgerRow = {
   memo: string
   debit: number
   credit: number
+  sourceType?: LedgerRowSourceType
+  sourceId?: string | number | null
+  isEditable?: boolean
+  isDeletable?: boolean
 }
 
 export type AccountingLedgerResponse = {
@@ -667,7 +676,7 @@ export async function fetchAccountingLedger(
   throw new Error('Unexpected accounting ledger response')
 }
 
-/** GET /api/admin/finance/students — lightweight roster; balance filled when ledger is opened. */
+/** GET /api/admin/finance/students?term=&year= — roster with quarter balance. */
 export type AdminFinanceStudentRow = {
   studentId: string
   name: string
@@ -695,12 +704,22 @@ function parseAdminFinanceStudentRow(
   return { studentId: o.studentId, name: o.name, balance }
 }
 
-export async function fetchAdminFinanceStudents(options?: {
-  signal?: AbortSignal
-}): Promise<AdminFinanceStudentRow[]> {
-  const data = (await fetchApiJson('/api/admin/finance/students', {
-    signal: options?.signal,
-  })) as unknown
+export async function fetchAdminFinanceStudents(
+  term: string,
+  year: number,
+  options?: {
+    signal?: AbortSignal
+  },
+): Promise<AdminFinanceStudentRow[]> {
+  const params = new URLSearchParams()
+  params.set('term', term.trim())
+  params.set('year', String(year))
+  const data = (await fetchApiJson(
+    `/api/admin/finance/students?${params.toString()}`,
+    {
+      signal: options?.signal,
+    },
+  )) as unknown
   if (data == null || typeof data !== 'object') {
     throw new Error('Unexpected admin finance students response')
   }
@@ -822,6 +841,283 @@ export async function postAdminFinancePayment(
     return { ok: true }
   }
   throw new Error('Unexpected admin finance payment response')
+}
+
+export type AdminFinanceGlobalQuarter = {
+  term: string
+  year: number
+  label: string
+}
+
+/** GET /api/admin/finance/quarters */
+export async function fetchGlobalFinanceQuarters(options?: {
+  signal?: AbortSignal
+}): Promise<AdminFinanceGlobalQuarter[]> {
+  const data = (await fetchApiJson('/api/admin/finance/quarters', {
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as { quarters?: unknown }).quarters)
+  ) {
+    const q = (data as { quarters: unknown[] }).quarters
+    const out: AdminFinanceGlobalQuarter[] = []
+    for (const row of q) {
+      if (row == null || typeof row !== 'object') continue
+      const o = row as Record<string, unknown>
+      if (
+        typeof o.term === 'string' &&
+        typeof o.year === 'number' &&
+        typeof o.label === 'string'
+      ) {
+        out.push({ term: o.term, year: o.year, label: o.label })
+      }
+    }
+    return out
+  }
+  throw new Error('Unexpected global finance quarters response')
+}
+
+export type FinanceQuarterSettingsResponse = {
+  term: string
+  year: number
+  paymentDueDate: string | null
+  lateFeeEnabled: boolean
+  lateFeeAmount: number
+}
+
+/** GET /api/admin/finance/quarter-settings?term=&year= */
+export async function fetchFinanceQuarterSettings(
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal },
+): Promise<FinanceQuarterSettingsResponse> {
+  const params = new URLSearchParams()
+  params.set('term', term.trim())
+  params.set('year', String(year))
+  const data = (await fetchApiJson(
+    `/api/admin/finance/quarter-settings?${params.toString()}`,
+    { signal: options?.signal },
+  )) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as { term?: unknown }).term === 'string' &&
+    typeof (data as { year?: unknown }).year === 'number' &&
+    typeof (data as { lateFeeEnabled?: unknown }).lateFeeEnabled ===
+      'boolean' &&
+    typeof (data as { lateFeeAmount?: unknown }).lateFeeAmount === 'number'
+  ) {
+    const o = data as Record<string, unknown>
+    const pdd = o.paymentDueDate
+    const paymentDueDate =
+      pdd === null || pdd === undefined
+        ? null
+        : typeof pdd === 'string'
+          ? pdd.slice(0, 10)
+          : null
+    return {
+      term: o.term as string,
+      year: o.year as number,
+      paymentDueDate,
+      lateFeeEnabled: o.lateFeeEnabled as boolean,
+      lateFeeAmount: o.lateFeeAmount as number,
+    }
+  }
+  throw new Error('Unexpected quarter settings response')
+}
+
+export type PutFinanceQuarterSettingsBody = {
+  term: string
+  year: number
+  paymentDueDate: string | null
+  lateFeeEnabled?: boolean
+  lateFeeAmount?: number
+}
+
+/** PUT /api/admin/finance/quarter-settings */
+export async function putFinanceQuarterSettings(
+  body: PutFinanceQuarterSettingsBody,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: boolean }> {
+  const data = (await fetchApiJson('/api/admin/finance/quarter-settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true
+  ) {
+    return { ok: true }
+  }
+  throw new Error('Unexpected quarter settings save response')
+}
+
+/** POST /api/admin/finance/run-late-fee */
+export async function postAdminRunLateFee(
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal },
+): Promise<{
+  ok: boolean
+  insertedCount: number
+  skippedCount: number
+  message?: string
+}> {
+  const data = (await fetchApiJson('/api/admin/finance/run-late-fee', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ term: term.trim(), year }),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true &&
+    typeof (data as { insertedCount?: unknown }).insertedCount === 'number' &&
+    typeof (data as { skippedCount?: unknown }).skippedCount === 'number'
+  ) {
+    return data as {
+      ok: boolean
+      insertedCount: number
+      skippedCount: number
+      message?: string
+    }
+  }
+  throw new Error('Unexpected run late fee response')
+}
+
+function financeLedgerContextQuery(
+  studentId: string,
+  term: string,
+  year: number,
+): string {
+  const p = new URLSearchParams()
+  p.set('studentId', studentId.trim())
+  p.set('term', term.trim())
+  p.set('year', String(year))
+  return p.toString()
+}
+
+export type PutAdminFinanceChargeBody = {
+  description: string
+  amount: number
+  category: 'fees' | 'other' | 'tuition' | 'clinical'
+}
+
+/** PUT /api/admin/finance/charge/:id */
+export async function putAdminFinanceCharge(
+  id: number,
+  studentId: string,
+  term: string,
+  year: number,
+  body: PutAdminFinanceChargeBody,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: boolean }> {
+  const qs = financeLedgerContextQuery(studentId, term, year)
+  const data = (await fetchApiJson(
+    `/api/admin/finance/charge/${encodeURIComponent(String(id))}?${qs}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    },
+  )) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true
+  ) {
+    return { ok: true }
+  }
+  throw new Error('Unexpected admin finance charge update response')
+}
+
+/** DELETE /api/admin/finance/charge/:id */
+export async function deleteAdminFinanceCharge(
+  id: number,
+  studentId: string,
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: boolean }> {
+  const qs = financeLedgerContextQuery(studentId, term, year)
+  const data = (await fetchApiJson(
+    `/api/admin/finance/charge/${encodeURIComponent(String(id))}?${qs}`,
+    { method: 'DELETE', signal: options?.signal },
+  )) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true
+  ) {
+    return { ok: true }
+  }
+  throw new Error('Unexpected admin finance charge delete response')
+}
+
+export type PutAdminFinancePaymentBody = {
+  amount: number
+  paidAt: string
+  method: string
+  description: string | null
+}
+
+/** PUT /api/admin/finance/payment/:id */
+export async function putAdminFinancePayment(
+  id: number,
+  studentId: string,
+  term: string,
+  year: number,
+  body: PutAdminFinancePaymentBody,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: boolean }> {
+  const qs = financeLedgerContextQuery(studentId, term, year)
+  const data = (await fetchApiJson(
+    `/api/admin/finance/payment/${encodeURIComponent(String(id))}?${qs}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: options?.signal,
+    },
+  )) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true
+  ) {
+    return { ok: true }
+  }
+  throw new Error('Unexpected admin finance payment update response')
+}
+
+/** DELETE /api/admin/finance/payment/:id */
+export async function deleteAdminFinancePayment(
+  id: number,
+  studentId: string,
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: boolean }> {
+  const qs = financeLedgerContextQuery(studentId, term, year)
+  const data = (await fetchApiJson(
+    `/api/admin/finance/payment/${encodeURIComponent(String(id))}?${qs}`,
+    { method: 'DELETE', signal: options?.signal },
+  )) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    (data as { ok?: unknown }).ok === true
+  ) {
+    return { ok: true }
+  }
+  throw new Error('Unexpected admin finance payment delete response')
 }
 
 /** Shared status for normalized academic rows (matches backend `StudentAcademicCourseStatus`). */

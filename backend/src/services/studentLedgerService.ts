@@ -23,6 +23,12 @@ export type LedgerQuarterOption = {
   label: string;
 };
 
+export type LedgerRowSourceType =
+  | "system"
+  | "manual_charge"
+  | "manual_payment"
+  | "auto_late_fee";
+
 export type LedgerRowDto = {
   date: string;
   type: string;
@@ -30,6 +36,10 @@ export type LedgerRowDto = {
   memo: string;
   debit: number;
   credit: number;
+  sourceType: LedgerRowSourceType;
+  sourceId: string | number | null;
+  isEditable: boolean;
+  isDeletable: boolean;
 };
 
 export type LedgerSummaryDto = {
@@ -123,6 +133,18 @@ function summarizeLedgerRows(rows: LedgerRowDto[]): LedgerSummaryDto {
   };
 }
 
+function systemRowMeta(): Pick<
+  LedgerRowDto,
+  "sourceType" | "sourceId" | "isEditable" | "isDeletable"
+> {
+  return {
+    sourceType: "system",
+    sourceId: null,
+    isEditable: false,
+    isDeletable: false,
+  };
+}
+
 /**
  * Portal-synthesized ledger when legacy `accounting` has no rows for the quarter.
  * Charges follow AMU catalog rules; payments come from `portal_payments`.
@@ -150,6 +172,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
       memo: formatPortalLedgerCourseMemo(course),
       debit: amt,
       credit: 0,
+      ...systemRowMeta(),
     });
   }
 
@@ -162,6 +185,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
         memo: fee.description,
         debit: roundMoney(fee.amount),
         credit: 0,
+        ...systemRowMeta(),
       });
     }
     const pref = ctx.preference ?? DEFAULT_TERM_PREF;
@@ -174,6 +198,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
         memo: "Tuition Installment Service Fee",
         debit: roundMoney(installmentFee.amount),
         credit: 0,
+        ...systemRowMeta(),
       });
     }
   }
@@ -181,6 +206,24 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
   for (const adj of ctx.adjustments) {
     const raw = roundMoney(adj.amount);
     if (raw === 0) continue;
+    const isLateFee = adj.adjustmentSource === "system_late_fee";
+    const sid = adj.id != null && Number.isFinite(adj.id) ? adj.id : null;
+    const baseMeta: Pick<
+      LedgerRowDto,
+      "sourceType" | "sourceId" | "isEditable" | "isDeletable"
+    > = isLateFee
+      ? {
+          sourceType: "auto_late_fee",
+          sourceId: sid,
+          isEditable: false,
+          isDeletable: false,
+        }
+      : {
+          sourceType: "manual_charge",
+          sourceId: sid,
+          isEditable: sid != null,
+          isDeletable: sid != null,
+        };
     if (raw > 0) {
       rows.push({
         date: chargeDate,
@@ -189,6 +232,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
         memo: adj.description.trim() || "Adjustment",
         debit: raw,
         credit: 0,
+        ...baseMeta,
       });
     } else {
       rows.push({
@@ -198,6 +242,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
         memo: adj.description.trim() || "Adjustment",
         debit: 0,
         credit: roundMoney(Math.abs(raw)),
+        ...baseMeta,
       });
     }
   }
@@ -206,6 +251,7 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
     const credit = roundMoney(Math.abs(p.amount));
     if (credit <= 0) continue;
     const paid = String(p.paidAt ?? "").trim().slice(0, 10);
+    const pid = p.id != null && Number.isFinite(p.id) ? p.id : null;
     rows.push({
       date: paid.length >= 10 ? paid : chargeDate,
       type: "Payment",
@@ -216,6 +262,10 @@ function buildPortalLedgerRowsFromContext(ctx: AccountContext): LedgerRowDto[] {
           : "Payment",
       debit: 0,
       credit,
+      sourceType: "manual_payment",
+      sourceId: pid,
+      isEditable: pid != null,
+      isDeletable: pid != null,
     });
   }
 
@@ -291,6 +341,10 @@ export async function getAccountingLedgerPayload(
         memo: r.memo,
         debit: r.debit,
         credit: r.credit,
+        sourceType: "system",
+        sourceId: r.seqNumber,
+        isEditable: false,
+        isDeletable: false,
       };
     });
 
@@ -326,4 +380,14 @@ export async function getAccountingLedgerPayload(
     rows,
     summary,
   };
+}
+
+/** Quarter balance using the same ledger rules as `getAccountingLedgerPayload`. */
+export async function getStudentQuarterBalance(
+  studentId: string,
+  term: string,
+  year: number,
+): Promise<number> {
+  const payload = await getAccountingLedgerPayload(studentId, term.trim(), year);
+  return payload?.summary.balance ?? 0;
 }

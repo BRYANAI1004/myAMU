@@ -65,20 +65,11 @@ export async function findLatestLegacyTermYear(
   );
 
   if (rows.length === 0) {
-    console.debug(
-      "[account-debug] findLatestLegacyTermYear: none",
-      JSON.stringify({ studentId }),
-    );
     return null;
   }
 
   const r = rows[0]!;
-  const out = { term: normalizeTerm(r.term), year: Number(r.year) };
-  console.debug(
-    "[account-debug] findLatestLegacyTermYear: ok",
-    JSON.stringify({ studentId, ...out }),
-  );
-  return out;
+  return { term: normalizeTerm(r.term), year: Number(r.year) };
 }
 
 /**
@@ -135,10 +126,6 @@ export async function loadLegacyAccountSnapshot(
   );
 
   if (regRows.length === 0) {
-    console.debug(
-      "[account-debug] loadLegacyAccountSnapshot: no registration row",
-      JSON.stringify({ studentId, term, year }),
-    );
     return null;
   }
 
@@ -152,16 +139,6 @@ export async function loadLegacyAccountSnapshot(
   const displayName = rawName || studentId;
   const totalFees = Number(reg.totalFees);
   const fees = Number.isFinite(totalFees) ? totalFees : 0;
-
-  console.debug(
-    "[account-debug] loadLegacyAccountSnapshot: ok",
-    JSON.stringify({
-      studentId,
-      term: regTerm,
-      year: regYear,
-      hasStudentRow: Boolean(rawName),
-    }),
-  );
 
   return {
     studentId,
@@ -278,7 +255,7 @@ export async function loadLegacyAccountingRows(
     [studentId, term, year],
   );
 
-  const out: LegacyAccountingRow[] = rows.map((r) => ({
+  return rows.map((r) => ({
     seqNumber: num(r.seqNumber),
     year: num(r.year),
     term: normalizeTerm(r.term),
@@ -289,18 +266,6 @@ export async function loadLegacyAccountingRows(
     credit: num(r.credit),
     memo: String(r.memo ?? "").trim(),
   }));
-
-  console.debug(
-    "[account-debug] loadLegacyAccountingRows",
-    JSON.stringify({
-      studentId,
-      term,
-      year,
-      rowCount: out.length,
-    }),
-  );
-
-  return out;
 }
 
 /** Raw row for admin student list: legacy `students` + latest `registration` term/year. */

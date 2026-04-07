@@ -15,11 +15,19 @@ import {
 } from "../controllers/adminCourseSectionController.js";
 import { deleteAdminPortalEnrollmentHandler } from "../controllers/adminEnrollmentController.js";
 import {
+  deleteAdminFinanceChargeByIdHandler,
+  deleteAdminFinancePaymentByIdHandler,
   getAdminFinanceLedgerHandler,
   getAdminFinanceQuartersHandler,
   getAdminFinanceStudents,
+  getFinanceQuarterSettings,
+  getGlobalFinanceQuarters,
   postAdminFinanceChargeHandler,
   postAdminFinancePaymentHandler,
+  postRunLateFeeCheck,
+  putAdminFinanceChargeByIdHandler,
+  putAdminFinancePaymentByIdHandler,
+  putFinanceQuarterSettings,
 } from "../controllers/adminFinanceController.js";
 import { getAdminCoursesOpenForRegistration } from "../controllers/adminOpenRegistrationCoursesController.js";
 import {
@@ -104,9 +112,20 @@ adminRouter.post("/course-sections", postAdminCourseSection);
 adminRouter.patch("/course-sections/:id", patchAdminCourseSection);
 adminRouter.delete("/course-sections/:id", deleteAdminCourseSection);
 adminRouter.delete("/enrollments", deleteAdminPortalEnrollmentHandler);
+adminRouter.get("/finance/quarters", getGlobalFinanceQuarters);
+adminRouter.get("/finance/quarter-settings", getFinanceQuarterSettings);
+adminRouter.put("/finance/quarter-settings", putFinanceQuarterSettings);
+adminRouter.post("/finance/run-late-fee", postRunLateFeeCheck);
 adminRouter.get("/finance/students", getAdminFinanceStudents);
 adminRouter.post("/finance/charge", postAdminFinanceChargeHandler);
 adminRouter.post("/finance/payment", postAdminFinancePaymentHandler);
+adminRouter.put("/finance/charge/:id", putAdminFinanceChargeByIdHandler);
+adminRouter.delete("/finance/charge/:id", deleteAdminFinanceChargeByIdHandler);
+adminRouter.put("/finance/payment/:id", putAdminFinancePaymentByIdHandler);
+adminRouter.delete(
+  "/finance/payment/:id",
+  deleteAdminFinancePaymentByIdHandler,
+);
 adminRouter.get("/finance/:studentId/quarters", getAdminFinanceQuartersHandler);
 adminRouter.get("/finance/:studentId/ledger", getAdminFinanceLedgerHandler);
 adminRouter.post("/academic-terms", postAdminAcademicTerm);
