@@ -5,7 +5,7 @@ export type CourseTitleFields = {
   chi_name?: string | number | null | undefined
 }
 
-function trimStr(v: string | null | undefined): string {
+function trimStr(v: string | number | null | undefined): string {
   if (v == null) return ''
   return String(v).trim()
 }
