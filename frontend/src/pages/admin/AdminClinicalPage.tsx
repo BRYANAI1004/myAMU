@@ -13,6 +13,8 @@ import {
 const PAGE_SIZE = 25
 const SEARCH_DEBOUNCE_MS = 300
 
+type AdminClinicalTabId = 'roster' | 'requests'
+
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
   useEffect(() => {
@@ -29,6 +31,7 @@ function clinicalReadinessLabel(
 }
 
 export function AdminClinicalPage() {
+  const [tab, setTab] = useState<AdminClinicalTabId>('roster')
   const [q, setQ] = useState('')
   const debouncedSearch = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS)
   const [page, setPage] = useState(1)
@@ -132,336 +135,374 @@ export function AdminClinicalPage() {
     <main className="admin-page">
       <div className="admin-page__toolbar">
         <h1 className="admin-page__title admin-page__title--inline">Clinical</h1>
-        <div className="admin-page__toolbar-actions">
-          <input
-            type="search"
-            className="admin-input admin-input--search"
-            placeholder="Search by student ID, name, email, or program"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Search clinical roster"
-            disabled={sectionLoading || Boolean(error)}
-          />
-        </div>
       </div>
 
-      {sectionLoading ? (
-        <section
-          className="portal-card portal-profile-state"
-          aria-busy="true"
-          aria-live="polite"
-        >
-          <p className="portal-profile-state__title">Loading clinical roster</p>
-          <p className="portal-profile-state__detail">
-            Please wait while we load each student&apos;s clinical progress from
-            the school database.
-          </p>
-        </section>
-      ) : null}
-
-      {!sectionLoading && error ? (
-        <section
-          className="portal-card portal-profile-state portal-profile-state--error"
-          role="alert"
-          aria-live="assertive"
-        >
-          <p className="portal-profile-state__title">
-            We could not load the clinical roster
-          </p>
-          <p className="portal-profile-state__detail">{error}</p>
-          <div className="portal-actions portal-profile-state__actions">
-            <button
-              type="button"
-              className="portal-btn portal-btn--secondary"
-              onClick={() => setReloadKey((k) => k + 1)}
-            >
-              Try again
-            </button>
-          </div>
-        </section>
-      ) : null}
-
-      {!sectionLoading && !error && rows != null ? (
-        <>
-          <div className="portal-table-wrap admin-table-wrap">
-            <table className="portal-table portal-data-table admin-students-table--center">
-              <thead>
-                <tr>
-                  <th scope="col">Student ID</th>
-                  <th scope="col">Name</th>
-                  <th scope="col">Clinical level</th>
-                  <th scope="col">Completed hours</th>
-                  <th scope="col">Required hours</th>
-                  <th scope="col">Readiness</th>
-                  <th scope="col">Missing</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="portal-card-note">
-                      {total === 0 && debouncedSearch === ''
-                        ? 'No students on file.'
-                        : 'No students match your search.'}
-                    </td>
-                  </tr>
-                ) : (
-                  items.map((r) => {
-                    const s = r.clinicalProgressSummary
-                    return (
-                      <tr key={r.studentId}>
-                        <td>{r.studentId}</td>
-                        <td>{r.name}</td>
-                        <td>
-                          {s ? (
-                            <span className="portal-status portal-status--scheduled">
-                              Level {s.level}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td>{s != null ? s.completedHours : '—'}</td>
-                        <td>{s != null ? s.requiredHours : '—'}</td>
-                        <td>
-                          {s ? (
-                            <span
-                              className={
-                                s.readiness === 'ready'
-                                  ? 'portal-status portal-status--paid'
-                                  : 'portal-status portal-status--pending'
-                              }
-                            >
-                              {clinicalReadinessLabel(s.readiness)}
-                            </span>
-                          ) : (
-                            '—'
-                          )}
-                        </td>
-                        <td
-                          style={{
-                            maxWidth: '14rem',
-                            textAlign: 'left',
-                            whiteSpace: 'normal',
-                          }}
-                        >
-                          {s == null ? (
-                            '—'
-                          ) : s.missingCount === 0 ? (
-                            <span className="portal-card-note">None</span>
-                          ) : (
-                            <>
-                              <span className="portal-card-note">
-                                {s.missingCount}{' '}
-                                {s.missingCount === 1 ? 'item' : 'items'}
-                              </span>
-                              {s.missingSummary ? (
-                                <div
-                                  style={{
-                                    marginTop: '0.25rem',
-                                    fontSize: '0.8125rem',
-                                    lineHeight: 1.35,
-                                  }}
-                                >
-                                  {s.missingSummary}
-                                </div>
-                              ) : null}
-                            </>
-                          )}
-                        </td>
-                        <td>
-                          <Link
-                            to={`/admin/clinical/${encodeURIComponent(r.studentId)}`}
-                            className="portal-btn portal-btn--secondary"
-                            style={{
-                              display: 'inline-flex',
-                              padding: '0.35rem 0.65rem',
-                              fontSize: '0.8125rem',
-                            }}
-                          >
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          <div
-            className="portal-actions"
-            style={{
-              marginTop: '1rem',
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'center',
-              gap: '0.75rem 1rem',
-            }}
-          >
-            <span className="portal-card-note" style={{ marginRight: 'auto' }}>
-              {total === 0
-                ? '0 results'
-                : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
-            </span>
-            <button
-              type="button"
-              className="portal-btn portal-btn--secondary"
-              disabled={!canGoPrev}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Previous
-            </button>
-            <span className="portal-card-note" aria-current="page">
-              Page {page}
-            </span>
-            <button
-              type="button"
-              className="portal-btn portal-btn--secondary"
-              disabled={!canGoNext}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </button>
-          </div>
-        </>
-      ) : null}
-
-      <section
-        className="portal-module-panel"
-        aria-labelledby="admin-pending-clinical-requests-heading"
-        style={{ marginTop: '2rem' }}
+      <div
+        className="portal-tab-group admin-courses-tablist"
+        role="tablist"
+        aria-label="Clinical views"
       >
-        <h2
-          id="admin-pending-clinical-requests-heading"
-          className="portal-module-panel-heading"
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'roster'}
+          className={['portal-tab', tab === 'roster' ? 'portal-tab--active' : '']
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => setTab('roster')}
         >
-          Pending clinical requests
-        </h2>
-        {pendingLoading && pendingRequests === null ? (
-          <p className="portal-card-note" aria-live="polite">
-            Loading requests…
-          </p>
-        ) : null}
-        {pendingError ? (
-          <p className="portal-page-lede" role="alert">
-            {pendingError}
-          </p>
-        ) : null}
-        {!pendingLoading && !pendingError && pendingRequests != null ? (
-          <div className="portal-table-wrap admin-table-wrap">
-            <table className="portal-table portal-data-table admin-students-table--center">
-              <thead>
-                <tr>
-                  <th scope="col">Student ID</th>
-                  <th scope="col">Slot</th>
-                  <th scope="col">Term / year</th>
-                  <th scope="col">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingRequests.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="portal-card-note">
-                      No pending clinical requests.
-                    </td>
-                  </tr>
-                ) : (
-                  pendingRequests.map((r) => {
-                    const busy = pendingActionId === r.id
-                    return (
-                      <tr key={r.id}>
-                        <td>{r.studentId}</td>
-                        <td
-                          style={{
-                            maxWidth: '20rem',
-                            textAlign: 'left',
-                            whiteSpace: 'normal',
-                          }}
-                        >
-                          {r.slotLabel}
-                        </td>
-                        <td>
-                          {r.term} {r.year}
-                        </td>
-                        <td>
-                          <div
-                            className="portal-actions"
-                            style={{
-                              flexWrap: 'wrap',
-                              gap: '0.35rem',
-                              justifyContent: 'flex-end',
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="portal-btn portal-btn--primary"
-                              style={{
-                                padding: '0.35rem 0.65rem',
-                                fontSize: '0.8125rem',
-                              }}
-                              disabled={busy}
-                              onClick={() => {
-                                setPendingActionId(r.id)
-                                ;(async () => {
-                                  try {
-                                    await postApproveClinicalRequest(r.id)
-                                    setPendingReloadKey((k) => k + 1)
-                                  } catch (e) {
-                                    window.alert(
-                                      e instanceof Error
-                                        ? e.message
-                                        : 'Approve failed.',
-                                    )
-                                  } finally {
-                                    setPendingActionId(null)
-                                  }
-                                })()
-                              }}
-                            >
-                              {busy ? '…' : 'Approve'}
-                            </button>
-                            <button
-                              type="button"
-                              className="portal-btn portal-btn--secondary"
-                              style={{
-                                padding: '0.35rem 0.65rem',
-                                fontSize: '0.8125rem',
-                              }}
-                              disabled={busy}
-                              onClick={() => {
-                                setPendingActionId(r.id)
-                                ;(async () => {
-                                  try {
-                                    await postRejectClinicalRequest(r.id)
-                                    setPendingReloadKey((k) => k + 1)
-                                  } catch (e) {
-                                    window.alert(
-                                      e instanceof Error
-                                        ? e.message
-                                        : 'Reject failed.',
-                                    )
-                                  } finally {
-                                    setPendingActionId(null)
-                                  }
-                                })()
-                              }}
-                            >
-                              {busy ? '…' : 'Reject'}
-                            </button>
-                          </div>
+          Clinical Roster
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'requests'}
+          className={[
+            'portal-tab',
+            tab === 'requests' ? 'portal-tab--active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => setTab('requests')}
+        >
+          Pending Requests
+        </button>
+      </div>
+
+      {tab === 'roster' ? (
+        <>
+          <div className="admin-page__toolbar">
+            <div className="admin-page__toolbar-actions">
+              <input
+                type="search"
+                className="admin-input admin-input--search"
+                placeholder="Search by student ID, name, email, or program"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label="Search clinical roster"
+                disabled={sectionLoading || Boolean(error)}
+              />
+            </div>
+          </div>
+
+          {sectionLoading ? (
+            <section
+              className="portal-card portal-profile-state"
+              aria-busy="true"
+              aria-live="polite"
+            >
+              <p className="portal-profile-state__title">Loading clinical roster</p>
+              <p className="portal-profile-state__detail">
+                Please wait while we load each student&apos;s clinical progress from
+                the school database.
+              </p>
+            </section>
+          ) : null}
+
+          {!sectionLoading && error ? (
+            <section
+              className="portal-card portal-profile-state portal-profile-state--error"
+              role="alert"
+              aria-live="assertive"
+            >
+              <p className="portal-profile-state__title">
+                We could not load the clinical roster
+              </p>
+              <p className="portal-profile-state__detail">{error}</p>
+              <div className="portal-actions portal-profile-state__actions">
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--secondary"
+                  onClick={() => setReloadKey((k) => k + 1)}
+                >
+                  Try again
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {!sectionLoading && !error && rows != null ? (
+            <>
+              <div className="portal-table-wrap admin-table-wrap">
+                <table className="portal-table portal-data-table admin-students-table--center">
+                  <thead>
+                    <tr>
+                      <th scope="col">Student ID</th>
+                      <th scope="col">Name</th>
+                      <th scope="col">Clinical level</th>
+                      <th scope="col">Completed hours</th>
+                      <th scope="col">Required hours</th>
+                      <th scope="col">Readiness</th>
+                      <th scope="col">Missing</th>
+                      <th scope="col">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="portal-card-note">
+                          {total === 0 && debouncedSearch === ''
+                            ? 'No students on file.'
+                            : 'No students match your search.'}
                         </td>
                       </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-      </section>
+                    ) : (
+                      items.map((r) => {
+                        const s = r.clinicalProgressSummary
+                        return (
+                          <tr key={r.studentId}>
+                            <td>{r.studentId}</td>
+                            <td>{r.name}</td>
+                            <td>
+                              {s ? (
+                                <span className="portal-status portal-status--scheduled">
+                                  Level {s.level}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>{s != null ? s.completedHours : '—'}</td>
+                            <td>{s != null ? s.requiredHours : '—'}</td>
+                            <td>
+                              {s ? (
+                                <span
+                                  className={
+                                    s.readiness === 'ready'
+                                      ? 'portal-status portal-status--paid'
+                                      : 'portal-status portal-status--pending'
+                                  }
+                                >
+                                  {clinicalReadinessLabel(s.readiness)}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td
+                              style={{
+                                maxWidth: '14rem',
+                                textAlign: 'left',
+                                whiteSpace: 'normal',
+                              }}
+                            >
+                              {s == null ? (
+                                '—'
+                              ) : s.missingCount === 0 ? (
+                                <span className="portal-card-note">None</span>
+                              ) : (
+                                <>
+                                  <span className="portal-card-note">
+                                    {s.missingCount}{' '}
+                                    {s.missingCount === 1 ? 'item' : 'items'}
+                                  </span>
+                                  {s.missingSummary ? (
+                                    <div
+                                      style={{
+                                        marginTop: '0.25rem',
+                                        fontSize: '0.8125rem',
+                                        lineHeight: 1.35,
+                                      }}
+                                    >
+                                      {s.missingSummary}
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                            </td>
+                            <td>
+                              <Link
+                                to={`/admin/clinical/${encodeURIComponent(r.studentId)}`}
+                                className="portal-btn portal-btn--secondary"
+                                style={{
+                                  display: 'inline-flex',
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8125rem',
+                                }}
+                              >
+                                View
+                              </Link>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div
+                className="portal-actions"
+                style={{
+                  marginTop: '1rem',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: '0.75rem 1rem',
+                }}
+              >
+                <span className="portal-card-note" style={{ marginRight: 'auto' }}>
+                  {total === 0
+                    ? '0 results'
+                    : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
+                </span>
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--secondary"
+                  disabled={!canGoPrev}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span className="portal-card-note" aria-current="page">
+                  Page {page}
+                </span>
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--secondary"
+                  disabled={!canGoNext}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            </>
+          ) : null}
+        </>
+      ) : (
+        <section
+          className="portal-module-panel"
+          aria-labelledby="admin-pending-clinical-requests-heading"
+        >
+          <h2
+            id="admin-pending-clinical-requests-heading"
+            className="portal-module-panel-heading"
+          >
+            Pending clinical requests
+          </h2>
+          {pendingLoading && pendingRequests === null ? (
+            <p className="portal-card-note" aria-live="polite">
+              Loading requests…
+            </p>
+          ) : null}
+          {pendingError ? (
+            <p className="portal-page-lede" role="alert">
+              {pendingError}
+            </p>
+          ) : null}
+          {!pendingLoading && !pendingError && pendingRequests != null ? (
+            <div className="portal-table-wrap admin-table-wrap">
+              <table className="portal-table portal-data-table admin-students-table--center">
+                <thead>
+                  <tr>
+                    <th scope="col">Student ID</th>
+                    <th scope="col">Slot</th>
+                    <th scope="col">Term / year</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="portal-card-note">
+                        No pending clinical requests.
+                      </td>
+                    </tr>
+                  ) : (
+                    pendingRequests.map((r) => {
+                      const busy = pendingActionId === r.id
+                      return (
+                        <tr key={r.id}>
+                          <td>{r.studentId}</td>
+                          <td
+                            style={{
+                              maxWidth: '20rem',
+                              textAlign: 'left',
+                              whiteSpace: 'normal',
+                            }}
+                          >
+                            {r.slotLabel}
+                          </td>
+                          <td>
+                            {r.term} {r.year}
+                          </td>
+                          <td>
+                            <div
+                              className="portal-actions"
+                              style={{
+                                flexWrap: 'wrap',
+                                gap: '0.35rem',
+                                justifyContent: 'flex-end',
+                              }}
+                            >
+                              <button
+                                type="button"
+                                className="portal-btn portal-btn--primary"
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8125rem',
+                                }}
+                                disabled={busy}
+                                onClick={() => {
+                                  setPendingActionId(r.id)
+                                  ;(async () => {
+                                    try {
+                                      await postApproveClinicalRequest(r.id)
+                                      setPendingReloadKey((k) => k + 1)
+                                    } catch (e) {
+                                      window.alert(
+                                        e instanceof Error
+                                          ? e.message
+                                          : 'Approve failed.',
+                                      )
+                                    } finally {
+                                      setPendingActionId(null)
+                                    }
+                                  })()
+                                }}
+                              >
+                                {busy ? '…' : 'Approve'}
+                              </button>
+                              <button
+                                type="button"
+                                className="portal-btn portal-btn--secondary"
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8125rem',
+                                }}
+                                disabled={busy}
+                                onClick={() => {
+                                  setPendingActionId(r.id)
+                                  ;(async () => {
+                                    try {
+                                      await postRejectClinicalRequest(r.id)
+                                      setPendingReloadKey((k) => k + 1)
+                                    } catch (e) {
+                                      window.alert(
+                                        e instanceof Error
+                                          ? e.message
+                                          : 'Reject failed.',
+                                      )
+                                    } finally {
+                                      setPendingActionId(null)
+                                    }
+                                  })()
+                                }}
+                              >
+                                {busy ? '…' : 'Reject'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      )}
     </main>
   )
 }
