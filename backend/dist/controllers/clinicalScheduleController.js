@@ -1,4 +1,4 @@
-import { assignClinicalSession, ClinicalScheduleValidationError, getStudentClinicalSchedule, } from "../services/clinicalScheduleService.js";
+import { assignClinicalSession, ClinicalScheduleValidationError, getStudentClinicalSchedule, listAdminClinicalTimetable, } from "../services/clinicalScheduleService.js";
 function readOptionalStringField(body, key) {
     if (!Object.prototype.hasOwnProperty.call(body, key)) {
         return undefined;
@@ -41,8 +41,29 @@ export async function getStudentClinicalScheduleHandler(req, res) {
     }
 }
 /**
+ * GET /api/admin/clinical/timetable
+ * Query: optional `term`, `year` (filters legacy `clinic_timetable` rows).
+ */
+export async function getAdminClinicalTimetableHandler(req, res) {
+    try {
+        const term = typeof req.query.term === "string" && req.query.term.trim() !== ""
+            ? req.query.term.trim()
+            : null;
+        const year = typeof req.query.year === "string" && req.query.year.trim() !== ""
+            ? req.query.year.trim()
+            : null;
+        const slots = await listAdminClinicalTimetable({ term, year });
+        res.json(slots);
+    }
+    catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Failed to load clinical timetable" });
+    }
+}
+/**
  * POST /api/admin/clinical/assign
- * Body: { studentId, courseCode, sessionDate, sessionName?, site?, faculty? }
+ * Preferred body: { studentId, timetableId }
+ * Legacy body: { studentId, courseCode, sessionDate, sessionName?, site?, faculty? }
  */
 export async function postAdminClinicalAssignHandler(req, res) {
     try {
@@ -51,15 +72,29 @@ export async function postAdminClinicalAssignHandler(req, res) {
             res.status(400).json({ error: "JSON body is required" });
             return;
         }
-        const result = await assignClinicalSession({
-            studentId: String(body.studentId ?? ""),
-            courseCode: String(body.courseCode ?? ""),
-            sessionDate: String(body.sessionDate ?? ""),
-            sessionName: readOptionalStringField(body, "sessionName"),
-            site: readOptionalStringField(body, "site"),
-            faculty: readOptionalStringField(body, "faculty"),
-            status: readOptionalStringField(body, "status"),
-        });
+        const tidRaw = body.timetableId;
+        let timetableId;
+        if (tidRaw !== undefined && tidRaw !== null && tidRaw !== "") {
+            const n = Number(tidRaw);
+            if (Number.isFinite(n) && n > 0) {
+                timetableId = n;
+            }
+        }
+        const result = timetableId !== undefined
+            ? await assignClinicalSession({
+                studentId: String(body.studentId ?? ""),
+                timetableId,
+                status: readOptionalStringField(body, "status"),
+            })
+            : await assignClinicalSession({
+                studentId: String(body.studentId ?? ""),
+                courseCode: String(body.courseCode ?? ""),
+                sessionDate: String(body.sessionDate ?? ""),
+                sessionName: readOptionalStringField(body, "sessionName"),
+                site: readOptionalStringField(body, "site"),
+                faculty: readOptionalStringField(body, "faculty"),
+                status: readOptionalStringField(body, "status"),
+            });
         if (!result.ok) {
             res.status(result.status).json({ error: result.error });
             return;

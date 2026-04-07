@@ -1,3 +1,4 @@
+import { getClinicTimetableById, listClinicTimetableSlots, } from "../repositories/clinicalTimetableRepository.js";
 import { insertClinicalAssignment, listStudentClinicalAssignments, } from "../repositories/clinicalScheduleRepository.js";
 /** Thrown when `getStudentClinicalSchedule` receives an invalid student id (maps to HTTP 400). */
 export class ClinicalScheduleValidationError extends Error {
@@ -6,7 +7,114 @@ export class ClinicalScheduleValidationError extends Error {
         this.name = "ClinicalScheduleValidationError";
     }
 }
-function rowToDto(r) {
+/**
+ * Interim placeholder DATE for timetable-driven rows: legacy slots are weekday/time only.
+ * Canonical metadata is `timetable_id` + `clinic_timetable`; API maps to a human-readable
+ * `sessionDate` string for clients (see `assignmentRowToScheduleDto`).
+ */
+export const TIMETABLE_ASSIGNMENT_SESSION_DATE_PLACEHOLDER = "1900-01-01";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const WEEKDAY_SHORT = {
+    monday: "Mon",
+    tuesday: "Tue",
+    wednesday: "Wed",
+    thursday: "Thu",
+    friday: "Fri",
+    saturday: "Sat",
+    sunday: "Sun",
+};
+function shortWeekday(day) {
+    const t = day.trim();
+    if (t === "") {
+        return "";
+    }
+    const k = t.toLowerCase();
+    return WEEKDAY_SHORT[k] ?? t.slice(0, 3);
+}
+/** Normalize MySQL TIME string to HH:MM for API consumers. */
+export function formatClinicTimeHm(raw) {
+    if (raw == null || raw === "") {
+        return null;
+    }
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(raw).trim());
+    if (!m) {
+        return null;
+    }
+    return `${m[1].padStart(2, "0")}:${m[2]}`;
+}
+function isMidnightPlaceholder(start, end) {
+    return start === "00:00" && end === "00:00";
+}
+/**
+ * Human-readable label for a legacy `clinic_timetable` row (also stored on assignments as snapshot).
+ */
+export function buildClinicTimetableSlotLabel(row) {
+    const dayShort = shortWeekday(row.weekday);
+    const st = row.timeFrom;
+    const en = row.timeTo;
+    const timeRange = st != null && en != null && !isMidnightPlaceholder(st, en)
+        ? `${st}–${en}`
+        : null;
+    const instr = row.instructor?.trim() ?? "";
+    const slotNum = row.slot?.trim() ?? "";
+    if (dayShort !== "" && timeRange != null) {
+        const tail = instr !== "" ? instr : `Clinic slot ${slotNum || "—"}`;
+        return `${dayShort} ${timeRange} · ${tail}`;
+    }
+    if (dayShort !== "" && timeRange == null) {
+        const tail = instr !== "" ? instr : `Clinic slot ${slotNum || "—"}`;
+        return `${dayShort} · ${tail}`;
+    }
+    if (timeRange != null) {
+        const tail = instr !== "" ? instr : `Clinic slot ${slotNum || "—"}`;
+        return `${timeRange} · ${tail}`;
+    }
+    if (instr !== "") {
+        return `Clinic slot ${slotNum || "—"} · ${instr}`;
+    }
+    return `Clinic slot ${slotNum || "—"}`;
+}
+function timetableRowToSlotLabel(row) {
+    return buildClinicTimetableSlotLabel({
+        weekday: row.weekday,
+        timeFrom: formatClinicTimeHm(row.time_from),
+        timeTo: formatClinicTimeHm(row.time_to),
+        slot: row.slot,
+        instructor: row.instructor || null,
+    });
+}
+function joinedRowSlotLabel(r) {
+    if (r.tt_day == null) {
+        return null;
+    }
+    return buildClinicTimetableSlotLabel({
+        weekday: r.tt_day,
+        timeFrom: formatClinicTimeHm(r.tt_time_from),
+        timeTo: formatClinicTimeHm(r.tt_time_to),
+        slot: r.tt_slot ?? "",
+        instructor: r.tt_instructor,
+    });
+}
+function assignmentRowToScheduleDto(r) {
+    if (r.timetable_id != null) {
+        const term = (r.tt_term ?? r.ca_term ?? "").trim();
+        const year = r.tt_year ?? r.ca_year;
+        const displayDate = year != null && term !== ""
+            ? `${year} ${term} · weekly`
+            : "Weekly clinic (timetable)";
+        const sessionName = joinedRowSlotLabel(r) ?? r.session_name;
+        const faculty = r.tt_instructor ?? r.faculty;
+        return {
+            id: r.id,
+            studentId: r.student_id,
+            courseCode: r.course_code,
+            sessionDate: displayDate,
+            sessionName,
+            site: r.site,
+            faculty,
+            status: r.status,
+        };
+    }
     return {
         id: r.id,
         studentId: r.student_id,
@@ -24,25 +132,80 @@ export async function getStudentClinicalSchedule(studentId) {
         throw new ClinicalScheduleValidationError("Student id is required");
     }
     const rows = await listStudentClinicalAssignments(sid);
-    return rows.map(rowToDto);
+    return rows.map(assignmentRowToScheduleDto);
 }
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+export async function listAdminClinicalTimetable(query) {
+    let yearNum = null;
+    if (query.year != null && String(query.year).trim() !== "") {
+        const n = Number(String(query.year).trim());
+        if (Number.isFinite(n)) {
+            yearNum = n;
+        }
+    }
+    const term = query.term != null && String(query.term).trim() !== ""
+        ? String(query.term).trim()
+        : null;
+    const rows = await listClinicTimetableSlots({
+        year: yearNum,
+        term,
+    });
+    return rows.map((row) => {
+        const start = formatClinicTimeHm(row.time_from);
+        const end = formatClinicTimeHm(row.time_to);
+        return {
+            id: row.id,
+            term: row.term,
+            year: row.year,
+            weekday: row.weekday,
+            startTime: start,
+            endTime: end,
+            instructor: row.instructor.trim() === "" ? null : row.instructor.trim(),
+            site: null,
+            courseCode: null,
+            slotLabel: timetableRowToSlotLabel(row),
+        };
+    });
+}
 function isValidCalendarDate(ymd) {
-    if (!ISO_DATE.test(ymd))
+    if (!ISO_DATE.test(ymd)) {
         return false;
+    }
     const [y, m, d] = ymd.split("-").map((x) => Number(x));
     const dt = new Date(y, m - 1, d);
     return (dt.getFullYear() === y &&
         dt.getMonth() === m - 1 &&
         dt.getDate() === d);
 }
+function opt(v) {
+    if (v === undefined) {
+        return null;
+    }
+    if (v === null) {
+        return null;
+    }
+    const s = String(v).trim();
+    return s === "" ? null : s;
+}
 export async function assignClinicalSession(body) {
     const studentId = String(body.studentId ?? "").trim();
-    const courseCode = String(body.courseCode ?? "").trim();
-    const sessionDate = String(body.sessionDate ?? "").trim();
     if (studentId === "") {
         return { ok: false, error: "studentId is required", status: 400 };
     }
+    const rawTid = body.timetableId;
+    let timetableId = NaN;
+    if (rawTid != null && rawTid !== "") {
+        timetableId =
+            typeof rawTid === "number"
+                ? rawTid
+                : typeof rawTid === "string"
+                    ? Number(rawTid.trim())
+                    : Number(rawTid);
+    }
+    if (Number.isFinite(timetableId) && timetableId > 0) {
+        return assignClinicalFromTimetableSlot(studentId, timetableId, body.status);
+    }
+    const courseCode = String(body.courseCode ?? "").trim();
+    const sessionDate = String(body.sessionDate ?? "").trim();
     if (courseCode === "") {
         return { ok: false, error: "courseCode is required", status: 400 };
     }
@@ -56,14 +219,6 @@ export async function assignClinicalSession(body) {
             status: 400,
         };
     }
-    const opt = (v) => {
-        if (v === undefined)
-            return null;
-        if (v === null)
-            return null;
-        const s = String(v).trim();
-        return s === "" ? null : s;
-    };
     let statusForDb;
     if (body.status !== undefined && body.status !== null) {
         const t = String(body.status).trim();
@@ -78,6 +233,47 @@ export async function assignClinicalSession(body) {
         sessionName: opt(body.sessionName),
         site: opt(body.site),
         faculty: opt(body.faculty),
+        ...(statusForDb !== undefined ? { status: statusForDb } : {}),
+    };
+    try {
+        const id = await insertClinicalAssignment(payload);
+        return { ok: true, id };
+    }
+    catch (e) {
+        console.error(e);
+        return {
+            ok: false,
+            error: "Failed to create clinical assignment",
+            status: 500,
+        };
+    }
+}
+async function assignClinicalFromTimetableSlot(studentId, timetableId, status) {
+    const tt = await getClinicTimetableById(timetableId);
+    if (tt == null) {
+        return { ok: false, error: "timetableId not found", status: 404 };
+    }
+    const slotLabel = timetableRowToSlotLabel(tt);
+    const term = tt.term.slice(0, 20);
+    const year = tt.year;
+    let statusForDb;
+    if (status !== undefined && status !== null) {
+        const t = String(status).trim();
+        if (t !== "") {
+            statusForDb = t;
+        }
+    }
+    const faculty = tt.instructor.trim() === "" ? null : tt.instructor.trim();
+    const payload = {
+        studentId,
+        courseCode: "CLINIC",
+        sessionDate: TIMETABLE_ASSIGNMENT_SESSION_DATE_PLACEHOLDER,
+        sessionName: slotLabel,
+        site: null,
+        faculty,
+        timetableId,
+        assignmentTerm: term || null,
+        assignmentYear: year,
         ...(statusForDb !== undefined ? { status: statusForDb } : {}),
     };
     try {

@@ -4,8 +4,14 @@ import type { Request, Response } from "express";
  */
 export declare function getStudentClinicalScheduleHandler(req: Request, res: Response): Promise<void>;
 /**
+ * GET /api/admin/clinical/timetable
+ * Query: optional `term`, `year` (filters legacy `clinic_timetable` rows).
+ */
+export declare function getAdminClinicalTimetableHandler(req: Request, res: Response): Promise<void>;
+/**
  * POST /api/admin/clinical/assign
- * Body: { studentId, courseCode, sessionDate, sessionName?, site?, faculty? }
+ * Preferred body: { studentId, timetableId }
+ * Legacy body: { studentId, courseCode, sessionDate, sessionName?, site?, faculty? }
  */
 export declare function postAdminClinicalAssignHandler(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=clinicalScheduleController.d.ts.map

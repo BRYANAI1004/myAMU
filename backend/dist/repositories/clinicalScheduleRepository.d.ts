@@ -8,6 +8,16 @@ export type ClinicalAssignmentDbRow = {
     faculty: string | null;
     status: string;
     created_at: Date;
+    timetable_id: number | null;
+    ca_term: string | null;
+    ca_year: number | null;
+    tt_day: string | null;
+    tt_time_from: string | null;
+    tt_time_to: string | null;
+    tt_slot: string | null;
+    tt_instructor: string | null;
+    tt_term: string | null;
+    tt_year: number | null;
 };
 export declare function listStudentClinicalAssignments(studentId: string): Promise<ClinicalAssignmentDbRow[]>;
 export type InsertClinicalAssignmentPayload = {
@@ -18,6 +28,9 @@ export type InsertClinicalAssignmentPayload = {
     site: string | null;
     faculty: string | null;
     status?: string;
+    timetableId?: number | null;
+    assignmentTerm?: string | null;
+    assignmentYear?: number | null;
 };
 export declare function insertClinicalAssignment(payload: InsertClinicalAssignmentPayload): Promise<number>;
 //# sourceMappingURL=clinicalScheduleRepository.d.ts.map
