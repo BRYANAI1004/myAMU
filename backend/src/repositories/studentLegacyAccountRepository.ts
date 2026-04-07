@@ -311,27 +311,8 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
   latest_year: unknown;
 };
 
-/**
- * All legacy `students` rows with latest registration term/year (same ordering as
- * `findLatestLegacyTermYear`). Used for the admin student roster.
- */
-export async function listLegacyAdminStudentRows(
-  pool: Pool,
-): Promise<LegacyAdminStudentListRow[]> {
-  const [rows] = await pool.query<LegacyAdminStudentListRow[]>(
-    `SELECT
-       TRIM(s.id) AS id,
-       s.name,
-       s.email,
-       s.background,
-       s.requirements_id,
-       s.tertiary,
-       s.signed_date,
-       s.EnrollStartDate AS enroll_start_date,
-       lr.term AS latest_term,
-       lr.year AS latest_year
-     FROM students s
-     LEFT JOIN (
+/** Latest registration row per student (same ordering as `findLatestLegacyTermYear`). */
+const ADMIN_STUDENT_LIST_LATEST_REG_JOIN = `LEFT JOIN (
        SELECT
          id,
          TRIM(term) AS term,
@@ -348,8 +329,94 @@ export async function listLegacyAdminStudentRows(
              END DESC
          ) AS rn
        FROM registration
-     ) lr ON lr.id = s.id AND lr.rn = 1
-     ORDER BY s.name ASC, s.id ASC`,
+     ) lr ON lr.id = s.id AND lr.rn = 1`;
+
+/** Escape `%`, `_`, and `\\` for use in a MySQL `LIKE` pattern with `ESCAPE '\\\\'`. */
+function escapeMysqlLikePattern(fragment: string): string {
+  return fragment
+    .replace(/\\/g, "\\\\")
+    .replace(/%/g, "\\%")
+    .replace(/_/g, "\\_");
+}
+
+function buildAdminStudentListSearch(
+  searchTrimmed: string,
+): { clause: string; params: string[] } {
+  if (searchTrimmed === "") {
+    return { clause: "", params: [] };
+  }
+  const like = `%${escapeMysqlLikePattern(searchTrimmed.toLowerCase())}%`;
+  return {
+    clause: ` WHERE (
+       LOWER(TRIM(s.id)) LIKE ? ESCAPE '\\\\'
+       OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '\\\\'
+       OR LOWER(COALESCE(s.email, '')) LIKE ? ESCAPE '\\\\'
+       OR LOWER(TRIM(CAST(IFNULL(s.requirements_id, '') AS CHAR))) LIKE ? ESCAPE '\\\\'
+     )`,
+    params: [like, like, like, like],
+  };
+}
+
+export type LegacyAdminStudentListQuery = {
+  /** Trimmed search string; matches student id, name, email, and program (`requirements_id`) case-insensitively. */
+  search: string;
+};
+
+/**
+ * Count of students matching the admin roster search (before pagination).
+ */
+export async function countLegacyAdminStudentListRows(
+  pool: Pool,
+  query: LegacyAdminStudentListQuery,
+): Promise<number> {
+  const { clause, params } = buildAdminStudentListSearch(query.search.trim());
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COUNT(*) AS cnt
+     FROM students s
+     ${ADMIN_STUDENT_LIST_LATEST_REG_JOIN}
+     ${clause}`,
+    params,
+  );
+  const row = rows[0];
+  if (row == null) return 0;
+  const n = Number((row as { cnt?: unknown }).cnt);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export type LegacyAdminStudentListPageQuery = LegacyAdminStudentListQuery & {
+  limit: number;
+  offset: number;
+};
+
+/**
+ * One page of legacy `students` rows with latest registration term/year (admin roster).
+ * Search is applied in SQL before `LIMIT` / `OFFSET`.
+ */
+export async function listLegacyAdminStudentListRowsPage(
+  pool: Pool,
+  query: LegacyAdminStudentListPageQuery,
+): Promise<LegacyAdminStudentListRow[]> {
+  const { clause, params } = buildAdminStudentListSearch(query.search.trim());
+  const limit = Math.max(0, Math.trunc(query.limit));
+  const offset = Math.max(0, Math.trunc(query.offset));
+  const [rows] = await pool.query<LegacyAdminStudentListRow[]>(
+    `SELECT
+       TRIM(s.id) AS id,
+       s.name,
+       s.email,
+       s.background,
+       s.requirements_id,
+       s.tertiary,
+       s.signed_date,
+       s.EnrollStartDate AS enroll_start_date,
+       lr.term AS latest_term,
+       lr.year AS latest_year
+     FROM students s
+     ${ADMIN_STUDENT_LIST_LATEST_REG_JOIN}
+     ${clause}
+     ORDER BY s.name ASC, s.id ASC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
   );
   return rows;
 }

@@ -32,6 +32,17 @@ export type AdminStudentListItem = {
   clinicalProgressSummary?: AdminStudentClinicalProgressSummary;
 };
 
+/**
+ * GET /api/admin/students — paginated roster payload (`items` is one page only).
+ * Query: `page`, `pageSize`, `search`, optional `clinicalSummary`.
+ */
+export type AdminStudentListPageResponse = {
+  items: AdminStudentListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 /** GET /api/admin/students/:studentId — full admin read model. */
 export type AdminStudentDetail = {
   studentId: string;

@@ -157,6 +157,14 @@ export type AdminStudentListItem = {
   clinicalProgressSummary?: AdminStudentClinicalProgressSummary
 }
 
+/** GET /api/admin/students — paginated roster (`items` is one page). */
+export type AdminStudentListPageResponse = {
+  items: AdminStudentListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
 /** One line-item under a term bucket in admin registration history (optional API field). */
 export type AdminStudentRegistrationHistoryItem = {
   courseCode?: string
@@ -458,32 +466,70 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
   }
 }
 
-export async function fetchAdminStudents(options?: {
-  signal?: AbortSignal
-  /** When true, each row may include `clinicalProgressSummary` (same source as admin detail). */
-  clinicalSummary?: boolean
-}): Promise<AdminStudentListItem[]> {
-  const path = options?.clinicalSummary
-    ? '/api/admin/students?clinicalSummary=1'
-    : '/api/admin/students'
-  const data = (await fetchApiJson(path, {
-    signal: options?.signal,
-  })) as unknown
+function parseAdminStudentListPageResponse(
+  data: unknown,
+): AdminStudentListPageResponse {
   if (data == null || typeof data !== 'object') {
     throw new Error('Unexpected admin students response')
   }
-  const raw = (data as { students?: unknown }).students
-  if (!Array.isArray(raw)) {
+  const o = data as Record<string, unknown>
+  const rawItems = o.items
+  if (!Array.isArray(rawItems)) {
     throw new Error('Unexpected admin students response')
   }
-  const students: AdminStudentListItem[] = []
-  for (const row of raw) {
+  const total = Number(o.total)
+  const page = Number(o.page)
+  const pageSize = Number(o.pageSize)
+  if (
+    !Number.isFinite(total) ||
+    !Number.isFinite(page) ||
+    !Number.isFinite(pageSize)
+  ) {
+    throw new Error('Unexpected admin students response')
+  }
+  const items: AdminStudentListItem[] = []
+  for (const row of rawItems) {
     if (row == null || typeof row !== 'object') {
       throw new Error('Unexpected admin students response')
     }
-    students.push(parseAdminStudentListRow(row as Record<string, unknown>))
+    items.push(parseAdminStudentListRow(row as Record<string, unknown>))
   }
-  return students
+  return {
+    items,
+    total: Math.trunc(total),
+    page: Math.trunc(page),
+    pageSize: Math.trunc(pageSize),
+  }
+}
+
+export async function fetchAdminStudents(options?: {
+  signal?: AbortSignal
+  /** 1-based page index. Default 1. */
+  page?: number
+  /** Rows per page. Default 25. */
+  pageSize?: number
+  /** Server-side filter (student id, name, email, program). */
+  search?: string
+  /** When true, each row may include `clinicalProgressSummary` (same source as admin detail). */
+  clinicalSummary?: boolean
+}): Promise<AdminStudentListPageResponse> {
+  const params = new URLSearchParams()
+  const page = options?.page ?? 1
+  const pageSize = options?.pageSize ?? 25
+  params.set('page', String(Math.max(1, Math.trunc(page))))
+  params.set('pageSize', String(Math.max(1, Math.trunc(pageSize))))
+  const search = (options?.search ?? '').trim()
+  if (search !== '') {
+    params.set('search', search.slice(0, 200))
+  }
+  if (options?.clinicalSummary) {
+    params.set('clinicalSummary', '1')
+  }
+  const path = `/api/admin/students?${params.toString()}`
+  const data = (await fetchApiJson(path, {
+    signal: options?.signal,
+  })) as unknown
+  return parseAdminStudentListPageResponse(data)
 }
 
 export async function fetchAdminStudentDetail(

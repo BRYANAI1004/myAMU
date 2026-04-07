@@ -1,10 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   deleteSelectedAdminStudents,
   fetchAdminStudents,
   type AdminStudentListItem,
 } from '../../lib/api'
+
+const PAGE_SIZE = 25
+const SEARCH_DEBOUNCE_MS = 300
+
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs)
+    return () => window.clearTimeout(t)
+  }, [value, delayMs])
+  return debounced
+}
 
 function displayCell(value: string | null): string {
   if (value == null || value.trim() === '') return '—'
@@ -24,7 +36,10 @@ function formatTableDate(iso: string | null): string {
 
 export function AdminStudentsPage() {
   const [q, setQ] = useState('')
+  const debouncedSearch = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS)
+  const [page, setPage] = useState(1)
   const [rows, setRows] = useState<AdminStudentListItem[] | null>(null)
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
@@ -32,19 +47,38 @@ export function AdminStudentsPage() {
   const [deleteSummary, setDeleteSummary] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  const debouncedSearchPrev = useRef<string | null>(null)
+  useEffect(() => {
+    if (debouncedSearchPrev.current === null) {
+      debouncedSearchPrev.current = debouncedSearch
+      return
+    }
+    if (debouncedSearchPrev.current !== debouncedSearch) {
+      debouncedSearchPrev.current = debouncedSearch
+      setPage(1)
+    }
+  }, [debouncedSearch])
+
   useEffect(() => {
     const ac = new AbortController()
     setLoading(true)
     setError(null)
     ;(async () => {
       try {
-        const data = await fetchAdminStudents({ signal: ac.signal })
+        const res = await fetchAdminStudents({
+          signal: ac.signal,
+          page,
+          pageSize: PAGE_SIZE,
+          search: debouncedSearch,
+        })
         if (ac.signal.aborted) return
-        setRows(data)
+        setRows(res.items)
+        setTotal(res.total)
         setError(null)
       } catch (e) {
         if (ac.signal.aborted) return
         setRows(null)
+        setTotal(0)
         setError(
           e instanceof Error ? e.message : 'Could not load students.',
         )
@@ -55,26 +89,13 @@ export function AdminStudentsPage() {
       }
     })()
     return () => ac.abort()
-  }, [reloadKey])
+  }, [page, debouncedSearch, reloadKey])
 
-  const filtered = useMemo(() => {
-    if (rows == null) return []
-    const s = q.trim().toLowerCase()
-    if (!s) return rows
-    return rows.filter((r) => {
-      const program = (r.requirementsId ?? '').toLowerCase()
-      return (
-        r.studentId.toLowerCase().includes(s) ||
-        r.name.toLowerCase().includes(s) ||
-        (r.email ?? '').toLowerCase().includes(s) ||
-        program.includes(s)
-      )
-    })
-  }, [q, rows])
+  const items = rows ?? []
 
-  const filteredIdSet = useMemo(
-    () => new Set(filtered.map((r) => r.studentId)),
-    [filtered],
+  const visibleIdSet = useMemo(
+    () => new Set(items.map((r) => r.studentId)),
+    [items],
   )
 
   useEffect(() => {
@@ -82,26 +103,32 @@ export function AdminStudentsPage() {
       let changed = false
       const next = new Set<string>()
       for (const id of prev) {
-        if (filteredIdSet.has(id)) next.add(id)
+        if (visibleIdSet.has(id)) next.add(id)
         else changed = true
       }
       if (!changed && next.size === prev.size) return prev
       return next
     })
-  }, [filteredIdSet])
+  }, [visibleIdSet])
 
   const selectedInViewCount = useMemo(() => {
     let n = 0
     for (const id of selectedIds) {
-      if (filteredIdSet.has(id)) n += 1
+      if (visibleIdSet.has(id)) n += 1
     }
     return n
-  }, [selectedIds, filteredIdSet])
+  }, [selectedIds, visibleIdSet])
 
-  const allFilteredSelected =
-    filtered.length > 0 && selectedInViewCount === filtered.length
+  const allVisibleSelected =
+    items.length > 0 && selectedInViewCount === items.length
 
   const sectionLoading = loading && rows === null && error === null
+
+  const canGoPrev = page > 1 && !sectionLoading && !error
+  const canGoNext =
+    !sectionLoading &&
+    !error &&
+    page * PAGE_SIZE < total
 
   function toggleRow(id: string, checked: boolean) {
     setSelectedIds((prev) => {
@@ -116,11 +143,11 @@ export function AdminStudentsPage() {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (checked) {
-        for (const r of filtered) {
+        for (const r of items) {
           next.add(r.studentId)
         }
       } else {
-        for (const r of filtered) {
+        for (const r of items) {
           next.delete(r.studentId)
         }
       }
@@ -161,6 +188,9 @@ export function AdminStudentsPage() {
       setDeleting(false)
     }
   }
+
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeEnd = Math.min(page * PAGE_SIZE, total)
 
   return (
     <main className="admin-page">
@@ -256,71 +286,109 @@ export function AdminStudentsPage() {
       ) : null}
 
       {!sectionLoading && !error && rows != null ? (
-        <div className="portal-table-wrap admin-table-wrap">
-          <table className="portal-table portal-data-table admin-students-table--center">
-            <thead>
-              <tr>
-                <th scope="col" className="admin-students-table__select">
-                  <input
-                    type="checkbox"
-                    aria-label="Select all visible students"
-                    checked={allFilteredSelected}
-                    onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                    disabled={filtered.length === 0 || deleting}
-                  />
-                </th>
-                <th scope="col">Student ID</th>
-                <th scope="col">Name</th>
-                <th scope="col">Division</th>
-                <th scope="col">Email</th>
-                <th scope="col">Program</th>
-                <th scope="col">Signed Date</th>
-                <th scope="col">Latest Registration Term</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
+        <>
+          <div className="portal-table-wrap admin-table-wrap">
+            <table className="portal-table portal-data-table admin-students-table--center">
+              <thead>
                 <tr>
-                  <td colSpan={8} className="portal-card-note">
-                    {rows.length === 0
-                      ? 'No students on file.'
-                      : 'No students match your search.'}
-                  </td>
+                  <th scope="col" className="admin-students-table__select">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible students"
+                      checked={allVisibleSelected}
+                      onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                      disabled={items.length === 0 || deleting}
+                    />
+                  </th>
+                  <th scope="col">Student ID</th>
+                  <th scope="col">Name</th>
+                  <th scope="col">Division</th>
+                  <th scope="col">Email</th>
+                  <th scope="col">Program</th>
+                  <th scope="col">Signed Date</th>
+                  <th scope="col">Latest Registration Term</th>
                 </tr>
-              ) : (
-                filtered.map((r) => (
-                  <tr key={r.studentId}>
-                    <td className="admin-students-table__select">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${r.studentId}`}
-                        checked={selectedIds.has(r.studentId)}
-                        onChange={(e) =>
-                          toggleRow(r.studentId, e.target.checked)
-                        }
-                        disabled={deleting}
-                      />
+              </thead>
+              <tbody>
+                {items.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="portal-card-note">
+                      {total === 0 && debouncedSearch === ''
+                        ? 'No students on file.'
+                        : 'No students match your search.'}
                     </td>
-                    <td>{r.studentId}</td>
-                    <td>
-                      <Link
-                        to={`/admin/students/${encodeURIComponent(r.studentId)}`}
-                        className="admin-student-name-link"
-                      >
-                        {r.name}
-                      </Link>
-                    </td>
-                    <td>{r.division}</td>
-                    <td>{displayCell(r.email)}</td>
-                    <td>{displayCell(r.requirementsId)}</td>
-                    <td>{formatTableDate(r.signedDate)}</td>
-                    <td>{displayCell(r.latestRegistrationTerm)}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  items.map((r) => (
+                    <tr key={r.studentId}>
+                      <td className="admin-students-table__select">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${r.studentId}`}
+                          checked={selectedIds.has(r.studentId)}
+                          onChange={(e) =>
+                            toggleRow(r.studentId, e.target.checked)
+                          }
+                          disabled={deleting}
+                        />
+                      </td>
+                      <td>{r.studentId}</td>
+                      <td>
+                        <Link
+                          to={`/admin/students/${encodeURIComponent(r.studentId)}`}
+                          className="admin-student-name-link"
+                        >
+                          {r.name}
+                        </Link>
+                      </td>
+                      <td>{r.division}</td>
+                      <td>{displayCell(r.email)}</td>
+                      <td>{displayCell(r.requirementsId)}</td>
+                      <td>{formatTableDate(r.signedDate)}</td>
+                      <td>{displayCell(r.latestRegistrationTerm)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            className="portal-actions"
+            style={{
+              marginTop: '1rem',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              gap: '0.75rem 1rem',
+            }}
+          >
+            <span className="portal-card-note" style={{ marginRight: 'auto' }}>
+              {total === 0
+                ? '0 results'
+                : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
+            </span>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={!canGoPrev || deleting}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+            >
+              Previous
+            </button>
+            <span className="portal-card-note" aria-current="page">
+              Page {page}
+            </span>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={!canGoNext || deleting}
+              onClick={() => setPage((p) => p + 1)}
+            >
+              Next
+            </button>
+          </div>
+        </>
       ) : null}
     </main>
   )

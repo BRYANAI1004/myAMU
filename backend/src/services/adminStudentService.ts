@@ -11,7 +11,8 @@ import {
   hasLegacyStudentRegistration,
   legacyStudentMasterExists,
   legacyStudentPasswordRowExists,
-  listLegacyAdminStudentRows,
+  countLegacyAdminStudentListRows,
+  listLegacyAdminStudentListRowsPage,
   loadLegacyStudentProfileRow,
   updateLegacyStudentMasterRow,
 } from "../repositories/studentLegacyAccountRepository.js";
@@ -137,32 +138,55 @@ function mapRowToListItem(r: Record<string, unknown>): AdminStudentListItem {
   };
 }
 
-export async function listAdminStudents(options?: {
+export type AdminStudentListPageResult = {
+  items: AdminStudentListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+export async function listAdminStudentsPage(options: {
+  page: number;
+  pageSize: number;
+  search: string;
   includeClinicalSummary?: boolean;
-}): Promise<AdminStudentListItem[]> {
-  const rows = await listLegacyAdminStudentRows(pool);
+}): Promise<AdminStudentListPageResult> {
+  const page = Math.max(1, Math.trunc(options.page));
+  const pageSize = Math.max(1, Math.trunc(options.pageSize));
+  const search = options.search.trim();
+  const offset = (page - 1) * pageSize;
+
+  const total = await countLegacyAdminStudentListRows(pool, { search });
+  const rows = await listLegacyAdminStudentListRowsPage(pool, {
+    search,
+    limit: pageSize,
+    offset,
+  });
   const base = rows.map((row) => mapRowToListItem(row as Record<string, unknown>));
-  if (!options?.includeClinicalSummary) {
-    return base;
+  let items: AdminStudentListItem[];
+  if (!options.includeClinicalSummary) {
+    items = base;
+  } else {
+    items = await Promise.all(
+      base.map(async (item) => {
+        try {
+          const cp = await buildClinicalProgress(pool, item.studentId);
+          return {
+            ...item,
+            clinicalProgressSummary: clinicalProgressToListSummary(cp),
+          };
+        } catch (e) {
+          console.error(
+            "[admin] buildClinicalProgress failed (list)",
+            item.studentId,
+            e,
+          );
+          return item;
+        }
+      }),
+    );
   }
-  return Promise.all(
-    base.map(async (item) => {
-      try {
-        const cp = await buildClinicalProgress(pool, item.studentId);
-        return {
-          ...item,
-          clinicalProgressSummary: clinicalProgressToListSummary(cp),
-        };
-      } catch (e) {
-        console.error(
-          "[admin] buildClinicalProgress failed (list)",
-          item.studentId,
-          e,
-        );
-        return item;
-      }
-    }),
-  );
+  return { items, total, page, pageSize };
 }
 
 function mapProfileRowToAdminDetail(
