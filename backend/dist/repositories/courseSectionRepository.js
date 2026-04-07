@@ -46,6 +46,11 @@ export function parseEnrolledStudentsJson(raw) {
     }));
     return out;
 }
+function normalizeScheduleTrackFromRow(row) {
+    const raw = row.schedule_track;
+    const s = raw === undefined || raw === null ? "" : String(raw).trim().toUpperCase();
+    return s === "CN" ? "CN" : "EN";
+}
 export function mapCourseSectionRow(row) {
     return {
         id: Number(row.id),
@@ -53,6 +58,7 @@ export function mapCourseSectionRow(row) {
         term: String(row.term ?? ""),
         year: Number(row.year),
         section_code: String(row.section_code ?? ""),
+        schedule_track: normalizeScheduleTrackFromRow(row),
         weekday: String(row.weekday ?? ""),
         start_time: nullableString(row.start_time),
         end_time: nullableString(row.end_time),
@@ -71,6 +77,7 @@ const SECTION_SELECT = `
     term,
     year,
     section_code,
+    schedule_track,
     weekday,
     start_time,
     end_time,
@@ -85,6 +92,7 @@ const UPDATABLE_COLUMNS = [
     "term",
     "year",
     "section_code",
+    "schedule_track",
     "weekday",
     "start_time",
     "end_time",
@@ -106,7 +114,7 @@ export async function getCourseSectionById(id) {
 export async function listCourseSectionsByCourseCode(courseCode, termFilter) {
     const code = courseCode.trim();
     if (termFilter) {
-        const sql = `${SECTION_SELECT} WHERE course_code = ? AND term = ? AND year = ? ORDER BY weekday ASC, start_time ASC`;
+        const sql = `${SECTION_SELECT} WHERE course_code = ? AND term = ? AND year = ? ORDER BY CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, weekday ASC, start_time ASC, section_code ASC`;
         const [rows] = await pool.query(sql, [
             code,
             termFilter.term.trim(),
@@ -114,7 +122,7 @@ export async function listCourseSectionsByCourseCode(courseCode, termFilter) {
         ]);
         return rows.map((r) => mapCourseSectionRow(withZeroEnrollment(r)));
     }
-    const sql = `${SECTION_SELECT} WHERE course_code = ? ORDER BY year ASC, term ASC, weekday ASC, start_time ASC`;
+    const sql = `${SECTION_SELECT} WHERE course_code = ? ORDER BY year ASC, term ASC, CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, weekday ASC, start_time ASC, section_code ASC`;
     const [rows] = await pool.query(sql, [code]);
     return rows.map((r) => mapCourseSectionRow(withZeroEnrollment(r)));
 }
@@ -139,6 +147,7 @@ export async function listCourseSectionsWithEnrollmentAggregates(term, year, opt
       cs.term,
       cs.year,
       cs.section_code,
+      cs.schedule_track,
       cs.weekday,
       cs.start_time,
       cs.end_time,
@@ -175,7 +184,8 @@ export async function listCourseSectionsWithEnrollmentAggregates(term, year, opt
       AND agg.agg_year = cs.year
     WHERE cs.term = ? AND cs.year = ?
     ${courseClause}
-    ORDER BY cs.course_code ASC, cs.weekday ASC, cs.start_time ASC
+    ORDER BY CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END,
+      cs.course_code ASC, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC
   `;
     const params = cc !== "" ? [t, year, cc] : [t, year];
     const [rows] = await pool.query(sql, params);
@@ -238,6 +248,7 @@ export async function createCourseSection(input) {
       term,
       year,
       section_code,
+      schedule_track,
       weekday,
       start_time,
       end_time,
@@ -245,13 +256,14 @@ export async function createCourseSection(input) {
       room,
       instructor,
       notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
     const params = [
         input.course_code,
         input.term,
         input.year,
         input.section_code,
+        input.schedule_track ?? "EN",
         input.weekday,
         input.start_time ?? null,
         input.end_time ?? null,

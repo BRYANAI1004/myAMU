@@ -6,6 +6,8 @@ export type CourseSectionDetail = {
     term: string;
     year: number;
     section_code: string;
+    /** Offered timetable group: English (EN) vs Chinese (CN). Not student track. */
+    schedule_track: "EN" | "CN";
     weekday: string;
     start_time: string | null;
     end_time: string | null;
@@ -29,6 +31,8 @@ export type CourseSectionCreateInput = {
     term: string;
     year: number;
     section_code: string;
+    /** Defaults to EN when omitted (insert uses DB default / repository fallback). */
+    schedule_track?: "EN" | "CN";
     weekday: string;
     start_time?: string | null;
     end_time?: string | null;

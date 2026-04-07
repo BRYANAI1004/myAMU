@@ -100,16 +100,34 @@ export async function enrollStudentInSections(studentExternalId, term, year, sec
                     error: "Each section must include course_code and section_code.",
                 };
             }
-            const [[secRow]] = await conn.query(`SELECT id FROM course_sections
-         WHERE course_code = ? AND section_code = ? AND term = ? AND year = ?
-         LIMIT 1`, [courseCode, sectionCode, trimmedTerm, year]);
-            if (!secRow) {
+            let secRows;
+            if (raw.schedule_track === "EN" || raw.schedule_track === "CN") {
+                const [rows] = await conn.query(`SELECT id FROM course_sections
+           WHERE course_code = ? AND section_code = ? AND term = ? AND year = ?
+             AND schedule_track = ?`, [courseCode, sectionCode, trimmedTerm, year, raw.schedule_track]);
+                secRows = rows;
+            }
+            else {
+                const [rows] = await conn.query(`SELECT id FROM course_sections
+           WHERE course_code = ? AND section_code = ? AND term = ? AND year = ?
+           ORDER BY CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, id ASC`, [courseCode, sectionCode, trimmedTerm, year]);
+                secRows = rows;
+            }
+            if (secRows.length === 0) {
                 await conn.rollback();
                 return {
                     ok: false,
                     error: `No section ${sectionCode} for course ${courseCode} in this term.`,
                 };
             }
+            if (secRows.length > 1) {
+                await conn.rollback();
+                return {
+                    ok: false,
+                    error: `Multiple timetable sections match ${courseCode} ${sectionCode} for this term. Specify schedule_track EN or CN.`,
+                };
+            }
+            const secRow = secRows[0];
             const resolved = await resolvePortalCourseIdForEnrollment(conn, courseCode);
             if (!resolved.ok) {
                 await conn.rollback();
@@ -153,6 +171,7 @@ export async function listStudentEnrolledSectionRows(studentExternalId, term, ye
       cs.term,
       cs.year,
       cs.section_code,
+      cs.schedule_track,
       cs.weekday,
       cs.start_time,
       cs.end_time,
@@ -169,6 +188,7 @@ export async function listStudentEnrolledSectionRows(studentExternalId, term, ye
         cs_inner.term,
         cs_inner.year,
         cs_inner.section_code,
+        cs_inner.schedule_track,
         cs_inner.weekday,
         cs_inner.start_time,
         cs_inner.end_time,

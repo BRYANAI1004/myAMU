@@ -2,6 +2,8 @@ import { type CourseSectionDetail } from "./courseSectionRepository.js";
 export type EnrollSectionInput = {
     course_code: string;
     section_code: string;
+    /** Disambiguates duplicate section_code across EN vs CN offered timetables. */
+    schedule_track?: "EN" | "CN";
 };
 /**
  * Validates each section against `course_sections` and `portal_courses`, then inserts
