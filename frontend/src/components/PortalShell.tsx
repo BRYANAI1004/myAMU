@@ -87,8 +87,10 @@ export function PortalShell({
         <SidebarNavList variant={sidebarNavVariant} onItemClick={closeMobileNav} />
       </PortalMobileNavDrawer>
       <div className="portal-main">
-        {showStudentBar ? <PortalStudentInfoBar /> : null}
-        <div className="portal-main-body">{children}</div>
+        <div className="portal-main-content">
+          {showStudentBar ? <PortalStudentInfoBar /> : null}
+          <div className="portal-main-body">{children}</div>
+        </div>
       </div>
     </div>
   )

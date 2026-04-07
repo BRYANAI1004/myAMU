@@ -31,8 +31,7 @@
   --portal-shadow: 0 1px 2px rgba(28, 35, 51, 0.06);
   --portal-max: 56rem;
   --portal-module-max: 74rem;
-  /* Matches .portal-main-body horizontal inset so student bar and page content align */
-  --portal-main-padding-x: clamp(1rem, 1.8vw, 1.5rem);
+  /* Horizontal gutters for the main column live on .portal-main-content (max-width island). */
   --portal-space-lede-bottom: 1.5rem;
   --portal-space-section: 1.75rem;
   --portal-space-main-bottom: 3rem;
@@ -82,36 +81,6 @@
 .portal-shell.portal-shell--dashboard-home.portal-shell--authenticated {
   min-height: auto;
   align-items: flex-start;
-}
-
-/* Dashboard main column: horizontal padding token (full-width layout, not a max-width island) */
-.portal-shell--dashboard-home {
-  /* Safe on small screens; desktop / widescreen use a tight app-shell gutter so the canvas fills the monitor */
-  --portal-dashboard-padding-x: clamp(1rem, 0.45rem + 1vw, 1.5rem);
-}
-
-@media (min-width: 1280px) {
-  .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(0.875rem, 0.45rem + 0.38vw, 1.125rem);
-  }
-}
-
-@media (min-width: 1440px) {
-  .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(0.75rem, 0.4rem + 0.28vw, 1rem);
-  }
-}
-
-@media (min-width: 1600px) {
-  .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(0.75rem, 0.35rem + 0.22vw, 0.875rem);
-  }
-}
-
-@media (min-width: 1920px) {
-  .portal-shell--dashboard-home {
-    --portal-dashboard-padding-x: clamp(0.625rem, 0.28rem + 0.16vw, 0.75rem);
-  }
 }
 
 .portal-shell--dashboard-home .portal-main {
@@ -491,6 +460,21 @@
   margin-left: 0;
 }
 
+/* Centered reading column: gutters + cap width on large screens (sidebar width unchanged). */
+.portal-main-content {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 /* —— Authenticated shell: student profile strip (below app header) —— */
 .portal-student-info-bar {
   flex-shrink: 0;
@@ -504,7 +488,7 @@
 .portal-student-info-bar-inner {
   width: 100%;
   min-height: var(--portal-student-bar-min-height);
-  padding: 0.875rem var(--portal-main-padding-x);
+  padding: 0.875rem 0;
   box-sizing: border-box;
   display: flex;
   flex-wrap: wrap;
@@ -627,7 +611,7 @@
   flex: 1;
   width: 100%;
   min-width: 0;
-  padding: 1rem var(--portal-main-padding-x) var(--portal-space-main-bottom);
+  padding: 1rem 0 var(--portal-space-main-bottom);
   box-sizing: border-box;
 }
 
@@ -642,58 +626,10 @@
   padding-bottom: clamp(1.5rem, 2.2vw, 2rem);
 }
 
-.portal-shell--no-sidebar .portal-main-body:has(.portal-dashboard) {
-  /* Full-width app canvas: dashboard-only gutters (no max-width island; aggressive taper on large desktop) */
-  padding-left: var(--portal-dashboard-padding-x);
-  padding-right: var(--portal-dashboard-padding-x);
-}
-
-/* Registration + Finances + Documents (sidebar routes): main column width + tighter gutters */
-.portal-main-body:has(.portal-registration-module),
-.portal-main-body:has(.portal-finances-module),
-.portal-main-body:has(.portal-documents-module) {
-  --portal-registration-main-padding-x: clamp(1rem, 0.45rem + 1vw, 1.5rem);
-  padding-left: var(--portal-registration-main-padding-x);
-  padding-right: var(--portal-registration-main-padding-x);
-}
-
-@media (min-width: 1280px) {
-  .portal-main-body:has(.portal-registration-module),
-  .portal-main-body:has(.portal-finances-module),
-  .portal-main-body:has(.portal-documents-module) {
-    --portal-registration-main-padding-x: clamp(0.875rem, 0.45rem + 0.38vw, 1.125rem);
-  }
-}
-
-@media (min-width: 1440px) {
-  .portal-main-body:has(.portal-registration-module),
-  .portal-main-body:has(.portal-finances-module),
-  .portal-main-body:has(.portal-documents-module) {
-    --portal-registration-main-padding-x: clamp(0.75rem, 0.4rem + 0.28vw, 1rem);
-  }
-}
-
-@media (min-width: 1600px) {
-  .portal-main-body:has(.portal-registration-module),
-  .portal-main-body:has(.portal-finances-module),
-  .portal-main-body:has(.portal-documents-module) {
-    --portal-registration-main-padding-x: clamp(0.75rem, 0.35rem + 0.22vw, 0.875rem);
-  }
-}
-
-@media (min-width: 1920px) {
-  .portal-main-body:has(.portal-registration-module),
-  .portal-main-body:has(.portal-finances-module),
-  .portal-main-body:has(.portal-documents-module) {
-    --portal-registration-main-padding-x: clamp(0.625rem, 0.28rem + 0.16vw, 0.75rem);
-  }
-}
-
 @media (max-width: 768px) {
   .portal-shell--authenticated {
     --portal-body-font-size: 0.8125rem;
     flex-direction: column;
-    --portal-main-padding-x: 1rem;
     /* Two-row gold bar when user + logout stack. */
     --portal-branding-bar-height: 4.75rem;
   }
@@ -765,13 +701,6 @@
 
   .portal-main-body {
     padding-top: 0.875rem;
-  }
-
-  .portal-main-body:has(.portal-registration-module),
-  .portal-main-body:has(.portal-finances-module),
-  .portal-main-body:has(.portal-documents-module) {
-    padding-left: var(--portal-main-padding-x);
-    padding-right: var(--portal-main-padding-x);
   }
 
   .portal-page-lede {
@@ -1165,7 +1094,7 @@ button.portal-tab {
 }
 
 /* —— Module layouts: local sub-navigation (Clinical, Documents) —— */
-/* Full-width column like Academics / Finances (no centered max-width island). */
+/* Clinical / Documents: use full width of the centered content column */
 .portal-clinical-module,
 .portal-documents-module {
   max-width: none;
@@ -1175,14 +1104,7 @@ button.portal-tab {
   box-sizing: border-box;
 }
 
-@media (min-width: 769px) {
-  .portal-main-body:has(.portal-documents-module) {
-    padding-left: clamp(0.625rem, 0.22rem + 0.65vw, 0.95rem);
-    padding-right: clamp(0.625rem, 0.22rem + 0.65vw, 0.95rem);
-  }
-}
-
-/* Registration + Finances + Academics: fill the main column (no centered island) */
+/* Registration + Finances + Academics: use full width of the centered content column */
 .portal-registration-module,
 .portal-finances-module,
 .portal-academics-module {
@@ -3282,6 +3204,14 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     min-height: 0 !important;
   }
 
+  .portal-shell--authenticated .portal-main-content {
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
   .portal-shell--authenticated .portal-main-body {
     padding: 0 !important;
   }
@@ -4775,7 +4705,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   max-width: none;
   margin: 0;
   box-sizing: border-box;
-  /* Explicit full-bleed within .portal-main-body (no inherited content column cap) */
+  /* Fills the centered .portal-main-content column (module has no inner max-width cap). */
   min-width: 0;
 }
 
@@ -6107,8 +6037,22 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .admin-portal__main {
   flex: 1;
   min-width: 0;
-  padding: clamp(1.25rem, 2vw, 1.75rem) clamp(1rem, 2vw, 1.75rem) 2.5rem;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(1.25rem, 2vw, 1.75rem) 0 2.5rem;
   background: var(--page-gray);
+}
+
+.admin-portal__main-content {
+  width: 100%;
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  box-sizing: border-box;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .admin-page__title {

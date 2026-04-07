@@ -9,7 +9,9 @@ export function AdminLayout() {
       <div className="admin-portal__frame">
         <AdminHeader />
         <div className="admin-portal__main">
-          <Outlet />
+          <div className="admin-portal__main-content">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>
