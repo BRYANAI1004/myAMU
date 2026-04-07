@@ -35,7 +35,7 @@
   --portal-space-lede-bottom: 1.5rem;
   --portal-space-section: 1.75rem;
   --portal-space-main-bottom: 3rem;
-  --portal-sidebar-width: 15rem; /* ~240px; fits module labels comfortably */
+  --portal-sidebar-width: 17.5rem; /* ~280px; aligns with dashboard services column */
   /* Fixed app header = gold school bar + white myAMU banner (see .portal-app-header) */
   /* ~72px gold bar, ~80px myAMU strip — reads as a full university header, not a thin utility bar */
   --portal-branding-bar-height: 4.5rem;
@@ -43,12 +43,13 @@
   --portal-header-height: calc(var(--portal-branding-bar-height) + var(--portal-portal-banner-height));
   --portal-student-bar-bg: var(--amu-red);
   --portal-student-bar-min-height: 4.25rem; /* avatar row + vertical padding */
-  --portal-sidebar-bg: var(--amu-red);
-  --portal-sidebar-border: var(--amu-red-dark);
-  --portal-sidebar-text: #ffffff;
-  --portal-sidebar-text-muted: rgba(255, 255, 255, 0.85);
-  --portal-sidebar-active: var(--amu-red-dark);
-  --portal-sidebar-hover: var(--amu-red-dark);
+  /* Light module nav (desktop sidebar + drawer): text-first, minimal chrome */
+  --portal-sidebar-bg: #ffffff;
+  --portal-sidebar-text: #444444;
+  --portal-sidebar-text-muted: #6b7280;
+  --portal-sidebar-link-active: #a6192e;
+  --portal-sidebar-row-hover: rgba(0, 0, 0, 0.05);
+  --portal-sidebar-row-active: rgba(166, 25, 46, 0.08);
   --portal-main-canvas-bg: var(--page-gray);
   /* Primary reading size: matches course / grades table body (e.g. course titles in portal tables). */
   --portal-body-font-size: 0.875rem;
@@ -334,12 +335,12 @@
   width: var(--portal-sidebar-width);
   height: calc(100vh - var(--portal-header-height));
   height: calc(100dvh - var(--portal-header-height));
-  padding: 0.875rem 0 1.25rem;
-  background: linear-gradient(180deg, #932030 0%, var(--amu-red) 42%, var(--amu-red-dark) 100%);
-  border-right: 1px solid rgba(0, 0, 0, 0.14);
+  padding: 0.75rem 0 1rem;
+  background: var(--portal-sidebar-bg);
+  border-right: 1px solid var(--portal-border-subtle);
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
+  gap: 0.5rem;
 }
 
 .portal-sidebar-nav {
@@ -360,7 +361,7 @@
 .portal-sidebar-nav-divider {
   height: 1px;
   margin: 0.625rem 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--portal-border-subtle);
   list-style: none;
 }
 
@@ -372,11 +373,11 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  min-height: 2.3125rem;
-  padding: 0.4rem 0.625rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  line-height: 1.3;
+  min-height: 2rem;
+  padding: 0.35rem 0.5rem;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.35;
   color: var(--portal-sidebar-text);
   text-decoration: none;
   border-radius: var(--portal-radius);
@@ -384,17 +385,16 @@
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-/* Icons use currentColor; tones follow link state (red-gradient sidebar keeps light text). */
 .portal-sidebar .sidebar-item {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--portal-sidebar-text);
 }
 
 .portal-sidebar .sidebar-item:hover {
-  color: #fff;
+  color: var(--portal-sidebar-text);
 }
 
 .portal-sidebar .sidebar-item.portal-nav-link--active {
-  color: #fff;
+  color: var(--portal-sidebar-link-active);
 }
 
 .portal-nav-link-icon {
@@ -414,19 +414,19 @@
 }
 
 .portal-nav-link:hover {
-  background: var(--portal-sidebar-hover);
+  background: var(--portal-sidebar-row-hover);
 }
 
 .portal-nav-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline: 2px solid var(--portal-sidebar-link-active);
   outline-offset: 2px;
 }
 
 .portal-nav-link--active {
-  background: var(--portal-sidebar-active);
-  color: var(--portal-sidebar-text);
-  border-color: rgba(0, 0, 0, 0.12);
-  font-weight: 600;
+  background: var(--portal-sidebar-row-active);
+  color: var(--portal-sidebar-link-active);
+  border-color: transparent;
+  font-weight: 400;
 }
 
 .portal-nav-link--disabled {
@@ -436,11 +436,11 @@
 }
 
 .portal-nav-link--signout {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--portal-sidebar-text-muted);
 }
 
 .portal-nav-link--signout:hover {
-  color: #fff;
+  color: var(--portal-sidebar-text);
 }
 
 .portal-main {
@@ -463,11 +463,11 @@
 /* Centered reading column: gutters + cap width on large screens (sidebar width unchanged). */
 .portal-main-content {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1440px;
   margin-left: auto;
   margin-right: auto;
-  padding-left: 24px;
-  padding-right: 24px;
+  padding-left: 20px;
+  padding-right: 20px;
   box-sizing: border-box;
   flex: 1 1 auto;
   display: flex;
@@ -834,7 +834,7 @@
 }
 
 .portal-sidebar-drawer-close:hover {
-  background: var(--portal-sidebar-hover);
+  background: var(--portal-sidebar-row-hover);
   color: var(--portal-sidebar-text);
 }
 
@@ -3479,7 +3479,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   padding: 0.875rem 1rem;
   text-align: left;
   font-family: inherit;
-  font-size: 0.8125rem; /* match .portal-nav-link sidebar menu */
+  font-size: 0.875rem; /* align with sidebar module nav (14px) */
   font-weight: 500;
   line-height: 1.3;
   color: var(--portal-text);
@@ -4777,9 +4777,8 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-dashboard-home-grid {
   display: grid;
   width: 100%;
-  /* Compact services rail (~240px); calendar takes remaining width */
-  grid-template-columns: 240px minmax(0, 1fr);
-  gap: 1.5rem clamp(1rem, 1.5vw, 1.5rem);
+  grid-template-columns: minmax(260px, 280px) minmax(0, 1fr);
+  gap: 20px;
   align-items: stretch;
 }
 
@@ -4799,10 +4798,10 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   height: 100%;
 }
 
-/* Large desktop: row breathing room; column gap stays 16–24px */
+/* Large desktop: row breathing room; column gap matches shell rhythm */
 @media (min-width: 1025px) {
   .portal-dashboard-home-grid {
-    gap: 1.75rem clamp(1rem, 1.35vw, 1.5rem);
+    gap: 20px;
   }
 
   .portal-dashboard-home-primary > .portal-dashboard-services,
