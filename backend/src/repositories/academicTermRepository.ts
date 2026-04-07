@@ -35,6 +35,8 @@ function normalizeRow(row: RowDataPacket): AcademicTermDetail {
     end_date: nullableDateString(row.end_date),
     registration_open: nullableDateString(row.registration_open),
     registration_close: nullableDateString(row.registration_close),
+    payment_due_date: nullableDateString(row.payment_due_date),
+    lock_registration_if_overdue: asBool(row.lock_registration_if_overdue),
     status: row.status as AcademicTermStatus,
     is_visible: asBool(row.is_visible),
   };
@@ -52,6 +54,8 @@ const TERM_SELECT = `
     end_date,
     registration_open,
     registration_close,
+    payment_due_date,
+    lock_registration_if_overdue,
     status,
     is_visible
   FROM academic_terms
@@ -124,9 +128,11 @@ export async function insertAcademicTerm(
       end_date,
       registration_open,
       registration_close,
+      payment_due_date,
+      lock_registration_if_overdue,
       status,
       is_visible
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     row.id,
@@ -139,6 +145,8 @@ export async function insertAcademicTerm(
     row.end_date,
     row.registration_open,
     row.registration_close,
+    row.payment_due_date,
+    row.lock_registration_if_overdue ? 1 : 0,
     row.status,
     row.is_visible ? 1 : 0,
   ];
@@ -171,6 +179,8 @@ export async function updateAcademicTermRow(
       end_date = ?,
       registration_open = ?,
       registration_close = ?,
+      payment_due_date = ?,
+      lock_registration_if_overdue = ?,
       status = ?,
       is_visible = ?
     WHERE id = ?
@@ -186,6 +196,8 @@ export async function updateAcademicTermRow(
     row.end_date,
     row.registration_open,
     row.registration_close,
+    row.payment_due_date,
+    row.lock_registration_if_overdue ? 1 : 0,
     row.status,
     row.is_visible ? 1 : 0,
     currentId,

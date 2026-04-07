@@ -17,6 +17,8 @@ export declare function getQuarterSettingsPayload(term: string, year: number): P
     paymentDueDate: string | null;
     lateFeeEnabled: boolean;
     lateFeeAmount: number;
+    ddlPersistenceAvailable: boolean;
+    ddlSaveNote: string | null;
 }>;
 export declare function putQuarterSettings(input: {
     term: string;
@@ -25,7 +27,12 @@ export declare function putQuarterSettings(input: {
     lateFeeEnabled?: boolean;
     lateFeeAmount?: number;
     updatedBy?: string | null;
-}): Promise<void>;
+}): Promise<{
+    ok: true;
+} | {
+    ok: false;
+    message: string;
+}>;
 export declare function listAdminFinanceStudentsForQuarter(term: string, year: number): Promise<AdminFinanceStudentRow[]>;
 export declare function getAdminFinanceQuarters(studentId: string): Promise<{
     studentId: string;

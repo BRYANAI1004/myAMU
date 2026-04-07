@@ -154,7 +154,7 @@ export async function putFinanceQuarterSettings(req, res) {
             res.status(400).json({ error: "lateFeeAmount must be a number." });
             return;
         }
-        await putQuarterSettings({
+        const saveResult = await putQuarterSettings({
             term,
             year: Math.trunc(year),
             paymentDueDate,
@@ -164,6 +164,10 @@ export async function putFinanceQuarterSettings(req, res) {
                 : undefined,
             updatedBy: null,
         });
+        if (!saveResult.ok) {
+            res.status(200).json(saveResult);
+            return;
+        }
         res.json({ ok: true });
     }
     catch (e) {

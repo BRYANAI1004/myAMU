@@ -1,5 +1,5 @@
 import { pool } from "../lib/db.js";
-import { deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getPortalPaymentById, getTermFinanceSettings, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listFinanceRosterRows, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, updateManualBillingAdjustment, updatePortalPayment, upsertTermFinanceSettings, } from "../repositories/adminFinanceRepository.js";
+import { academicTermsPaymentDueDateColumnExists, deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getFinanceQuarterDdlFromAcademicTerms, getPortalPaymentById, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listFinanceRosterRows, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, setFinanceQuarterDdlOnAcademicTerms, updateManualBillingAdjustment, updatePortalPayment, } from "../repositories/adminFinanceRepository.js";
 import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRepository.js";
 import { getAccountingLedgerPayload, getAccountingQuartersPayload, getStudentQuarterBalance, } from "./studentLedgerService.js";
 const CHARGE_CATEGORIES = [
@@ -30,38 +30,50 @@ export async function listGlobalQuartersPayload() {
     };
 }
 export async function getQuarterSettingsPayload(term, year) {
-    const row = await getTermFinanceSettings(pool, term, year);
-    if (row == null) {
-        return {
-            term: term.trim(),
-            year: Math.trunc(year),
-            paymentDueDate: null,
-            lateFeeEnabled: true,
-            lateFeeAmount: 30,
-        };
+    const y = Math.trunc(year);
+    const t = term.trim();
+    const hasCol = await academicTermsPaymentDueDateColumnExists(pool);
+    const { paymentDueDate, rowExists } = await getFinanceQuarterDdlFromAcademicTerms(pool, t, y);
+    const ddlPersistenceAvailable = hasCol && rowExists;
+    let ddlSaveNote = null;
+    if (!ddlPersistenceAvailable) {
+        if (!hasCol) {
+            ddlSaveNote =
+                "Payment DDL persistence is not yet enabled on academic terms.";
+        }
+        else {
+            ddlSaveNote =
+                "No matching academic term row for this quarter. Create it under Academic Terms before saving a payment due date.";
+        }
     }
     return {
-        term: row.term,
-        year: row.year,
-        paymentDueDate: row.paymentDueDate,
-        lateFeeEnabled: row.lateFeeEnabled,
-        lateFeeAmount: row.lateFeeAmount,
+        term: t,
+        year: y,
+        paymentDueDate,
+        lateFeeEnabled: true,
+        lateFeeAmount: 30,
+        ddlPersistenceAvailable,
+        ddlSaveNote,
     };
 }
 export async function putQuarterSettings(input) {
-    const existing = await getTermFinanceSettings(pool, input.term, input.year);
-    const lateFeeEnabled = input.lateFeeEnabled ?? existing?.lateFeeEnabled ?? true;
-    const lateFeeAmount = roundMoney(input.lateFeeAmount != null && Number.isFinite(input.lateFeeAmount)
-        ? input.lateFeeAmount
-        : (existing?.lateFeeAmount ?? 30));
-    await upsertTermFinanceSettings(pool, {
-        term: input.term,
-        year: input.year,
-        paymentDueDate: input.paymentDueDate,
-        lateFeeEnabled,
-        lateFeeAmount,
-        updatedBy: input.updatedBy ?? null,
-    });
+    void input.lateFeeEnabled;
+    void input.lateFeeAmount;
+    void input.updatedBy;
+    const result = await setFinanceQuarterDdlOnAcademicTerms(pool, input.term, input.year, input.paymentDueDate);
+    if (result === "no_column") {
+        return {
+            ok: false,
+            message: "Payment DDL persistence is not yet enabled on academic terms.",
+        };
+    }
+    if (result === "not_found") {
+        return {
+            ok: false,
+            message: "No matching academic term row for this quarter. Create it under Academic Terms first.",
+        };
+    }
+    return { ok: true };
 }
 async function mapWithConcurrency(items, limit, fn) {
     const out = new Array(items.length);
@@ -407,8 +419,8 @@ export async function verifyPaymentForStudentTerm(id, studentId, term, year) {
 export async function runLateFeeCheckForQuarter(term, year) {
     const t = term.trim();
     const y = Math.trunc(year);
-    const settings = await getTermFinanceSettings(pool, t, y);
-    if (settings == null || settings.paymentDueDate == null) {
+    const { paymentDueDate } = await getFinanceQuarterDdlFromAcademicTerms(pool, t, y);
+    if (paymentDueDate == null) {
         return {
             ok: true,
             insertedCount: 0,
@@ -416,16 +428,8 @@ export async function runLateFeeCheckForQuarter(term, year) {
             message: "No payment due date configured for this quarter; nothing to do.",
         };
     }
-    if (!settings.lateFeeEnabled) {
-        return {
-            ok: true,
-            insertedCount: 0,
-            skippedCount: 0,
-            message: "Late fee is disabled for this quarter.",
-        };
-    }
     const today = todayIsoDate();
-    if (today <= settings.paymentDueDate) {
+    if (today <= paymentDueDate) {
         return {
             ok: true,
             insertedCount: 0,
@@ -433,7 +437,7 @@ export async function runLateFeeCheckForQuarter(term, year) {
             message: "Payment due date has not passed yet; no late fees applied.",
         };
     }
-    const feeAmount = roundMoney(settings.lateFeeAmount || 30);
+    const feeAmount = roundMoney(30);
     const studentIds = await listStudentIdsWithPortalQuarterActivity(pool, t, y);
     let insertedCount = 0;
     let skippedCount = 0;

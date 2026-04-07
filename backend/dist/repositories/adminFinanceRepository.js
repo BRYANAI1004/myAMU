@@ -75,7 +75,7 @@ export async function listGlobalFinanceQuarters(pool) {
        UNION
        SELECT DISTINCT TRIM(term) AS term, year FROM accounting
        UNION
-       SELECT DISTINCT term, year FROM portal_term_finance_settings
+       SELECT DISTINCT TRIM(term_name) AS term, year FROM academic_terms
      ) q
      WHERE TRIM(term) <> ''`);
     const byKey = new Map();
@@ -95,51 +95,72 @@ export async function listGlobalFinanceQuarters(pool) {
         return termSortOrder(b.term) - termSortOrder(a.term);
     });
 }
-export async function getTermFinanceSettings(pool, term, year) {
-    const [rows] = await pool.query(`SELECT term, year,
-            payment_due_date AS paymentDueDate,
-            late_fee_enabled AS lateFeeEnabled,
-            late_fee_amount AS lateFeeAmount,
-            updated_by AS updatedBy
-     FROM portal_term_finance_settings
-     WHERE term = ? AND year = ?
-     LIMIT 1`, [term.trim(), Math.trunc(year)]);
-    const r = rows[0];
-    if (!r)
-        return null;
-    const due = r.paymentDueDate;
-    let paymentDueDate = null;
-    if (due instanceof Date) {
-        paymentDueDate = due.toISOString().slice(0, 10);
+let cachedAcademicTermsPaymentDueDateColumn = null;
+/**
+ * Detects optional `academic_terms.payment_due_date` without migrations.
+ * Cached for the process lifetime.
+ */
+export async function academicTermsPaymentDueDateColumnExists(pool) {
+    if (cachedAcademicTermsPaymentDueDateColumn !== null) {
+        return cachedAcademicTermsPaymentDueDateColumn;
     }
-    else if (typeof due === "string" && due.trim() !== "") {
-        paymentDueDate = due.trim().slice(0, 10);
+    try {
+        const [rows] = await pool.query(`SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'academic_terms'
+         AND COLUMN_NAME = 'payment_due_date'`);
+        cachedAcademicTermsPaymentDueDateColumn = Number(rows[0]?.c) > 0;
+    }
+    catch {
+        cachedAcademicTermsPaymentDueDateColumn = false;
+    }
+    return cachedAcademicTermsPaymentDueDateColumn;
+}
+function paymentDueDateFromDbValue(due) {
+    if (due == null)
+        return null;
+    if (due instanceof Date) {
+        return due.toISOString().slice(0, 10);
+    }
+    if (typeof due === "string" && due.trim() !== "") {
+        return due.trim().slice(0, 10);
+    }
+    return null;
+}
+/** Payment DDL and whether a matching `academic_terms` row exists for this finance quarter. */
+export async function getFinanceQuarterDdlFromAcademicTerms(pool, term, year) {
+    const t = term.trim();
+    const y = Math.trunc(year);
+    const [existRows] = await pool.query(`SELECT 1 AS ok FROM academic_terms
+     WHERE LOWER(TRIM(term_name)) = LOWER(TRIM(?)) AND year = ?
+     LIMIT 1`, [t, y]);
+    const rowExists = existRows.length > 0;
+    const hasCol = await academicTermsPaymentDueDateColumnExists(pool);
+    if (!hasCol) {
+        return { paymentDueDate: null, rowExists };
+    }
+    const [rows] = await pool.query(`SELECT payment_due_date AS paymentDueDate FROM academic_terms
+     WHERE LOWER(TRIM(term_name)) = LOWER(TRIM(?)) AND year = ?
+     LIMIT 1`, [t, y]);
+    const r = rows[0];
+    if (!r) {
+        return { paymentDueDate: null, rowExists };
     }
     return {
-        term: str(r.term),
-        year: Number(r.year),
-        paymentDueDate,
-        lateFeeEnabled: Boolean(r.lateFeeEnabled),
-        lateFeeAmount: Number(r.lateFeeAmount) || 30,
-        updatedBy: r.updatedBy != null ? String(r.updatedBy) : null,
+        paymentDueDate: paymentDueDateFromDbValue(r.paymentDueDate),
+        rowExists,
     };
 }
-export async function upsertTermFinanceSettings(pool, params) {
-    await pool.execute(`INSERT INTO portal_term_finance_settings
-      (term, year, payment_due_date, late_fee_enabled, late_fee_amount, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       payment_due_date = VALUES(payment_due_date),
-       late_fee_enabled = VALUES(late_fee_enabled),
-       late_fee_amount = VALUES(late_fee_amount),
-       updated_by = VALUES(updated_by)`, [
-        params.term.trim(),
-        Math.trunc(params.year),
-        params.paymentDueDate,
-        params.lateFeeEnabled ? 1 : 0,
-        params.lateFeeAmount,
-        params.updatedBy,
-    ]);
+export async function setFinanceQuarterDdlOnAcademicTerms(pool, term, year, paymentDueDate) {
+    const hasCol = await academicTermsPaymentDueDateColumnExists(pool);
+    if (!hasCol)
+        return "no_column";
+    const [res] = await pool.execute(`UPDATE academic_terms SET payment_due_date = ?
+     WHERE LOWER(TRIM(term_name)) = LOWER(TRIM(?)) AND year = ?`, [paymentDueDate, term.trim(), Math.trunc(year)]);
+    const affected = res.affectedRows ?? 0;
+    if (affected === 0)
+        return "not_found";
+    return "ok";
 }
 /** Students with any portal billing activity for the term (late fee candidates). */
 export async function listStudentIdsWithPortalQuarterActivity(pool, term, year) {

@@ -143,6 +143,8 @@ export async function createAcademicTerm(
     end_date: input.end_date ?? null,
     registration_open: input.registration_open ?? null,
     registration_close: input.registration_close ?? null,
+    payment_due_date: input.payment_due_date ?? null,
+    lock_registration_if_overdue: input.lock_registration_if_overdue === true,
     status: input.status,
     is_visible: input.is_visible !== false,
   });
@@ -225,6 +227,14 @@ export async function updateAcademicTerm(
       patch.registration_close !== undefined
         ? patch.registration_close
         : existing.registration_close,
+    payment_due_date:
+      patch.payment_due_date !== undefined
+        ? patch.payment_due_date
+        : existing.payment_due_date,
+    lock_registration_if_overdue:
+      patch.lock_registration_if_overdue !== undefined
+        ? patch.lock_registration_if_overdue
+        : existing.lock_registration_if_overdue,
     status,
     is_visible,
   });

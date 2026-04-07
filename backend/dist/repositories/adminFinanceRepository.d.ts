@@ -17,23 +17,18 @@ export declare function listGlobalFinanceQuarters(pool: Pool): Promise<{
     term: string;
     year: number;
 }[]>;
-export type TermFinanceSettingsRow = {
-    term: string;
-    year: number;
+/**
+ * Detects optional `academic_terms.payment_due_date` without migrations.
+ * Cached for the process lifetime.
+ */
+export declare function academicTermsPaymentDueDateColumnExists(pool: Pool): Promise<boolean>;
+/** Payment DDL and whether a matching `academic_terms` row exists for this finance quarter. */
+export declare function getFinanceQuarterDdlFromAcademicTerms(pool: Pool, term: string, year: number): Promise<{
     paymentDueDate: string | null;
-    lateFeeEnabled: boolean;
-    lateFeeAmount: number;
-    updatedBy: string | null;
-};
-export declare function getTermFinanceSettings(pool: Pool, term: string, year: number): Promise<TermFinanceSettingsRow | null>;
-export declare function upsertTermFinanceSettings(pool: Pool, params: {
-    term: string;
-    year: number;
-    paymentDueDate: string | null;
-    lateFeeEnabled: boolean;
-    lateFeeAmount: number;
-    updatedBy: string | null;
-}): Promise<void>;
+    rowExists: boolean;
+}>;
+export type SetFinanceQuarterDdlResult = "ok" | "no_column" | "not_found";
+export declare function setFinanceQuarterDdlOnAcademicTerms(pool: Pool, term: string, year: number, paymentDueDate: string | null): Promise<SetFinanceQuarterDdlResult>;
 /** Students with any portal billing activity for the term (late fee candidates). */
 export declare function listStudentIdsWithPortalQuarterActivity(pool: Pool, term: string, year: number): Promise<string[]>;
 export declare function hasSystemLateFeeForQuarter(pool: Pool, studentExternalId: string, term: string, year: number): Promise<boolean>;
