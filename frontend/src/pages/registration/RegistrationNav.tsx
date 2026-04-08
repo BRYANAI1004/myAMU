@@ -8,6 +8,7 @@ const ITEMS = [
   { to: 'search', label: 'Course Search' },
   { to: 'offered-timetable', label: 'Offered Timetable' },
   { to: 'course-bin', label: 'My CourseBin' },
+  { to: 'add-drop', label: 'Add/Drop' },
   { to: 'schedule', label: 'My Timetable' },
 ] as const
 
