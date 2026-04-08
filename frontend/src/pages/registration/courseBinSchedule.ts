@@ -26,9 +26,11 @@ function courseBinItemToSyntheticSection(
   }
 
   const sec = item.section.trim()
+  const withTitle = item as CourseBinItem & { course_title?: string | null }
   return {
     id: -1000 - index,
     course_code: code,
+    course_title: withTitle.course_title?.trim() || code,
     term: '',
     year: 0,
     section_code: sec === '' ? '—' : sec,
