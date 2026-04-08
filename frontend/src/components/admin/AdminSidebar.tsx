@@ -37,8 +37,7 @@ export function AdminSidebar() {
   return (
     <aside className="admin-sidebar" aria-label="Administration">
       <div className="admin-sidebar__brand">
-        <span className="admin-sidebar__brand-title">Admin</span>
-        <span className="admin-sidebar__brand-sub">Navigation</span>
+        <span className="admin-sidebar__brand-title">ADMIN</span>
       </div>
       <nav className="admin-sidebar__nav" aria-label="Primary">
         <ul className="admin-sidebar__list">

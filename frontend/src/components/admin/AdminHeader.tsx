@@ -1,8 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 
-const MOCK_ADMIN_NAME = 'Li, Lillian'
-
 export function AdminHeader() {
   const navigate = useNavigate()
   const { logout } = useAdminAuth()
@@ -25,9 +23,14 @@ export function AdminHeader() {
         <span className="admin-header__title">Administrator Portal</span>
       </div>
       <div className="admin-header__right">
-        <span className="admin-header__name">{MOCK_ADMIN_NAME}</span>
         <button type="button" className="admin-header__logout" onClick={handleLogout}>
-          Log out
+          <img
+            className="admin-header__logout-icon"
+            src="/logout (1).svg"
+            alt=""
+            aria-hidden
+          />
+          <span>Logout</span>
         </button>
       </div>
     </header>
