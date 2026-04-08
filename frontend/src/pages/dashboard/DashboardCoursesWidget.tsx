@@ -2,10 +2,15 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
 import {
+  fetchAcademicTerms,
   fetchCurrentAcademicTerm,
   fetchRecentAcademicTerms,
+  fetchStudentEnrolledSections,
   fetchStudentRegisteredScheduleRowsForTerm,
+  type AcademicTerm,
 } from '../../lib/api'
+import { enrolledSectionsToScheduleRows } from '../../lib/enrolledSectionsToScheduleRows'
+import { resolveAcademicTermIdForPortalTerm } from '../../lib/resolveAcademicTermIdForPortalTerm'
 import { mergeTermOptions } from '../registration/registrationTermSearch'
 import {
   currentTermLabel,
@@ -30,6 +35,12 @@ import type { ScheduleRow } from '../../types/billing'
 type CalendarView = 'list' | 'week'
 
 type CalendarWeekTermKey = { term: string; year: number }
+
+type DashboardWeekTermOption = CalendarWeekTermKey & {
+  label: string
+  /** When known (registration term list or resolved from academic terms), drives enrolled-sections fetch. */
+  academicTermId?: string
+}
 
 function termKeysEqual(a: CalendarWeekTermKey, b: CalendarWeekTermKey): boolean {
   return (
@@ -282,8 +293,10 @@ export function DashboardCoursesWidget() {
   const weekTermRowsCacheRef = useRef<Map<string, ScheduleRow[]>>(new Map())
   /** Same merge as registration layout when account `availableScheduleTerms` is empty. */
   const [registrationMergedScheduleTerms, setRegistrationMergedScheduleTerms] = useState<
-    Array<{ term: string; year: number; label: string }>
+    Array<{ term: string; year: number; label: string; academicTermId: string }>
   >([])
+  const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([])
+  const [academicTermsLoading, setAcademicTermsLoading] = useState(false)
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
 
@@ -328,8 +341,33 @@ export function DashboardCoursesWidget() {
           label:
             t.term_label?.trim() ||
             currentTermLabel({ term: t.term_name, year: t.year }),
+          academicTermId: t.id,
         })),
       )
+    })()
+    return () => ac.abort()
+  }, [accountHasScheduleTermOptions, isAuthenticated])
+
+  /** Map browse term+year → academic term id when the account lists terms without ids (portal enrollments API). */
+  useEffect(() => {
+    if (!isAuthenticated || !accountHasScheduleTermOptions) {
+      setAcademicTerms([])
+      setAcademicTermsLoading(false)
+      return
+    }
+    const ac = new AbortController()
+    setAcademicTermsLoading(true)
+    void (async () => {
+      try {
+        const terms = await fetchAcademicTerms({ signal: ac.signal })
+        if (ac.signal.aborted) return
+        setAcademicTerms(terms)
+      } catch {
+        if (ac.signal.aborted) return
+        setAcademicTerms([])
+      } finally {
+        if (!ac.signal.aborted) setAcademicTermsLoading(false)
+      }
     })()
     return () => ac.abort()
   }, [accountHasScheduleTermOptions, isAuthenticated])

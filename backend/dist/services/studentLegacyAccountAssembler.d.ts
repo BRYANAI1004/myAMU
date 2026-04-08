@@ -1,5 +1,6 @@
 import type { MarksRow } from "../repositories/studentAcademicsRepository.js";
 import type { LegacyAccountingRow, LegacyAccountSnapshot } from "../repositories/studentLegacyAccountRepository.js";
+import type { PortalEnrollmentAcademicRow } from "../repositories/studentEnrollmentRepository.js";
 import type { CourseTranscriptLookupEntry } from "../repositories/studentTranscriptRepository.js";
 import type { AccountScheduleTermOption, ClinicalProgress, StudentAccountPayload } from "../types/studentAccount.js";
 /** Legacy `accounting.date` is stored as YYYYMMDD (int). Emit ISO date for API / frontend. */
@@ -16,6 +17,11 @@ export type AssembleLegacyStudentAccountOptions = {
     } | null;
     availableScheduleTerms: AccountScheduleTermOption[];
     clinicalProgress: ClinicalProgress;
+    /**
+     * When non-empty, browsed-term schedule rows merge **active** portal didactic enrollments with
+     * marks (portal wins on duplicate course code). Withdrawn portal rows stay out of the timetable.
+     */
+    portalEnrollmentRows?: PortalEnrollmentAcademicRow[];
 };
 export declare function assembleLegacyStudentAccountPayload(snap: LegacyAccountSnapshot, accountingRows: LegacyAccountingRow[], 
 /** All `marks` rows for the student (newest term first), same source as `/academics`. */

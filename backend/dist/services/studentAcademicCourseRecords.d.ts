@@ -59,6 +59,18 @@ export declare function resolveRegistrationAnchoredAcademicTerm(registrationTerm
     term: string;
     year: number;
 } | null;
+/**
+ * Same as {@link resolveRegistrationAnchoredAcademicTerm}, but if every `marks` row for the term is
+ * academically closed while the student still has at least one **active** portal enrollment in that
+ * term, keep the term active (timetable/dashboard use portal enrollments).
+ */
+export declare function resolveRegistrationAnchoredAcademicTermConsideringPortal(registrationTerm: {
+    term: string;
+    year: number;
+} | null, marks: MarksRow[], portalEnrollments: Pick<PortalEnrollmentAcademicRow, "term" | "year" | "status">[]): {
+    term: string;
+    year: number;
+} | null;
 export declare function normalizeEnglishTitle(code: string, rawTitle: string, lookup: Map<string, CourseTranscriptLookupEntry>): string;
 /** Prefer English catalog title; otherwise legacy `marks.course_title` / `clinic.course_title`. */
 export declare function resolveCourseDisplayTitle(code: string, legacyTitle: string, lookup: Map<string, CourseTranscriptLookupEntry>): string;

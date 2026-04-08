@@ -1,4 +1,4 @@
-import { buildAcademicCourseRecordsFromMarksWithLookup, resolveRegistrationAnchoredAcademicTerm, scheduleRowsFromAcademicCourseRecords, termsMatch, } from "./studentAcademicCourseRecords.js";
+import { buildAcademicCourseRecordsFromMarksWithLookup, legacyCompletedBlocksPortalRow, portalEnrollmentRowToAcademicCourseRecord, resolveCourseDisplayTitle, resolveRegistrationAnchoredAcademicTermConsideringPortal, scheduleRowsFromAcademicCourseRecords, termsMatch, } from "./studentAcademicCourseRecords.js";
 import { buildAccountCurrentTerm, deriveAccountRegistration, } from "./studentAccountDashboard.js";
 function roundMoney(n) {
     return Math.round(n * 100) / 100;
@@ -17,6 +17,25 @@ export function legacyAccountingDateToIso(dateRaw) {
 }
 function typeNorm(type) {
     return type.trim().toLowerCase();
+}
+function mergeBrowseTermScheduleRecords(portalRecords, marksRecords) {
+    const byCode = new Map();
+    const key = (r) => r.courseCode.trim().toLowerCase();
+    for (const r of portalRecords) {
+        if (r.status === "withdrawn")
+            continue;
+        byCode.set(key(r), r);
+    }
+    for (const r of marksRecords) {
+        if (r.status === "withdrawn")
+            continue;
+        const k = key(r);
+        if (!byCode.has(k))
+            byCode.set(k, r);
+    }
+    return [...byCode.values()].sort((a, b) => a.courseCode.localeCompare(b.courseCode, undefined, {
+        sensitivity: "base",
+    }));
 }
 export function assembleLegacyStudentAccountPayload(snap, accountingRows, 
 /** All `marks` rows for the student (newest term first), same source as `/academics`. */
@@ -68,10 +87,19 @@ allMarksRows, courseLookup, options) {
     }
     const browseTerm = { term: snap.term, year: snap.year };
     const { portalActiveTerm, availableScheduleTerms, clinicalProgress } = options;
+    const portalRows = options.portalEnrollmentRows ?? [];
     const marksRowsForBrowse = allMarksRows.filter((m) => m.year === browseTerm.year && termsMatch(m.term, browseTerm.term));
     const courseRecords = buildAcademicCourseRecordsFromMarksWithLookup(snap.studentId, allMarksRows, courseLookup, portalActiveTerm);
     const browseRecords = courseRecords.filter((r) => r.year === browseTerm.year && termsMatch(r.term, browseTerm.term));
-    const scheduleRows = scheduleRowsFromAcademicCourseRecords(browseRecords);
+    const portalBrowseRecords = portalRows
+        .filter((p) => p.year === browseTerm.year &&
+        termsMatch(p.term, browseTerm.term) &&
+        !legacyCompletedBlocksPortalRow(courseRecords, p.course_code, p.term, p.year))
+        .map((p) => portalEnrollmentRowToAcademicCourseRecord(snap.studentId, p, resolveCourseDisplayTitle(p.course_code, p.course_title_raw.length > 0 ? p.course_title_raw : p.course_code, courseLookup), portalActiveTerm));
+    const scheduleSourceRecords = portalBrowseRecords.length > 0
+        ? mergeBrowseTermScheduleRecords(portalBrowseRecords, browseRecords)
+        : browseRecords.filter((r) => r.status !== "withdrawn");
+    const scheduleRows = scheduleRowsFromAcademicCourseRecords(scheduleSourceRecords);
     const currentTerm = portalActiveTerm != null
         ? buildAccountCurrentTerm(portalActiveTerm.term, portalActiveTerm.year)
         : null;
@@ -84,7 +112,7 @@ allMarksRows, courseLookup, options) {
         termLabel: browseLabel,
         ...(browseMatchesPortalActive
             ? {
-                academicEnrollmentActive: resolveRegistrationAnchoredAcademicTerm(browseTerm, allMarksRows) != null,
+                academicEnrollmentActive: resolveRegistrationAnchoredAcademicTermConsideringPortal(browseTerm, allMarksRows, portalRows) != null,
                 marksRowsForRegistrationTerm: marksRowsForBrowse.length,
             }
             : {}),

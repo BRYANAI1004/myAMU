@@ -8,9 +8,10 @@ import { pool } from "../lib/db.js";
 import { listMarksForStudent } from "../repositories/studentAcademicsRepository.js";
 import { findLatestLegacyTermYear, listLegacyRegistrationTermsForStudent, loadLegacyAccountSnapshot, loadLegacyAccountingRows, } from "../repositories/studentLegacyAccountRepository.js";
 import { findLatestTermYearForStudent, listPortalScheduleTermsForStudent, loadAccountContext, } from "../repositories/studentAccountRepository.js";
+import { findLatestPortalEnrollmentTermYear, listPortalEnrollmentRowsForStudentAcademics, } from "../repositories/studentEnrollmentRepository.js";
 import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
 import { getCatalogDemoAccountPayload } from "./demoAccountService.js";
-import { resolveRegistrationAnchoredAcademicTerm, termSortOrder, } from "./studentAcademicCourseRecords.js";
+import { pickNewerRegistrationAnchor, resolveRegistrationAnchoredAcademicTermConsideringPortal, termSortOrder, } from "./studentAcademicCourseRecords.js";
 import { buildClinicalProgress } from "./clinicalProgressService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
 import { buildAccountCurrentTerm } from "./studentAccountDashboard.js";
@@ -109,29 +110,38 @@ async function getRealStudentAccountPayload(studentId, termYear) {
         year = latest.year;
     }
     console.debug("[account-debug] getStudentAccountPayload (legacy) input", JSON.stringify({ studentId, term, year, mode: termYear.mode }));
-    const [snap, listedPairs] = await Promise.all([
+    const [snap, listedPairs, portalEnrollmentRows, latestPortalTermYear, portalScheduleTermList, latestLegacyTermYear,] = await Promise.all([
         loadLegacyAccountSnapshot(pool, studentId, term, year),
         listLegacyRegistrationTermsForStudent(pool, studentId),
+        listPortalEnrollmentRowsForStudentAcademics(studentId),
+        findLatestPortalEnrollmentTermYear(studentId),
+        listPortalScheduleTermsForStudent(pool, studentId).catch(() => []),
+        findLatestLegacyTermYear(pool, studentId),
     ]);
     if (!snap) {
         return null;
     }
-    const [accountingRows, allMarksRows, courseLookup, latestReg, clinicalProgress] = await Promise.all([
+    const [accountingRows, allMarksRows, courseLookup, clinicalProgress] = await Promise.all([
         loadLegacyAccountingRows(pool, studentId, term, year),
         listMarksForStudent(pool, studentId),
         loadCoursesTranscriptLookup(pool),
-        findLatestLegacyTermYear(pool, studentId),
         buildClinicalProgress(pool, studentId),
     ]);
-    let portalActiveTerm = null;
-    if (latestReg != null) {
-        const anchor = resolveRegistrationAnchoredAcademicTerm(latestReg, allMarksRows);
-        if (anchor != null) {
-            portalActiveTerm = { term: anchor.term, year: anchor.year };
-        }
+    const latestRegistration = pickNewerRegistrationAnchor(latestLegacyTermYear, latestPortalTermYear);
+    const portalActiveTerm = latestRegistration == null
+        ? null
+        : resolveRegistrationAnchoredAcademicTermConsideringPortal(latestRegistration, allMarksRows, portalEnrollmentRows);
+    let availableScheduleTerms = toScheduleTermOptions(listedPairs);
+    for (const p of portalScheduleTermList) {
+        availableScheduleTerms = mergeScheduleTermOptionLists(availableScheduleTerms, p.term, p.year);
     }
-    const availableScheduleTerms = mergeScheduleTermOptionLists(toScheduleTermOptions(listedPairs), snap.term, snap.year);
-    return assembleLegacyStudentAccountPayload(snap, accountingRows, allMarksRows, courseLookup, { portalActiveTerm, availableScheduleTerms, clinicalProgress });
+    availableScheduleTerms = mergeScheduleTermOptionLists(availableScheduleTerms, snap.term, snap.year);
+    return assembleLegacyStudentAccountPayload(snap, accountingRows, allMarksRows, courseLookup, {
+        portalActiveTerm,
+        availableScheduleTerms,
+        clinicalProgress,
+        portalEnrollmentRows,
+    });
 }
 export async function getStudentAccountPayload(studentId, termYear) {
     if (studentId === DEMO_STUDENT_ID) {
