@@ -129,6 +129,26 @@ export async function portalStudentExists(db, studentExternalId) {
     return rows.length > 0;
 }
 /**
+ * Document requirement rows FK to `portal_students`. Login/profile use legacy `students.id`.
+ * Ensure a portal row exists whenever the legacy master row exists so GET/POST documents can run.
+ */
+export async function ensurePortalStudentRowFromLegacyStudents(db, studentExternalId) {
+    const [rows] = await db.query(`SELECT TRIM(id) AS id, TRIM(name) AS name
+     FROM students
+     WHERE id = ?
+     LIMIT 1`, [studentExternalId]);
+    if (rows.length === 0)
+        return false;
+    const nameRaw = rows[0]?.name;
+    const fullName = typeof nameRaw === "string" && nameRaw.trim() !== ""
+        ? nameRaw.trim()
+        : studentExternalId;
+    await db.query(`INSERT INTO portal_students (student_external_id, full_name)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE student_external_id = student_external_id`, [studentExternalId, fullName]);
+    return true;
+}
+/**
  * Inserts missing current-state rows for all requirement types (assigned, no scores).
  * Rows that already exist are left unchanged (ON DUPLICATE KEY UPDATE id=id).
  */

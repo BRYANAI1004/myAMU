@@ -4,6 +4,11 @@ import { type CreateDocumentRequirementAttemptInput, type DocumentRequirementTyp
 export type StudentDocumentsDbClient = Pool | PoolConnection;
 export declare function portalStudentExists(db: StudentDocumentsDbClient, studentExternalId: string): Promise<boolean>;
 /**
+ * Document requirement rows FK to `portal_students`. Login/profile use legacy `students.id`.
+ * Ensure a portal row exists whenever the legacy master row exists so GET/POST documents can run.
+ */
+export declare function ensurePortalStudentRowFromLegacyStudents(db: StudentDocumentsDbClient, studentExternalId: string): Promise<boolean>;
+/**
  * Inserts missing current-state rows for all requirement types (assigned, no scores).
  * Rows that already exist are left unchanged (ON DUPLICATE KEY UPDATE id=id).
  */
