@@ -80,6 +80,157 @@ function toggleWeekday(
   return WEEKDAYS_FULL_ORDERED.filter((d) => set.has(d))
 }
 
+function AdminCourseSectionsTableHead() {
+  return (
+    <thead>
+      <tr>
+        <th scope="col">Section</th>
+        <th scope="col">Course title</th>
+        <th scope="col">Track</th>
+        <th scope="col">Weekday</th>
+        <th scope="col">Start</th>
+        <th scope="col">End</th>
+        <th scope="col">Delivery</th>
+        <th scope="col">Room</th>
+        <th scope="col">Instructor</th>
+        <th scope="col">Enrolled</th>
+        <th scope="col">Registrations</th>
+        <th scope="col">Notes</th>
+        <th scope="col">Actions</th>
+      </tr>
+    </thead>
+  )
+}
+
+type AdminCourseSectionGroupTableProps = {
+  ariaLabelledBy: string
+  title: string
+  rows: AdminCourseSection[]
+  emptyMessage: string
+  catalog: CourseCatalogItem | null
+  busy: boolean
+  onViewStudents: (row: AdminCourseSection) => void
+  onEdit: (row: AdminCourseSection) => void
+  onDeleteRow: (row: AdminCourseSection) => void
+}
+
+function AdminCourseSectionGroupTable({
+  ariaLabelledBy,
+  title,
+  rows,
+  emptyMessage,
+  catalog,
+  busy,
+  onViewStudents,
+  onEdit,
+  onDeleteRow,
+}: AdminCourseSectionGroupTableProps) {
+  return (
+    <section
+      className="admin-course-sections-group"
+      aria-labelledby={ariaLabelledBy}
+    >
+      <h3 id={ariaLabelledBy} className="admin-course-sections-group__title">
+        {title}
+      </h3>
+      <div className="portal-table-wrap admin-table-wrap">
+        <table className="portal-table admin-course-sections-table">
+          <AdminCourseSectionsTableHead />
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={13}
+                  className="admin-course-sections-table__empty-row"
+                >
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.section_code}</td>
+                  <td>
+                    {getPreferredCourseTitle(
+                      catalog ?? {
+                        code: row.course_code,
+                        eng_name: null,
+                        chi_name: null,
+                      },
+                      row.schedule_track,
+                    )}
+                  </td>
+                  <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
+                  <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
+                  <td>{formatTimeHmsForDisplay(row.start_time)}</td>
+                  <td>{formatTimeHmsForDisplay(row.end_time)}</td>
+                  <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
+                  <td>{displayCell(row.room)}</td>
+                  <td>{displayCell(row.instructor)}</td>
+                  <td className="admin-course-sections-table__numeric">
+                    {row.enrolled_count}
+                  </td>
+                  <td>
+                    {row.enrolled_count > 0 ? (
+                      <span className="admin-course-sections-table__reg-open">
+                        Open
+                      </span>
+                    ) : (
+                      <span className="admin-course-sections-table__reg-none">
+                        None
+                      </span>
+                    )}
+                  </td>
+                  <td className="admin-course-sections-table__notes">
+                    {displayCell(row.notes)}
+                  </td>
+                  <td className="admin-course-sections-table__actions">
+                    <div
+                      className="admin-course-sections-table__action-stack"
+                      role="group"
+                      aria-label={`Actions for section ${row.section_code}`}
+                    >
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
+                        disabled={busy || row.enrolled_count === 0}
+                        title={
+                          row.enrolled_count === 0
+                            ? 'No students enrolled'
+                            : undefined
+                        }
+                        onClick={() => onViewStudents(row)}
+                      >
+                        View students
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
+                        disabled={busy}
+                        onClick={() => onEdit(row)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact portal-btn--admin-danger"
+                        disabled={busy}
+                        onClick={() => void onDeleteRow(row)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
 export function AdminCourseSectionsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
@@ -630,187 +781,52 @@ export function AdminCourseSectionsPage() {
         </p>
       )}
 
-      <div className="portal-table-wrap admin-table-wrap">
-        <table className="portal-table">
-          <thead>
-            <tr>
-              <th scope="col">Section</th>
-              <th scope="col">Course title</th>
-              <th scope="col">Track</th>
-              <th scope="col">Weekday</th>
-              <th scope="col">Start</th>
-              <th scope="col">End</th>
-              <th scope="col">Delivery</th>
-              <th scope="col">Room</th>
-              <th scope="col">Instructor</th>
-              <th scope="col">Enrolled</th>
-              <th scope="col">Registrations</th>
-              <th scope="col">Notes</th>
-              <th scope="col">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sectionsLoading && (
-              <tr>
-                <td colSpan={13}>Loading sections…</td>
-              </tr>
-            )}
-            {!sectionsLoading && sections != null && sections.length === 0 && (
-              <tr>
-                <td colSpan={13}>No sections for this term and course.</td>
-              </tr>
-            )}
-            {!sectionsLoading && sections != null && sections.length > 0 && (
-              <>
-                <tbody>
-                  <tr>
-                    <td colSpan={13}>
-                      <strong>English Timetable Sections</strong>
-                    </td>
-                  </tr>
-                  {enSectionRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} className="portal-text-muted">
-                        None for this course in this term.
-                      </td>
-                    </tr>
-                  ) : null}
-                  {enSectionRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.section_code}</td>
-                      <td>
-                        {getPreferredCourseTitle(
-                          selectedCourseCatalog ?? {
-                            code: row.course_code,
-                            eng_name: null,
-                            chi_name: null,
-                          },
-                          row.schedule_track,
-                        )}
-                      </td>
-                      <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
-                      <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
-                      <td>{formatTimeHmsForDisplay(row.start_time)}</td>
-                      <td>{formatTimeHmsForDisplay(row.end_time)}</td>
-                      <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
-                      <td>{displayCell(row.room)}</td>
-                      <td>{displayCell(row.instructor)}</td>
-                      <td>{row.enrolled_count}</td>
-                      <td>
-                        {row.enrolled_count > 0 ? (
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => setEnrolledModalSection(row)}
-                          >
-                            View students
-                          </button>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{displayCell(row.notes)}</td>
-                      <td>
-                        <div className="admin-inline-actions">
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => beginEdit(row)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => void onDeleteRow(row)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tbody>
-                  <tr>
-                    <td colSpan={13}>
-                      <strong>Chinese Timetable Sections</strong>
-                    </td>
-                  </tr>
-                  {cnSectionRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={13} className="portal-text-muted">
-                        None for this course in this term.
-                      </td>
-                    </tr>
-                  ) : null}
-                  {cnSectionRows.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.section_code}</td>
-                      <td>
-                        {getPreferredCourseTitle(
-                          selectedCourseCatalog ?? {
-                            code: row.course_code,
-                            eng_name: null,
-                            chi_name: null,
-                          },
-                          row.schedule_track,
-                        )}
-                      </td>
-                      <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
-                      <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
-                      <td>{formatTimeHmsForDisplay(row.start_time)}</td>
-                      <td>{formatTimeHmsForDisplay(row.end_time)}</td>
-                      <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
-                      <td>{displayCell(row.room)}</td>
-                      <td>{displayCell(row.instructor)}</td>
-                      <td>{row.enrolled_count}</td>
-                      <td>
-                        {row.enrolled_count > 0 ? (
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => setEnrolledModalSection(row)}
-                          >
-                            View students
-                          </button>
-                        ) : (
-                          '—'
-                        )}
-                      </td>
-                      <td>{displayCell(row.notes)}</td>
-                      <td>
-                        <div className="admin-inline-actions">
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => beginEdit(row)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={busy}
-                            onClick={() => void onDeleteRow(row)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {sectionsLoading ? (
+        <div
+          className="portal-table-wrap admin-table-wrap admin-course-sections-list__state-wrap"
+          role="status"
+          aria-live="polite"
+        >
+          <p className="admin-course-sections-list__state">Loading sections…</p>
+        </div>
+      ) : null}
+
+      {!sectionsLoading &&
+      sections != null &&
+      sections.length === 0 ? (
+        <div className="portal-table-wrap admin-table-wrap admin-course-sections-list__state-wrap">
+          <p className="admin-course-sections-list__state">
+            No sections for this term and course.
+          </p>
+        </div>
+      ) : null}
+
+      {!sectionsLoading && sections != null && sections.length > 0 ? (
+        <div className="admin-course-sections-list">
+          <AdminCourseSectionGroupTable
+            ariaLabelledBy="admin-course-sections-en-heading"
+            title="English Timetable Sections"
+            rows={enSectionRows}
+            emptyMessage="None for this course in this term."
+            catalog={selectedCourseCatalog}
+            busy={busy}
+            onViewStudents={setEnrolledModalSection}
+            onEdit={beginEdit}
+            onDeleteRow={onDeleteRow}
+          />
+          <AdminCourseSectionGroupTable
+            ariaLabelledBy="admin-course-sections-cn-heading"
+            title="Chinese Timetable Sections"
+            rows={cnSectionRows}
+            emptyMessage="None for this course in this term."
+            catalog={selectedCourseCatalog}
+            busy={busy}
+            onViewStudents={setEnrolledModalSection}
+            onEdit={beginEdit}
+            onDeleteRow={onDeleteRow}
+          />
+        </div>
+      ) : null}
 
       <section
         className="admin-form-section"

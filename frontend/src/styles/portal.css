@@ -4292,6 +4292,22 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   color: var(--portal-accent-hover);
 }
 
+.portal-btn.portal-btn--admin-danger {
+  color: var(--amu-red);
+  border-color: rgba(140, 29, 44, 0.42);
+  background: var(--portal-surface);
+}
+
+.portal-btn.portal-btn--admin-danger:hover:not(:disabled) {
+  background: var(--amu-red-ring);
+  border-color: var(--amu-red);
+  color: var(--amu-red-dark);
+}
+
+.portal-btn.portal-btn--admin-danger:disabled {
+  opacity: 0.55;
+}
+
 /* —— Payment summary stack —— */
 .portal-stack {
   display: flex;
@@ -6577,6 +6593,103 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     width: 100%;
     min-width: 0;
   }
+}
+
+/* Admin — Course Sections: grouped tables + row layout */
+.admin-course-sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  margin-bottom: var(--portal-space-section);
+}
+
+.admin-course-sections-list .portal-table-wrap {
+  margin-bottom: 0;
+}
+
+.admin-course-sections-list__state-wrap {
+  margin-bottom: var(--portal-space-section);
+}
+
+.admin-course-sections-list__state {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  font-size: 0.875rem;
+  color: var(--portal-text-muted);
+}
+
+.admin-course-sections-group__title {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-text-muted);
+}
+
+.admin-course-sections-table th:nth-child(10),
+.admin-course-sections-table td:nth-child(10) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-course-sections-table th:nth-child(2),
+.admin-course-sections-table td:nth-child(2) {
+  min-width: 7rem;
+  max-width: 15rem;
+  word-break: break-word;
+}
+
+.admin-course-sections-table th:first-child,
+.admin-course-sections-table td:first-child {
+  white-space: nowrap;
+}
+
+.admin-course-sections-table td.admin-course-sections-table__notes {
+  max-width: 12rem;
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  word-break: break-word;
+  vertical-align: middle;
+}
+
+.admin-course-sections-table td.admin-course-sections-table__empty-row {
+  text-align: left;
+  color: var(--portal-text-muted);
+  font-size: 0.875rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.admin-course-sections-table__reg-none {
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+}
+
+.admin-course-sections-table__reg-open {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--portal-text);
+}
+
+.admin-course-sections-table td.admin-course-sections-table__actions {
+  vertical-align: middle;
+  padding-top: 0.6rem;
+  padding-bottom: 0.6rem;
+}
+
+.admin-course-sections-table__action-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  min-width: 7.85rem;
+  margin-left: auto;
+}
+
+.admin-course-sections-table__action-stack .portal-btn {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-field--weekdays {
