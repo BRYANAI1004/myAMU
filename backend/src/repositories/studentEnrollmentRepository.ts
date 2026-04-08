@@ -413,8 +413,11 @@ export async function deletePortalEnrollmentByStudentCourseTermYear(
   const code = courseCode.trim();
   const t = term.trim();
   const sql = `
-    DELETE e FROM portal_enrollments e
+    UPDATE portal_enrollments e
     INNER JOIN portal_courses pc ON pc.course_id = e.course_id
+    SET
+      e.status = 'withdrawn',
+      e.withdrawn_at = NOW()
     WHERE e.student_external_id COLLATE utf8mb4_unicode_ci =
           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
       AND pc.course_code COLLATE utf8mb4_unicode_ci =
@@ -422,6 +425,7 @@ export async function deletePortalEnrollmentByStudentCourseTermYear(
       AND e.term COLLATE utf8mb4_unicode_ci =
           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
       AND e.year = ?
+      AND (e.status IS NULL OR e.status = 'active')
   `;
   const [result] = await pool.query<ResultSetHeader>(sql, [sid, code, t, year]);
   return result.affectedRows;
