@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
-import { fetchStudentRegisteredScheduleRowsForTerm } from '../../lib/api'
+import {
+  fetchCurrentAcademicTerm,
+  fetchRecentAcademicTerms,
+  fetchStudentRegisteredScheduleRowsForTerm,
+} from '../../lib/api'
+import { mergeTermOptions } from '../registration/registrationTermSearch'
 import {
   currentTermLabel,
   formatPortalCourseInstructor,
@@ -275,6 +280,10 @@ export function DashboardCoursesWidget() {
   const [weekFetchLoading, setWeekFetchLoading] = useState(false)
   const [weekFetchError, setWeekFetchError] = useState(false)
   const weekTermRowsCacheRef = useRef<Map<string, ScheduleRow[]>>(new Map())
+  /** Same merge as registration layout when account `availableScheduleTerms` is empty. */
+  const [registrationMergedScheduleTerms, setRegistrationMergedScheduleTerms] = useState<
+    Array<{ term: string; year: number; label: string }>
+  >([])
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
 
@@ -286,9 +295,50 @@ export function DashboardCoursesWidget() {
     weekTermRowsCacheRef.current.clear()
   }, [currentStudentId])
 
+  const accountScheduleTerms = account.availableScheduleTerms ?? []
+  const accountHasScheduleTermOptions = accountScheduleTerms.length > 0
+
+  useEffect(() => {
+    if (accountHasScheduleTermOptions) {
+      setRegistrationMergedScheduleTerms([])
+      return
+    }
+    if (!isAuthenticated) {
+      setRegistrationMergedScheduleTerms([])
+      return
+    }
+    const ac = new AbortController()
+    void (async () => {
+      const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
+      const currentP = fetchCurrentAcademicTerm({ signal: ac.signal })
+      const [recentR, currentR] = await Promise.allSettled([recentP, currentP])
+      if (ac.signal.aborted) return
+
+      let recent: Awaited<ReturnType<typeof fetchRecentAcademicTerms>> = []
+      let current: Awaited<ReturnType<typeof fetchCurrentAcademicTerm>> = null
+      if (recentR.status === 'fulfilled') recent = recentR.value
+      if (currentR.status === 'fulfilled') current = currentR.value
+
+      const merged = mergeTermOptions(recent, current)
+      if (ac.signal.aborted) return
+      setRegistrationMergedScheduleTerms(
+        merged.map((t) => ({
+          term: t.term_name,
+          year: t.year,
+          label:
+            t.term_label?.trim() ||
+            currentTermLabel({ term: t.term_name, year: t.year }),
+        })),
+      )
+    })()
+    return () => ac.abort()
+  }, [accountHasScheduleTermOptions, isAuthenticated])
+
   const registration = account.registration
   const browseLabel = browseTermDisplayLabel(account)
-  const availableTerms = account.availableScheduleTerms ?? []
+  const weekTermSelectOptions = accountHasScheduleTermOptions
+    ? accountScheduleTerms
+    : registrationMergedScheduleTerms
   const listScheduleRows = account.scheduleRows
 
   const isLoadingAccount = Boolean(loading && isAuthenticated)
@@ -394,7 +444,7 @@ export function DashboardCoursesWidget() {
 
   const weekTermDisplayLabel =
     resolvedWeekTerm != null
-      ? availableTerms.find((x) => termKeysEqual(x, resolvedWeekTerm))?.label?.trim() ||
+      ? weekTermSelectOptions.find((x) => termKeysEqual(x, resolvedWeekTerm))?.label?.trim() ||
         currentTermLabel({ term: resolvedWeekTerm.term, year: resolvedWeekTerm.year })
       : ''
 
@@ -409,7 +459,7 @@ export function DashboardCoursesWidget() {
       : ''
 
   const showWeekTermSelect =
-    !isLoadingAccount && view === 'week' && registration.status === 'registered' && availableTerms.length > 0
+    !isLoadingAccount && view === 'week' && weekTermSelectOptions.length > 0
 
   const showListCourseTable =
     !isLoadingAccount &&
@@ -449,7 +499,7 @@ export function DashboardCoursesWidget() {
                   setCalendarWeekTerm({ term, year })
                 }}
               >
-                {availableTerms.map((opt) => (
+                {weekTermSelectOptions.map((opt) => (
                   <option
                     key={scheduleTermOptionValue(opt.term, opt.year)}
                     value={scheduleTermOptionValue(opt.term, opt.year)}
