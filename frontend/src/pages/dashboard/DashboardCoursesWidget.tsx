@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
 import { fetchStudentRegisteredScheduleRowsForTerm } from '../../lib/api'
@@ -30,6 +30,10 @@ function termKeysEqual(a: CalendarWeekTermKey, b: CalendarWeekTermKey): boolean 
   return (
     a.year === b.year && a.term.trim().toLowerCase() === b.term.trim().toLowerCase()
   )
+}
+
+function normalizedWeekTermCacheKey(t: CalendarWeekTermKey): string {
+  return `${t.term.trim().toLowerCase()}|${t.year}`
 }
 
 /**
@@ -270,6 +274,7 @@ export function DashboardCoursesWidget() {
   const [weekTermRows, setWeekTermRows] = useState<ScheduleRow[] | null>(null)
   const [weekFetchLoading, setWeekFetchLoading] = useState(false)
   const [weekFetchError, setWeekFetchError] = useState(false)
+  const weekTermRowsCacheRef = useRef<Map<string, ScheduleRow[]>>(new Map())
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
 
@@ -278,6 +283,7 @@ export function DashboardCoursesWidget() {
     setWeekTermRows(null)
     setWeekFetchLoading(false)
     setWeekFetchError(false)
+    weekTermRowsCacheRef.current.clear()
   }, [currentStudentId])
 
   const registration = account.registration
@@ -301,12 +307,6 @@ export function DashboardCoursesWidget() {
   }, [schedulePayloadStudent.term, schedulePayloadStudent.year])
 
   const resolvedWeekTerm = calendarWeekTerm ?? defaultTermFromAccount
-
-  const payloadScheduleRows = useMemo(() => {
-    if (!isAuthenticated) return account.scheduleRows
-    if (fetchedAccount) return fetchedAccount.scheduleRows
-    return []
-  }, [isAuthenticated, account.scheduleRows, fetchedAccount])
 
   const usePayloadRowsForWeek = Boolean(
     resolvedWeekTerm &&
@@ -333,6 +333,15 @@ export function DashboardCoursesWidget() {
       return
     }
 
+    const cacheKey = normalizedWeekTermCacheKey(resolvedWeekTerm)
+    const cached = weekTermRowsCacheRef.current.get(cacheKey)
+    if (cached) {
+      setWeekTermRows(cached)
+      setWeekFetchLoading(false)
+      setWeekFetchError(false)
+      return
+    }
+
     const ac = new AbortController()
     setWeekFetchLoading(true)
     setWeekFetchError(false)
@@ -347,6 +356,7 @@ export function DashboardCoursesWidget() {
           { signal: ac.signal },
         )
         if (ac.signal.aborted) return
+        weekTermRowsCacheRef.current.set(cacheKey, rows)
         setWeekTermRows(rows)
       } catch {
         if (ac.signal.aborted) return
@@ -379,7 +389,7 @@ export function DashboardCoursesWidget() {
   const effectiveWeekRows: ScheduleRow[] = weekScheduleLoading
     ? []
     : usePayloadRowsForWeek
-      ? payloadScheduleRows
+      ? account.scheduleRows
       : (weekTermRows ?? [])
 
   const weekTermDisplayLabel =
@@ -576,44 +586,46 @@ export function DashboardCoursesWidget() {
         >
           {resolvedWeekTerm == null ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              No academic term is available for your week schedule.
+              No term available.
             </p>
           ) : null}
 
           {resolvedWeekTerm != null && weekScheduleLoading ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Loading timetable…
+              Loading schedule…
             </p>
           ) : null}
 
           {resolvedWeekTerm != null && weekFetchError && !weekScheduleLoading ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Could not load this term’s timetable.
+              Could not load schedule.
             </p>
           ) : null}
 
-          {!weekScheduleLoading ? (
-            <>
-              {resolvedWeekTerm != null && effectiveWeekRows.length === 0 && !weekFetchError ? (
-                <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-                  No scheduled classes for this term.
-                </p>
-              ) : null}
-              {resolvedWeekTerm != null &&
-              effectiveWeekRows.length > 0 &&
-              !weekHasParsableMeetings &&
-              !weekFetchError ? (
-                <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-                  Some courses do not include weekly times on this grid. Use the Courses tab for full
-                  meeting details.
-                </p>
-              ) : null}
-              <div className="portal-dashboard-courses-timetable-wrap">
-                <DashboardWeekTimetableMobileList model={weekTimetableModel} />
-                <DashboardWeekTimetableGrid model={weekTimetableModel} />
-              </div>
-            </>
+          {resolvedWeekTerm != null &&
+          !weekScheduleLoading &&
+          !weekFetchError &&
+          effectiveWeekRows.length === 0 ? (
+            <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
+              No scheduled classes for this term.
+            </p>
           ) : null}
+
+          {resolvedWeekTerm != null &&
+          !weekScheduleLoading &&
+          !weekFetchError &&
+          effectiveWeekRows.length > 0 &&
+          !weekHasParsableMeetings ? (
+            <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
+              Some courses do not include weekly times on this grid. Use the Courses tab for full
+              meeting details.
+            </p>
+          ) : null}
+
+          <div className="portal-dashboard-courses-timetable-wrap">
+            <DashboardWeekTimetableMobileList model={weekTimetableModel} />
+            <DashboardWeekTimetableGrid model={weekTimetableModel} />
+          </div>
         </div>
       ) : null}
 
