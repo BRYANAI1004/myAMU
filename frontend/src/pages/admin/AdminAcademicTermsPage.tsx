@@ -27,6 +27,7 @@ type TermForm = {
   end_date: string
   registration_open: string
   registration_close: string
+  withdraw_deadline: string
   payment_due_date: string
   status: AcademicTermStatus
   is_visible: boolean
@@ -58,6 +59,7 @@ function termToForm(t: AcademicTerm): TermForm {
     end_date: t.end_date ?? '',
     registration_open: t.registration_open ?? '',
     registration_close: t.registration_close ?? '',
+    withdraw_deadline: t.withdraw_deadline ?? '',
     payment_due_date: t.payment_due_date ?? '',
     status: t.status,
     is_visible: t.is_visible,
@@ -76,6 +78,7 @@ function defaultAddForm(nextSequence: number): TermForm {
     end_date: '',
     registration_open: '',
     registration_close: '',
+    withdraw_deadline: '',
     payment_due_date: '',
     status: 'planned',
     is_visible: true,
@@ -166,6 +169,7 @@ export function AdminAcademicTermsPage() {
       end_date: emptyToNull(form.end_date),
       registration_open: emptyToNull(form.registration_open),
       registration_close: emptyToNull(form.registration_close),
+      withdraw_deadline: emptyToNull(form.withdraw_deadline),
       payment_due_date: emptyToNull(form.payment_due_date),
     }
     for (const [k, v] of Object.entries(datePayload)) {
@@ -275,6 +279,7 @@ export function AdminAcademicTermsPage() {
                 <th scope="col">Status</th>
                 <th scope="col">Registration Open</th>
                 <th scope="col">Registration Close</th>
+                <th scope="col">Withdraw DDL</th>
                 <th scope="col">Payment DDL</th>
                 <th scope="col">Lock Registration if Overdue</th>
                 <th scope="col">Visible</th>
@@ -284,7 +289,7 @@ export function AdminAcademicTermsPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="portal-card-note">
+                  <td colSpan={12} className="portal-card-note">
                     No academic terms yet. Use Add Term to create one.
                   </td>
                 </tr>
@@ -300,6 +305,7 @@ export function AdminAcademicTermsPage() {
                     <td>{t.status}</td>
                     <td>{formatTableDate(t.registration_open)}</td>
                     <td>{formatTableDate(t.registration_close)}</td>
+                    <td>{formatTableDate(t.withdraw_deadline)}</td>
                     <td>{formatTableDate(t.payment_due_date)}</td>
                     <td>{t.lock_registration_if_overdue ? 'Yes' : 'No'}</td>
                     <td>{t.is_visible ? 'Yes' : 'No'}</td>
@@ -478,6 +484,24 @@ export function AdminAcademicTermsPage() {
                     setForm((f) => ({
                       ...f,
                       registration_close: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="portal-course-feedback-modal__field">
+                <label htmlFor="admin-term-withdraw-deadline">
+                  Withdraw deadline
+                </label>
+                <input
+                  id="admin-term-withdraw-deadline"
+                  className="admin-input"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  type="date"
+                  value={form.withdraw_deadline}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      withdraw_deadline: e.target.value,
                     }))
                   }
                 />
