@@ -48,10 +48,9 @@ function termKeysEqual(a: CalendarWeekTermKey, b: CalendarWeekTermKey): boolean 
   )
 }
 
-type WeekRowsCacheKind = 'enrolled' | 'legacy'
-
-function normalizedWeekTermCacheKey(t: CalendarWeekTermKey, kind: WeekRowsCacheKind): string {
-  return `${t.term.trim().toLowerCase()}|${t.year}|${kind}`
+/** One cache entry per browse term+year regardless of enrolled-sections vs legacy account source. */
+function normalizedWeekTermCacheKey(t: CalendarWeekTermKey): string {
+  return `${t.term.trim().toLowerCase()}|${t.year}`
 }
 
 /**
@@ -381,7 +380,12 @@ export function DashboardCoursesWidget() {
   const browseLabel = browseTermDisplayLabel(account)
   const weekTermSelectOptions: DashboardWeekTermOption[] = useMemo(() => {
     if (accountHasScheduleTermOptions) {
-      return accountScheduleTerms.map((o) => ({ ...o }))
+      return accountScheduleTerms.map((o) => ({
+        term: o.term,
+        year: o.year,
+        label: o.label,
+        ...(o.academicTermId?.trim() ? { academicTermId: o.academicTermId.trim() } : {}),
+      }))
     }
     return registrationMergedScheduleTerms.map((o) => ({
       term: o.term,
@@ -461,8 +465,7 @@ export function DashboardCoursesWidget() {
     }
 
     const termId = resolvedAcademicTermId
-    const cacheKind: WeekRowsCacheKind = termId ? 'enrolled' : 'legacy'
-    const cacheKey = normalizedWeekTermCacheKey(resolvedWeekTerm, cacheKind)
+    const cacheKey = normalizedWeekTermCacheKey(resolvedWeekTerm)
     const cached = weekTermRowsCacheRef.current.get(cacheKey)
     if (cached) {
       setWeekTermRows(cached)
@@ -477,23 +480,47 @@ export function DashboardCoursesWidget() {
       setWeekFetchError(false)
       setWeekTermRows(null)
       ;(async () => {
+        const sid = currentStudentId.trim()
+        const qs = new URLSearchParams()
+        qs.set('studentId', sid)
+        qs.set('academic_term_id', termId)
+        console.debug(
+          '[dashboard My Calendar] enrolled-sections',
+          `/api/student/enrolled-sections?${qs.toString()}`,
+          { portalTerm: resolvedWeekTerm.term, portalYear: resolvedWeekTerm.year, academicTermId: termId },
+        )
+        let rows: ScheduleRow[] = []
+        let hardFailure = false
         try {
-          const sections = await fetchStudentEnrolledSections(
-            currentStudentId.trim(),
-            termId,
-            { signal: ac.signal },
-          )
+          const sections = await fetchStudentEnrolledSections(sid, termId, {
+            signal: ac.signal,
+          })
           if (ac.signal.aborted) return
-          const rows = enrolledSectionsToScheduleRows(sections)
-          weekTermRowsCacheRef.current.set(cacheKey, rows)
-          setWeekTermRows(rows)
+          rows = enrolledSectionsToScheduleRows(sections)
         } catch {
           if (ac.signal.aborted) return
-          setWeekTermRows([])
-          setWeekFetchError(true)
-        } finally {
-          if (!ac.signal.aborted) setWeekFetchLoading(false)
+          console.debug(
+            '[dashboard My Calendar] enrolled-sections failed; trying legacy account schedule',
+            { portalTerm: resolvedWeekTerm.term, portalYear: resolvedWeekTerm.year },
+          )
+          try {
+            rows = await fetchStudentRegisteredScheduleRowsForTerm(
+              sid,
+              resolvedWeekTerm.term,
+              resolvedWeekTerm.year,
+              { signal: ac.signal },
+            )
+            if (ac.signal.aborted) return
+          } catch {
+            if (ac.signal.aborted) return
+            hardFailure = true
+            rows = []
+          }
         }
+        weekTermRowsCacheRef.current.set(cacheKey, rows)
+        setWeekTermRows(rows)
+        setWeekFetchError(hardFailure)
+        if (!ac.signal.aborted) setWeekFetchLoading(false)
       })()
       return () => ac.abort()
     }
@@ -514,9 +541,14 @@ export function DashboardCoursesWidget() {
     setWeekTermRows(null)
 
     ;(async () => {
+      const sid = currentStudentId.trim()
+      const accountPath = `/api/students/${encodeURIComponent(sid)}/account?term=${encodeURIComponent(
+        resolvedWeekTerm.term,
+      )}&year=${encodeURIComponent(String(resolvedWeekTerm.year))}`
+      console.debug('[dashboard My Calendar] legacy account schedule', accountPath)
       try {
         const rows = await fetchStudentRegisteredScheduleRowsForTerm(
-          currentStudentId.trim(),
+          sid,
           resolvedWeekTerm.term,
           resolvedWeekTerm.year,
           { signal: ac.signal },

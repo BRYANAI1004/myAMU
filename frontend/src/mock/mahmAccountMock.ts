@@ -83,7 +83,13 @@ export type MahmAccountMock = {
   termChargeEffectiveDate: string
   scheduleRows: ScheduleRow[]
   /** Terms available for schedule/account browsing (API); omit or single entry when not used. */
-  availableScheduleTerms?: Array<{ term: string; year: number; label: string }>
+  availableScheduleTerms?: Array<{
+    term: string
+    year: number
+    label: string
+    /** `academic_terms.id` when provided by GET /account (avoids fragile client-only term matching). */
+    academicTermId?: string
+  }>
   recentActivity: MahmRecentActivityEntry[]
   statements: MahmStatementEntry[]
   clinicalProgress?: MahmClinicalProgress

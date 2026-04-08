@@ -220,74 +220,72 @@ export async function enrollStudentInSections(
 /**
  * One `course_sections` row per enrolled course (same term/year), chosen deterministically when
  * multiple sections exist for a course (lowest `id`). Timetable display for course-only portal enrollments.
+ *
+ * Uses `MIN(id)` per `course_code` instead of `ROW_NUMBER()` so MySQL 5.7 / older MariaDB builds
+ * do not throw on window functions.
  */
 export async function listStudentEnrolledSectionRows(
   studentExternalId: string,
   term: string,
   year: number,
 ): Promise<CourseSectionDetail[]> {
+  const sid = studentExternalId.trim();
+  const t = term.trim();
   const sql = `
     SELECT
-      cs.id,
-      cs.course_code,
-      cs.term,
-      cs.year,
-      cs.section_code,
-      cs.schedule_track,
-      cs.weekday,
-      cs.start_time,
-      cs.end_time,
-      cs.delivery_mode,
-      cs.room,
-      cs.instructor,
-      cs.notes,
-      cs.course_title,
+      cs_inner.id,
+      cs_inner.course_code,
+      cs_inner.term,
+      cs_inner.year,
+      cs_inner.section_code,
+      cs_inner.schedule_track,
+      cs_inner.weekday,
+      cs_inner.start_time,
+      cs_inner.end_time,
+      cs_inner.delivery_mode,
+      cs_inner.room,
+      cs_inner.instructor,
+      cs_inner.notes,
+      COALESCE(
+        NULLIF(TRIM(cat.eng_name), ''),
+        NULLIF(TRIM(pc.title), '')
+      ) AS course_title,
       0 AS enrolled_count,
       CAST(NULL AS JSON) AS enrolled_students_json
-    FROM (
-      SELECT
-        cs_inner.id,
-        cs_inner.course_code,
-        cs_inner.term,
-        cs_inner.year,
-        cs_inner.section_code,
-        cs_inner.schedule_track,
-        cs_inner.weekday,
-        cs_inner.start_time,
-        cs_inner.end_time,
-        cs_inner.delivery_mode,
-        cs_inner.room,
-        cs_inner.instructor,
-        cs_inner.notes,
-        COALESCE(
-          NULLIF(TRIM(cat.eng_name), ''),
-          NULLIF(TRIM(pc.title), '')
-        ) AS course_title,
-        ROW_NUMBER() OVER (PARTITION BY cs_inner.course_code ORDER BY cs_inner.id) AS rn
-      FROM course_sections cs_inner
-      INNER JOIN portal_courses pc
-        ON pc.course_code COLLATE utf8mb4_unicode_ci =
-           cs_inner.course_code COLLATE utf8mb4_unicode_ci
-      LEFT JOIN courses cat
-        ON TRIM(cat.code) COLLATE utf8mb4_unicode_ci =
-           TRIM(cs_inner.course_code) COLLATE utf8mb4_unicode_ci
-      INNER JOIN portal_enrollments e
-        ON e.course_id = pc.course_id
-        AND e.student_external_id COLLATE utf8mb4_unicode_ci =
+    FROM course_sections cs_inner
+    INNER JOIN portal_courses pc
+      ON pc.course_code COLLATE utf8mb4_unicode_ci =
+         cs_inner.course_code COLLATE utf8mb4_unicode_ci
+    LEFT JOIN courses cat
+      ON TRIM(cat.code) COLLATE utf8mb4_unicode_ci =
+         TRIM(cs_inner.course_code) COLLATE utf8mb4_unicode_ci
+    INNER JOIN portal_enrollments e
+      ON e.course_id = pc.course_id
+      AND e.student_external_id COLLATE utf8mb4_unicode_ci =
+          CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+      AND e.term COLLATE utf8mb4_unicode_ci =
+          cs_inner.term COLLATE utf8mb4_unicode_ci
+      AND e.year = cs_inner.year
+    INNER JOIN (
+      SELECT cs2.course_code, MIN(cs2.id) AS pick_id
+      FROM course_sections cs2
+      INNER JOIN portal_courses pc2
+        ON pc2.course_code COLLATE utf8mb4_unicode_ci =
+           cs2.course_code COLLATE utf8mb4_unicode_ci
+      INNER JOIN portal_enrollments e2
+        ON e2.course_id = pc2.course_id
+        AND e2.student_external_id COLLATE utf8mb4_unicode_ci =
             CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
-        AND e.term COLLATE utf8mb4_unicode_ci =
-            cs_inner.term COLLATE utf8mb4_unicode_ci
-        AND e.year = cs_inner.year
-      WHERE cs_inner.term = ? AND cs_inner.year = ?
-    ) cs
-    WHERE cs.rn = 1
-    ORDER BY cs.course_code ASC, cs.weekday ASC, cs.start_time ASC
+        AND e2.term COLLATE utf8mb4_unicode_ci =
+            cs2.term COLLATE utf8mb4_unicode_ci
+        AND e2.year = cs2.year
+      WHERE cs2.term = ? AND cs2.year = ?
+      GROUP BY cs2.course_code
+    ) chosen ON cs_inner.id = chosen.pick_id
+    WHERE cs_inner.term = ? AND cs_inner.year = ?
+    ORDER BY cs_inner.course_code ASC, cs_inner.weekday ASC, cs_inner.start_time ASC
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [
-    studentExternalId.trim(),
-    term.trim(),
-    year,
-  ]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [sid, sid, t, year, t, year]);
   return rows.map((r) => mapCourseSectionRow(r));
 }
 

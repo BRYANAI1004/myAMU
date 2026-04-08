@@ -47,6 +47,8 @@ export type AccountScheduleTermOption = {
   term: string;
   year: number;
   label: string;
+  /** When this calendar term maps to a row in `academic_terms` (portal registration / enrolled-sections). */
+  academicTermId?: string;
 };
 
 export type AccountRegistrationStatus =

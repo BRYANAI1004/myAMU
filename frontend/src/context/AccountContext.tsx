@@ -165,7 +165,12 @@ function parseAvailableScheduleTermsFromApi(
     const cap = titleCaseTerm(term)
     const label =
       labelRaw || (cap && year ? `${cap} ${year}` : cap || (year ? String(year) : ''))
-    mapped.push({ term, year, label })
+    const academicTermIdRaw = r.academicTermId ?? r.academic_term_id
+    const academicTermId =
+      typeof academicTermIdRaw === 'string' && academicTermIdRaw.trim() !== ''
+        ? academicTermIdRaw.trim()
+        : undefined
+    mapped.push({ term, year, label, ...(academicTermId ? { academicTermId } : {}) })
   }
   if (mapped.length > 0) return mapped
   const st = student.term?.trim()

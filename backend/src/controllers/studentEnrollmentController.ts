@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { removeAdminPortalEnrollment } from "../services/adminEnrollmentService.js";
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
+import type { CourseSectionDetail } from "../repositories/courseSectionRepository.js";
 import { listStudentEnrolledSectionRows } from "../repositories/studentEnrollmentRepository.js";
 import { InvalidAcademicTermError } from "../services/courseSectionService.js";
 import {
@@ -146,16 +147,50 @@ export async function getStudentEnrolledSections(
     }
     const row = await getAcademicTermById(academicTermId);
     if (!row) {
-      res.status(400).json({
+      console.warn(
+        "[student/enrolled-sections] unknown_academic_term",
+        JSON.stringify({ studentId, academic_term_id: academicTermId }),
+      );
+      res.status(404).json({
         error:
           "The selected academic term is not valid or no longer exists. Choose another term.",
+        code: "UNKNOWN_ACADEMIC_TERM",
+        academic_term_id: academicTermId,
       });
       return;
     }
-    const sections = await listStudentEnrolledSectionRows(
-      studentId,
-      row.term_name,
-      row.year,
+
+    let sections: CourseSectionDetail[];
+    try {
+      sections = await listStudentEnrolledSectionRows(
+        studentId,
+        row.term_name,
+        row.year,
+      );
+    } catch (queryErr) {
+      console.warn(
+        "[student/enrolled-sections] query_soft_fail",
+        JSON.stringify({
+          studentId,
+          academic_term_id: academicTermId,
+          resolvedTerm: row.term_name,
+          resolvedYear: row.year,
+          message:
+            queryErr instanceof Error ? queryErr.message : String(queryErr),
+        }),
+      );
+      sections = [];
+    }
+
+    console.warn(
+      "[student/enrolled-sections] ok",
+      JSON.stringify({
+        studentId,
+        academic_term_id: academicTermId,
+        resolvedTerm: row.term_name,
+        resolvedYear: row.year,
+        sectionCount: sections.length,
+      }),
     );
     res.json(sections);
   } catch (e) {

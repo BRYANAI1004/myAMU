@@ -6,6 +6,8 @@
 
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
+import type { Pool } from "mysql2/promise";
+import type { RowDataPacket } from "mysql2";
 import { listMarksForStudent } from "../repositories/studentAcademicsRepository.js";
 import {
   findLatestLegacyTermYear,
@@ -32,7 +34,10 @@ import {
   pickNewerRegistrationAnchor,
   resolveRegistrationAnchoredAcademicTermConsideringPortal,
   termSortOrder,
+  termsMatch,
 } from "./studentAcademicCourseRecords.js";
+import { listAcademicTerms } from "../repositories/academicTermRepository.js";
+import type { AcademicTermDetail } from "../types/academicTerm.js";
 import { buildClinicalProgress } from "./clinicalProgressService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
 import { buildAccountCurrentTerm } from "./studentAccountDashboard.js";
@@ -69,6 +74,120 @@ function mergeScheduleTermOptionLists(
     if (b.year !== a.year) return b.year - a.year;
     return termSortOrder(b.term) - termSortOrder(a.term);
   });
+}
+
+/** Map portal/legacy calendar term + year → `academic_terms.id` when names or labels align. */
+function academicTermIdForCalendarTerm(
+  catalog: AcademicTermDetail[],
+  calendarTerm: string,
+  calendarYear: number,
+): string | undefined {
+  const y = Number(calendarYear);
+  if (!Number.isFinite(y)) return undefined;
+  const raw = calendarTerm.trim();
+  if (raw === "") return undefined;
+  const want = raw.toLowerCase();
+  const compact = want.replace(/[\s_-]+/g, "");
+  const aliasToCanon: Record<string, string> = {
+    spr1: "spring",
+    spring1: "spring",
+    sum1: "summer",
+    summer1: "summer",
+    fal: "fall",
+    fall1: "fall",
+    win: "winter",
+    winter1: "winter",
+  };
+  const canonFromAlias = aliasToCanon[compact];
+
+  for (const a of catalog) {
+    if (a.year !== y) continue;
+    if (a.term_name.toLowerCase() === want) return a.id;
+  }
+  if (canonFromAlias) {
+    for (const a of catalog) {
+      if (a.year === y && a.term_name.toLowerCase() === canonFromAlias) {
+        return a.id;
+      }
+    }
+  }
+  for (const a of catalog) {
+    if (a.year !== y) continue;
+    const lbl = a.term_label.trim().toLowerCase();
+    if (lbl === want || lbl.startsWith(`${want} `) || lbl.includes(` ${want}`)) {
+      return a.id;
+    }
+  }
+  return undefined;
+}
+
+async function enrichScheduleTermsWithAcademicIds(
+  terms: AccountScheduleTermOption[],
+): Promise<AccountScheduleTermOption[]> {
+  if (terms.length === 0) return terms;
+  try {
+    const catalog = await listAcademicTerms();
+    return terms.map((t) => {
+      if (t.academicTermId != null && t.academicTermId.trim() !== "") {
+        return t;
+      }
+      const id = academicTermIdForCalendarTerm(catalog, t.term, t.year);
+      return id != null ? { ...t, academicTermId: id } : t;
+    });
+  } catch (e) {
+    console.warn(
+      "[account] enrichScheduleTermsWithAcademicIds skipped:",
+      e instanceof Error ? e.message : e,
+    );
+    return terms;
+  }
+}
+
+/**
+ * Legacy `registration` may be absent for a browse term even when the student has portal
+ * enrollments or `marks` rows — avoid 404 on GET /account?term=&year= for those cases.
+ */
+async function resolveBrowseAccountSnapshot(
+  snap: Awaited<ReturnType<typeof loadLegacyAccountSnapshot>>,
+  dbPool: Pool,
+  studentId: string,
+  term: string,
+  year: number,
+  termYearMode: AccountTermYearInput["mode"],
+  portalEnrollmentRows: Awaited<
+    ReturnType<typeof listPortalEnrollmentRowsForStudentAcademics>
+  >,
+  allMarksRows: Awaited<ReturnType<typeof listMarksForStudent>>,
+): Promise<Awaited<ReturnType<typeof loadLegacyAccountSnapshot>>> {
+  if (snap != null) return snap;
+  if (termYearMode !== "explicit") return null;
+
+  const hasPortal = portalEnrollmentRows.some(
+    (p) => p.year === year && termsMatch(p.term, term),
+  );
+  const hasMarks = allMarksRows.some(
+    (m) => m.year === year && termsMatch(m.term, term),
+  );
+  if (!hasPortal && !hasMarks) return null;
+
+  const [[studentRow]] = await dbPool.query<RowDataPacket[]>(
+    `SELECT TRIM(name) AS name FROM students WHERE id = ? LIMIT 1`,
+    [studentId],
+  );
+  if (studentRow == null) return null;
+
+  const rawName =
+    studentRow.name != null && String(studentRow.name).trim() !== ""
+      ? String(studentRow.name).trim()
+      : "";
+  const displayName = rawName !== "" ? rawName : studentId;
+  return {
+    studentId,
+    displayName,
+    term: term.trim(),
+    year,
+    totalFees: 0,
+  };
 }
 
 function augmentPayloadScheduleMeta(
@@ -194,6 +313,7 @@ async function getRealStudentAccountPayload(
     latestPortalTermYear,
     portalScheduleTermList,
     latestLegacyTermYear,
+    allMarksRows,
   ] = await Promise.all([
     loadLegacyAccountSnapshot(pool, studentId, term, year),
     listLegacyRegistrationTermsForStudent(pool, studentId),
@@ -203,17 +323,28 @@ async function getRealStudentAccountPayload(
       () => [] as { term: string; year: number }[],
     ),
     findLatestLegacyTermYear(pool, studentId),
+    listMarksForStudent(pool, studentId),
   ]);
-  if (!snap) {
+
+  const effectiveSnap = await resolveBrowseAccountSnapshot(
+    snap,
+    pool,
+    studentId,
+    term,
+    year,
+    termYear.mode,
+    portalEnrollmentRows,
+    allMarksRows,
+  );
+  if (!effectiveSnap) {
     return null;
   }
-  const [accountingRows, allMarksRows, courseLookup, clinicalProgress] =
-    await Promise.all([
-      loadLegacyAccountingRows(pool, studentId, term, year),
-      listMarksForStudent(pool, studentId),
-      loadCoursesTranscriptLookup(pool),
-      buildClinicalProgress(pool, studentId),
-    ]);
+
+  const [accountingRows, courseLookup, clinicalProgress] = await Promise.all([
+    loadLegacyAccountingRows(pool, studentId, effectiveSnap.term, effectiveSnap.year),
+    loadCoursesTranscriptLookup(pool),
+    buildClinicalProgress(pool, studentId),
+  ]);
 
   const latestRegistration = pickNewerRegistrationAnchor(
     latestLegacyTermYear,
@@ -238,12 +369,14 @@ async function getRealStudentAccountPayload(
   }
   availableScheduleTerms = mergeScheduleTermOptionLists(
     availableScheduleTerms,
-    snap.term,
-    snap.year,
+    effectiveSnap.term,
+    effectiveSnap.year,
   );
+  availableScheduleTerms =
+    await enrichScheduleTermsWithAcademicIds(availableScheduleTerms);
 
   return assembleLegacyStudentAccountPayload(
-    snap,
+    effectiveSnap,
     accountingRows,
     allMarksRows,
     courseLookup,
