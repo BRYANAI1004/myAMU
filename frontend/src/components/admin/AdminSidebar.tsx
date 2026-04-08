@@ -1,5 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom'
 
+function navClassName(isActive: boolean) {
+  return ['portal-nav-link', 'sidebar-item', isActive ? 'portal-nav-link--active' : '']
+    .filter(Boolean)
+    .join(' ')
+}
+
 type AdminNavItem = {
   path: string
   label: string
@@ -36,11 +42,8 @@ export function AdminSidebar() {
 
   return (
     <aside className="admin-sidebar" aria-label="Administration">
-      <div className="admin-sidebar__brand">
-        <span className="admin-sidebar__brand-title">ADMIN</span>
-      </div>
-      <nav className="admin-sidebar__nav" aria-label="Primary">
-        <ul className="admin-sidebar__list">
+      <nav className="portal-sidebar-nav" aria-label="Primary">
+        <ul className="portal-sidebar-nav-list portal-sidebar-nav-list--text-only">
           {links.map(({ path, label, end, schedulingContext }) => (
             <li key={path}>
               <NavLink
@@ -50,9 +53,7 @@ export function AdminSidebar() {
                     : path
                 }
                 end={end ?? false}
-                className={({ isActive }) =>
-                  `admin-sidebar__link${isActive ? ' admin-sidebar__link--active' : ''}`
-                }
+                className={({ isActive }) => navClassName(isActive)}
               >
                 {label}
               </NavLink>
