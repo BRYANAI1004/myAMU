@@ -290,7 +290,7 @@ export function AdminStudentDetailPage() {
 
   useEffect(() => {
     if (activeTab !== 'documents' || !studentId.trim() || !detail) return
-    if (docTerms !== null || docTermsLoading) return
+    if (docTerms !== null) return
     const ac = new AbortController()
     setDocTermsLoading(true)
     setDocTermsError(null)
@@ -315,7 +315,7 @@ export function AdminStudentDetailPage() {
       }
     })()
     return () => ac.abort()
-  }, [activeTab, studentId, detail, docTerms, docTermsLoading])
+  }, [activeTab, studentId, detail, docTerms])
 
   const loadDocumentsForTerm = useCallback(
     async (termId: string, signal?: AbortSignal) => {
