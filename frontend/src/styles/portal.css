@@ -9,6 +9,14 @@
   --border-gray: #e5e5e5;
   --text-dark: #333333;
   --amu-red-ring: rgba(140, 29, 44, 0.18);
+  /* Red module sidebar (student internal + admin): shared gutters; header inset matches nav label start */
+  --portal-red-sidebar-pad-top: 0.4rem;
+  --portal-red-sidebar-pad-bottom: 0.65rem;
+  --portal-red-nav-gutter-y: 0.1rem;
+  --portal-red-nav-gutter-x: 0.4rem;
+  --portal-red-nav-link-pad-y: 0.34rem;
+  --portal-red-nav-link-pad-x: 0.45rem;
+  --portal-red-nav-text-inset: calc(var(--portal-red-nav-gutter-x) + var(--portal-red-nav-link-pad-x));
 }
 
 /* —— Design tokens —— */
@@ -132,6 +140,15 @@
   min-width: 0;
   min-height: var(--portal-branding-bar-height);
   padding: 0.5rem clamp(1.5rem, 3vw, 2rem);
+}
+
+/* Grid-align gold bar with red sidebar nav labels (internal modules + admin). */
+.portal-shell--internal-module .portal-branding-bar-inner,
+.admin-portal .portal-branding-bar-inner {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: max(env(safe-area-inset-left), var(--portal-red-nav-text-inset));
+  padding-right: max(env(safe-area-inset-right), clamp(1.5rem, 3vw, 2rem));
 }
 
 .portal-branding-bar-start {
@@ -536,50 +553,70 @@
   }
 }
 
-/* Internal module sidebar: AMU red, text-only nav (desktop + drawer). */
-.portal-shell--internal-module .portal-sidebar {
-  background: #A6192E;
+/* Internal module + admin: AMU red, text-only nav (shared typography with student Registration / Finances / …). */
+.portal-shell--internal-module .portal-sidebar,
+.admin-portal .admin-sidebar {
+  background: #a6192e;
   border-right: 1px solid rgba(0, 0, 0, 0.12);
-  padding: 0.4rem 0 0.65rem;
+  padding: var(--portal-red-sidebar-pad-top) 0 var(--portal-red-sidebar-pad-bottom);
 }
 
-.portal-shell--internal-module .portal-sidebar-nav {
-  padding: 0.1rem 0.4rem 0;
+.portal-shell--internal-module .portal-sidebar-nav,
+.admin-portal .admin-sidebar .portal-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--portal-red-nav-gutter-y) var(--portal-red-nav-gutter-x) 0;
 }
 
-.portal-shell--internal-module .portal-sidebar-nav-list {
+.portal-shell--internal-module .portal-sidebar-nav-list,
+.admin-portal .admin-sidebar .portal-sidebar-nav-list {
   gap: 0.0625rem;
 }
 
-.portal-shell--internal-module .portal-sidebar .portal-nav-link {
+.portal-shell--internal-module .portal-sidebar .portal-nav-link,
+.admin-portal .admin-sidebar .portal-nav-link {
+  display: flex;
+  align-items: center;
   font-size: 14px;
   font-weight: 400;
   line-height: 1.35;
+  letter-spacing: 0.2px;
   color: #ffffff;
   min-height: 0;
-  padding: 0.34rem 0.45rem;
+  padding: var(--portal-red-nav-link-pad-y) var(--portal-red-nav-link-pad-x);
+  border-radius: var(--portal-radius);
+  border: none;
+  box-sizing: border-box;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
-.portal-shell--internal-module .portal-sidebar .sidebar-item {
+.portal-shell--internal-module .portal-sidebar .sidebar-item,
+.admin-portal .admin-sidebar .sidebar-item {
   color: #ffffff;
 }
 
-.portal-shell--internal-module .portal-sidebar .sidebar-item:hover {
+.portal-shell--internal-module .portal-sidebar .sidebar-item:hover,
+.admin-portal .admin-sidebar .sidebar-item:hover {
   color: #ffffff;
 }
 
-.portal-shell--internal-module .portal-sidebar .portal-nav-link:hover {
+.portal-shell--internal-module .portal-sidebar .portal-nav-link:hover,
+.admin-portal .admin-sidebar .portal-nav-link:hover {
   background: rgba(255, 255, 255, 0.06);
   color: #ffffff;
 }
 
-.portal-shell--internal-module .portal-sidebar .portal-nav-link:focus-visible {
+.portal-shell--internal-module .portal-sidebar .portal-nav-link:focus-visible,
+.admin-portal .admin-sidebar .portal-nav-link:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.9);
   outline-offset: 2px;
 }
 
 .portal-shell--internal-module .portal-sidebar .portal-nav-link--active,
-.portal-shell--internal-module .portal-sidebar .sidebar-item.portal-nav-link--active {
+.portal-shell--internal-module .portal-sidebar .sidebar-item.portal-nav-link--active,
+.admin-portal .admin-sidebar .portal-nav-link--active,
+.admin-portal .admin-sidebar .sidebar-item.portal-nav-link--active {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   font-weight: 500;
@@ -780,6 +817,12 @@
     padding-left: 1rem;
     padding-right: 1rem;
     align-items: center;
+  }
+
+  .portal-shell--internal-module .portal-branding-bar-inner,
+  .admin-portal .portal-branding-bar-inner {
+    padding-left: max(env(safe-area-inset-left), var(--portal-red-nav-text-inset), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
   }
 
   .portal-branding-bar-start {
@@ -6140,18 +6183,13 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   border-bottom: 1px solid var(--border-gray);
 }
 
-.admin-portal .portal-branding-bar-start {
-  gap: 0.75rem;
-}
-
 .admin-portal__branding-title {
   font-family: 'Cinzel', 'Times New Roman', Times, serif;
   font-size: clamp(0.9375rem, 1.35vw, 1.0625rem);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
   line-height: 1.2;
   color: #1a1a1a;
-  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -6167,68 +6205,9 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   width: var(--admin-sidebar-width);
   height: calc(100vh - var(--admin-header-height));
   height: calc(100dvh - var(--admin-header-height));
-  padding: 0 0 1rem;
-  padding-top: clamp(1.5rem, 4vh, 2rem);
-  background: #a6192e;
   color: #ffffff;
-  border-right: 1px solid rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
-}
-
-/* Red module nav — parity with `.portal-shell--internal-module .portal-sidebar` */
-.admin-portal .admin-sidebar .portal-sidebar-nav {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 0.4rem 0;
-  margin: 0;
-}
-
-.admin-portal .admin-sidebar .portal-sidebar-nav-list {
-  gap: 0.0625rem;
-}
-
-.admin-portal .admin-sidebar .portal-nav-link {
-  display: flex;
-  align-items: center;
-  min-height: 0;
-  padding: 0.4rem 0.45rem;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: 0.2px;
-  color: #ffffff;
-  text-decoration: none;
-  border-radius: 8px;
-  border: none;
-  box-sizing: border-box;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.admin-portal .admin-sidebar .sidebar-item {
-  color: #ffffff;
-}
-
-.admin-portal .admin-sidebar .sidebar-item:hover {
-  color: #ffffff;
-}
-
-.admin-portal .admin-sidebar .portal-nav-link:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
-}
-
-.admin-portal .admin-sidebar .portal-nav-link:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.9);
-  outline-offset: 2px;
-}
-
-.admin-portal .admin-sidebar .portal-nav-link--active,
-.admin-portal .admin-sidebar .sidebar-item.portal-nav-link--active {
-  background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  font-weight: 500;
-  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.35);
 }
 
 .admin-portal__main {
@@ -7309,7 +7288,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     padding-top: 0;
   }
 
-  .admin-sidebar {
+  .admin-portal .admin-sidebar {
     position: relative;
     top: auto;
     left: auto;
@@ -7320,7 +7299,6 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     border-right: none;
     border-bottom: 1px solid rgba(0, 0, 0, 0.12);
     padding: 1rem 0.625rem 0.75rem;
-    padding-top: 1rem;
   }
 
   .admin-portal .admin-sidebar .portal-sidebar-nav-list {
@@ -7339,12 +7317,13 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     justify-content: center;
     text-align: center;
     font-size: 0.8125rem;
+    font-weight: 400;
     padding: 0.5rem 0.65rem;
   }
 
-  .admin-portal .portal-branding-bar-inner {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  .admin-portal .admin-sidebar .portal-nav-link--active,
+  .admin-portal .admin-sidebar .sidebar-item.portal-nav-link--active {
+    font-weight: 500;
   }
 
   .admin-portal .portal-branding-bar-start {

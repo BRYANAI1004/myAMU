@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { PORTAL_BRANDING_TITLE } from '../../branding'
+import { ADMIN_PORTAL_HEADER_TITLE, PORTAL_BRANDING_TITLE } from '../../branding'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { IconLogout } from '../icons/PortalModuleIcons'
 
@@ -20,7 +20,7 @@ export function AdminHeader() {
             <Link
               to="/admin"
               className="portal-branding-bar-logo-link"
-              aria-label={`${PORTAL_BRANDING_TITLE} — admin home`}
+              aria-label={`${PORTAL_BRANDING_TITLE} — ${ADMIN_PORTAL_HEADER_TITLE}, home`}
             >
               <img
                 src="/AMULogo.png"
@@ -29,7 +29,7 @@ export function AdminHeader() {
                 decoding="async"
               />
             </Link>
-            <span className="admin-portal__branding-title">{PORTAL_BRANDING_TITLE}</span>
+            <span className="admin-portal__branding-title">{ADMIN_PORTAL_HEADER_TITLE}</span>
           </div>
           <div className="portal-branding-bar-end">
             <div className="portal-branding-bar-actions">
