@@ -1,4 +1,5 @@
 import { env } from "../config/env.js";
+import { removeAdminPortalEnrollment } from "../services/adminEnrollmentService.js";
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import { listStudentEnrolledSectionRows } from "../repositories/studentEnrollmentRepository.js";
 import { InvalidAcademicTermError } from "../services/courseSectionService.js";
@@ -55,6 +56,18 @@ function parseQueryString(req, key) {
         return null;
     const t = v.trim();
     return t === "" ? null : t;
+}
+function parseStudentWithdrawBody(body) {
+    if (body == null || typeof body !== "object")
+        return null;
+    const o = body;
+    const studentId = typeof o.studentId === "string" ? o.studentId.trim() : "";
+    const academic_term_id = typeof o.academic_term_id === "string" ? o.academic_term_id.trim() : "";
+    const course_code = typeof o.course_code === "string" ? o.course_code.trim() : "";
+    if (studentId === "" || academic_term_id === "" || course_code === "") {
+        return null;
+    }
+    return { studentId, academic_term_id, course_code };
 }
 export async function postStudentEnroll(req, res) {
     try {
@@ -120,6 +133,37 @@ export async function getStudentEnrolledSections(req, res) {
         console.error("[student/enrolled-sections] failed:", e);
         const body = {
             error: "Failed to load enrolled sections.",
+        };
+        if (env.nodeEnv === "development")
+            body.message = devMessage(e);
+        res.status(500).json(body);
+    }
+}
+/**
+ * POST /api/student/withdraw
+ * Body: { studentId, academic_term_id, course_code }
+ * Soft-withdraws the portal enrollment (same contract as admin enrollment delete).
+ */
+export async function postStudentWithdraw(req, res) {
+    try {
+        const parsed = parseStudentWithdrawBody(req.body);
+        if (parsed == null) {
+            res.status(400).json({
+                error: "Request body must include studentId, academic_term_id, and course_code.",
+            });
+            return;
+        }
+        const result = await removeAdminPortalEnrollment(parsed);
+        if (!result.ok) {
+            res.status(400).json({ error: result.error });
+            return;
+        }
+        res.json({ success: true, removedCount: result.removedCount });
+    }
+    catch (e) {
+        console.error("[student/withdraw] failed:", e);
+        const body = {
+            error: "Withdrawal could not be completed. Please try again.",
         };
         if (env.nodeEnv === "development")
             body.message = devMessage(e);

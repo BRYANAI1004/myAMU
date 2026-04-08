@@ -2399,6 +2399,8 @@ export type AcademicTerm = {
   end_date: string | null
   registration_open: string | null
   registration_close: string | null
+  /** YYYY-MM-DD when set; controls student withdraw eligibility on Add/Drop. */
+  withdraw_deadline: string | null
   payment_due_date: string | null
   lock_registration_if_overdue: boolean
   status: AcademicTermStatus
@@ -2493,6 +2495,9 @@ function parseAcademicTermRow(row: Record<string, unknown>): AcademicTerm | null
     end_date: parseNullableIsoDate(row.end_date),
     registration_open: parseNullableIsoDate(row.registration_open),
     registration_close: parseNullableIsoDate(row.registration_close),
+    withdraw_deadline: parseNullableIsoDate(
+      row.withdraw_deadline !== undefined ? row.withdraw_deadline : null,
+    ),
     payment_due_date: parseNullableIsoDate(
       row.payment_due_date !== undefined ? row.payment_due_date : null,
     ),
@@ -2585,6 +2590,7 @@ export type CreateAcademicTermBody = {
   end_date?: string | null
   registration_open?: string | null
   registration_close?: string | null
+  withdraw_deadline?: string | null
   payment_due_date?: string | null
   lock_registration_if_overdue?: boolean
   status: AcademicTermStatus
@@ -2993,6 +2999,46 @@ export async function fetchStudentEnrolledSections(
     { signal: options?.signal },
   )) as unknown
   return parseAdminCourseSectionList(data)
+}
+
+/** POST /api/student/withdraw — soft-withdraws one didactic portal enrollment for the term. */
+export async function postStudentWithdraw(
+  body: {
+    studentId: string
+    academic_term_id: string
+    course_code: string
+  },
+  options?: { signal?: AbortSignal },
+): Promise<{ success: boolean; removedCount: number }> {
+  try {
+    const data = (await fetchApiJson('/api/student/withdraw', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentId: body.studentId.trim(),
+        academic_term_id: body.academic_term_id.trim(),
+        course_code: body.course_code.trim(),
+      }),
+      signal: options?.signal,
+    })) as unknown
+    if (
+      data != null &&
+      typeof data === 'object' &&
+      typeof (data as { success?: unknown }).success === 'boolean' &&
+      typeof (data as { removedCount?: unknown }).removedCount === 'number'
+    ) {
+      return data as { success: boolean; removedCount: number }
+    }
+    throw new Error('Unexpected withdraw response')
+  } catch (e) {
+    if (e instanceof Error) {
+      const cleaned = e.message.replace(/\s*\(HTTP \d+\)\s*$/, '').trim()
+      if (cleaned !== e.message) {
+        throw new Error(cleaned)
+      }
+    }
+    throw e
+  }
 }
 
 export async function fetchAdminCourseSections(params: {

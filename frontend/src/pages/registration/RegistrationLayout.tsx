@@ -31,6 +31,7 @@ function academicTermStubForDeepLink(termId: string): AcademicTerm {
     end_date: null,
     registration_open: null,
     registration_close: null,
+    withdraw_deadline: null,
     payment_due_date: null,
     lock_registration_if_overdue: false,
     status: 'planned',

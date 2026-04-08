@@ -270,6 +270,7 @@ export async function listStudentEnrolledSectionRows(
         AND e.term COLLATE utf8mb4_unicode_ci =
             cs_inner.term COLLATE utf8mb4_unicode_ci
         AND e.year = cs_inner.year
+        AND (e.status IS NULL OR e.status = 'active')
       WHERE cs_inner.term = ? AND cs_inner.year = ?
     ) cs
     WHERE cs.rn = 1
