@@ -52,8 +52,10 @@ export function termsMatch(a: string, b: string): boolean {
 export function formatMysqlTime(v: unknown): string | null {
   if (v == null) return null;
   if (v instanceof Date) {
-    const s = v.toISOString().slice(11, 19);
-    return s.length > 0 ? s : null;
+    if (!Number.isFinite(v.getTime())) return null;
+    // mysql2 maps MySQL TIME to a Date; wall clock is in local components, not UTC ISO time.
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(v.getHours())}:${pad(v.getMinutes())}:${pad(v.getSeconds())}`;
   }
   const s = String(v).trim();
   return s.length > 0 ? s : null;

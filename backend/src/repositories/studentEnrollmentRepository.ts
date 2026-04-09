@@ -540,13 +540,17 @@ export async function listPortalEnrollmentRowsForStudentAcademics(
           TRIM(e.term) COLLATE utf8mb4_unicode_ci
       AND cs_pick.year = e.year
       AND cs_pick.id = (
-        SELECT MIN(cs2.id)
+        SELECT cs2.id
         FROM course_sections cs2
         WHERE TRIM(cs2.course_code) COLLATE utf8mb4_unicode_ci =
               TRIM(pc.course_code) COLLATE utf8mb4_unicode_ci
           AND TRIM(cs2.term) COLLATE utf8mb4_unicode_ci =
               TRIM(e.term) COLLATE utf8mb4_unicode_ci
           AND cs2.year = e.year
+        ORDER BY
+          (cs2.weekday IS NULL OR TRIM(cs2.weekday) = '' OR cs2.start_time IS NULL OR cs2.end_time IS NULL) ASC,
+          cs2.id ASC
+        LIMIT 1
       )
     WHERE e.student_external_id COLLATE utf8mb4_unicode_ci =
           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci

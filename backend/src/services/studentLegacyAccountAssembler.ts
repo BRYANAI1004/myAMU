@@ -14,7 +14,6 @@ import type {
 } from "../types/studentAccount.js";
 import {
   buildAcademicCourseRecordsFromMarksWithLookup,
-  legacyCompletedBlocksPortalRow,
   portalEnrollmentRowToAcademicCourseRecord,
   resolveCourseDisplayTitle,
   resolveRegistrationAnchoredAcademicTermConsideringPortal,
@@ -161,20 +160,22 @@ export function assembleLegacyStudentAccountPayload(
     (r) => r.year === browseTerm.year && termsMatch(r.term, browseTerm.term),
   );
 
-  const portalRowsForBrowseTerm = portalRows.filter(
-    (p) =>
-      p.year === browseTerm.year &&
-      termsMatch(p.term, browseTerm.term) &&
-      !legacyCompletedBlocksPortalRow(
-        courseRecords,
-        p.course_code,
-        p.term,
-        p.year,
-      ),
+  /**
+   * Schedule merge uses **all** non-withdrawn portal rows for the browse term. Do not apply
+   * `legacyCompletedBlocksPortalRow` here: marks may already carry final grades while still lacking
+   * `days` / `time_from` / `time_to`; excluding portal rows then yields empty or unparsable schedules.
+   * (Enrollment/transcript merge in `/academics` keeps the stricter portal filter.)
+   */
+  const portalRowsInBrowseTerm = portalRows.filter(
+    (p) => p.year === browseTerm.year && termsMatch(p.term, browseTerm.term),
   );
-  const activePortalEnrollmentCountForBrowseTerm = portalRowsForBrowseTerm.filter(
+  const activePortalEnrollmentCountForBrowseTerm = portalRowsInBrowseTerm.filter(
     (p) => p.status !== "withdrawn",
   ).length;
+
+  const portalRowsForScheduleMerge = portalRowsInBrowseTerm.filter(
+    (p) => p.status !== "withdrawn",
+  );
 
   /**
    * Portal rows from `listPortalEnrollmentRowsForStudentAcademics` include `weekday`,
@@ -182,7 +183,7 @@ export function assembleLegacyStudentAccountPayload(
    * catalog `course_code` + enrollment `term` + `year`, so `scheduleRowsFromAcademicCourseRecords`
    * can render timetables for terms without marks.
    */
-  const portalBrowseRecords = portalRowsForBrowseTerm.map((p) =>
+  const portalBrowseRecords = portalRowsForScheduleMerge.map((p) =>
     portalEnrollmentRowToAcademicCourseRecord(
       snap.studentId,
       p,
