@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParams'
+import { AdminCourseFeedbackModal } from '../../components/admin/AdminCourseFeedbackModal'
 import {
   deleteAdminPortalEnrollment,
   fetchAcademicTerms,
@@ -77,6 +78,9 @@ export function AdminCourseSectionRosterPage() {
   const [busyGradeId, setBusyGradeId] = useState<string | null>(null)
   const [gradeDraft, setGradeDraft] = useState<Record<string, string>>({})
   const [reloadNonce, setReloadNonce] = useState(0)
+  const [feedbackStudentId, setFeedbackStudentId] = useState<string | null>(
+    null,
+  )
 
   const termLabel = useMemo(() => {
     if (termId === '') return null
@@ -85,6 +89,11 @@ export function AdminCourseSectionRosterPage() {
   }, [terms, termId])
 
   const missingContext = termId === '' || courseCode === ''
+
+  const rosterTermYear = useMemo(() => {
+    if (termId === '') return null
+    return terms?.find((x) => x.id === termId)?.year ?? null
+  }, [terms, termId])
 
   useEffect(() => {
     if (termId === '') {
@@ -206,6 +215,15 @@ export function AdminCourseSectionRosterPage() {
 
   return (
     <main className="admin-page admin-course-section-roster">
+      {feedbackStudentId != null && !missingContext ? (
+        <AdminCourseFeedbackModal
+          studentId={feedbackStudentId}
+          courseCode={courseCode}
+          termId={termId}
+          termYear={rosterTermYear}
+          onClose={() => setFeedbackStudentId(null)}
+        />
+      ) : null}
       <div className="admin-course-section-roster__top">
         <Link
           to={backTo}
@@ -411,19 +429,26 @@ export function AdminCourseSectionRosterPage() {
                           )}
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary portal-btn--compact"
-                            disabled={
-                              busyId != null ||
-                              withdrawn
-                            }
-                            onClick={() => void onRemove(s.studentId)}
-                          >
-                            {busyId === s.studentId
-                              ? 'Removing…'
-                              : 'Remove registration'}
-                          </button>
+                          <div className="admin-course-section-roster__row-actions">
+                            <button
+                              type="button"
+                              className="portal-btn portal-btn--secondary portal-btn--compact"
+                              disabled={busyId != null || busyGradeId != null}
+                              onClick={() => setFeedbackStudentId(s.studentId)}
+                            >
+                              View Feedback
+                            </button>
+                            <button
+                              type="button"
+                              className="portal-btn portal-btn--secondary portal-btn--compact"
+                              disabled={busyId != null || withdrawn}
+                              onClick={() => void onRemove(s.studentId)}
+                            >
+                              {busyId === s.studentId
+                                ? 'Removing…'
+                                : 'Remove registration'}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )

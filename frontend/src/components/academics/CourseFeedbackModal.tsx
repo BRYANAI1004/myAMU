@@ -33,7 +33,6 @@ function ratingSelectField(
     <div className="portal-course-feedback-modal__field">
       <label htmlFor={id}>{label}</label>
       <select id={id} value={value} onChange={(e) => onChange(Number(e.target.value))}>
-        <option value={0}>Select…</option>
         {[1, 2, 3, 4, 5].map((n) => (
           <option key={n} value={n}>
             {n}
@@ -57,13 +56,10 @@ export function CourseFeedbackModal({
   onClose: () => void
   onSubmitted: () => void
 }) {
-  const [q1, setQ1] = useState(0)
-  const [q2, setQ2] = useState(0)
-  const [q3, setQ3] = useState(0)
-  const [q4, setQ4] = useState(0)
-  const [q5, setQ5] = useState(0)
-  const [overall, setOverall] = useState(0)
-  const [comment, setComment] = useState('')
+  const [overallRating, setOverallRating] = useState<number>(3)
+  const [workload, setWorkload] = useState<number>(3)
+  const [difficulty, setDifficulty] = useState<number>(3)
+  const [comment, setComment] = useState<string>('')
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [viewLoading, setViewLoading] = useState(mode === 'view')
@@ -110,24 +106,24 @@ export function CourseFeedbackModal({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
-    if (!q1 || !q2 || !q3 || !q4 || !q5 || !overall) {
-      setFormError('Please complete all ratings')
-      return
-    }
     setSubmitting(true)
     try {
-      await postStudentCourseFeedback(studentId, {
-        courseCode: row.courseCode,
-        term: row.term,
+      if (!row.courseCode?.trim() || !row.term?.trim() || row.year == null) {
+        throw new Error('Missing course metadata')
+      }
+      const payload = {
+        courseCode: row.courseCode.trim(),
+        term: row.term.trim(),
         year: row.year,
-        q1Rating: q1,
-        q2Rating: q2,
-        q3Rating: q3,
-        q4Rating: q4,
-        q5Rating: q5,
-        overallRating: overall,
-        comment: comment.trim() || null,
-      })
+        q1Rating: overallRating,
+        q2Rating: workload,
+        q3Rating: difficulty,
+        q4Rating: overallRating,
+        q5Rating: overallRating,
+        overallRating,
+        comment: comment?.trim() || null,
+      }
+      await postStudentCourseFeedback(studentId, payload)
       onClose()
       onSubmitted()
     } catch (err) {
@@ -139,6 +135,14 @@ export function CourseFeedbackModal({
 
   const titleId = 'course-feedback-modal-title'
   const courseLabel = `${row.courseCode.trim()} — ${courseRowDisplayTitle(row)}`
+
+  const view = viewItem
+  const vQ1 = view ? (view.q1Rating ?? view.rating) : null
+  const vQ2 = view ? (view.q2Rating ?? view.workloadRating) : null
+  const vQ3 = view ? (view.q3Rating ?? view.difficultyRating) : null
+  const vQ4 = view ? (view.q4Rating ?? view.rating) : null
+  const vQ5 = view ? (view.q5Rating ?? view.rating) : null
+  const vOverall = view ? (view.overallRating ?? view.rating) : null
 
   return (
     <div
@@ -164,31 +168,18 @@ export function CourseFeedbackModal({
             </p>
             <form onSubmit={handleSubmit}>
               {ratingSelectField(
-                'cfb-q1',
-                'Course Content Quality (1–5)',
-                q1,
-                setQ1,
+                'cfb-overall',
+                'Overall Rating (1–5)',
+                overallRating,
+                setOverallRating,
               )}
+              {ratingSelectField('cfb-workload', 'Workload (1–5)', workload, setWorkload)}
               {ratingSelectField(
-                'cfb-q2',
-                'Instructor Effectiveness (1–5)',
-                q2,
-                setQ2,
+                'cfb-difficulty',
+                'Difficulty (1–5)',
+                difficulty,
+                setDifficulty,
               )}
-              {ratingSelectField(
-                'cfb-q3',
-                'Workload Appropriateness (1–5)',
-                q3,
-                setQ3,
-              )}
-              {ratingSelectField(
-                'cfb-q4',
-                'Clarity & Organization (1–5)',
-                q4,
-                setQ4,
-              )}
-              {ratingSelectField('cfb-q5', 'Practical Value (1–5)', q5, setQ5)}
-              {ratingSelectField('cfb-overall', 'Overall Rating (1–5)', overall, setOverall)}
               <div className="portal-course-feedback-modal__field">
                 <label htmlFor="cfb-comment">Comment</label>
                 <textarea
@@ -244,40 +235,53 @@ export function CourseFeedbackModal({
               </p>
             ) : null}
             {viewItem && !viewLoading ? (
-              <dl className="portal-course-feedback-modal__readonly-dl">
-                <div>
-                  <dt>Course Content Quality</dt>
-                  <dd>{viewItem.q1Rating ?? viewItem.rating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Instructor Effectiveness</dt>
-                  <dd>{viewItem.q2Rating ?? viewItem.workloadRating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Workload Appropriateness</dt>
-                  <dd>{viewItem.q3Rating ?? viewItem.difficultyRating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Clarity & Organization</dt>
-                  <dd>{viewItem.q4Rating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Practical Value</dt>
-                  <dd>{viewItem.q5Rating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Overall Rating</dt>
-                  <dd>{viewItem.overallRating ?? viewItem.rating ?? '—'}</dd>
-                </div>
-                <div>
-                  <dt>Comment</dt>
-                  <dd>
-                    {(viewItem.comment ?? viewItem.comments)?.trim()
-                      ? (viewItem.comment ?? viewItem.comments)
-                      : '—'}
-                  </dd>
-                </div>
-              </dl>
+              <>
+                <dl className="portal-course-feedback-modal__readonly-dl">
+                  <div>
+                    <dt>Q1 rating</dt>
+                    <dd>{vQ1 ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Q2 rating</dt>
+                    <dd>{vQ2 ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Q3 rating</dt>
+                    <dd>{vQ3 ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Q4 rating</dt>
+                    <dd>{vQ4 ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Q5 rating</dt>
+                    <dd>{vQ5 ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Overall Rating</dt>
+                    <dd>{vOverall ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Comment</dt>
+                    <dd>
+                      {(viewItem.comment ?? viewItem.comments)?.trim()
+                        ? (viewItem.comment ?? viewItem.comments)
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Submitted</dt>
+                    <dd>
+                      {viewItem.submittedAt
+                        ? new Date(viewItem.submittedAt).toLocaleString(undefined, {
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          })
+                        : '—'}
+                    </dd>
+                  </div>
+                </dl>
+              </>
             ) : null}
             <div className="portal-course-feedback-modal__actions">
               <button type="button" className="portal-btn portal-btn--secondary" onClick={onClose}>

@@ -6578,6 +6578,13 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   vertical-align: middle;
 }
 
+.admin-course-section-roster__row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
 .admin-field--weekdays {
   margin: 0;
   padding: 0;
