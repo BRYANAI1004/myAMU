@@ -1,3 +1,4 @@
+-- Legacy schema (superseded for new work by `course_feedback_schema.sql`).
 -- Course evaluation submissions (one per student / course / term / year).
 -- Apply on the portal database alongside other `backend/sql/*.sql` artifacts.
 

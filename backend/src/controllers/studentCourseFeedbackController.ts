@@ -1,14 +1,23 @@
 import type { Request, Response } from "express";
 import {
-  getCourseFeedbackForStudentApi,
+  getCourseFeedbackForQuery,
   parseSubmitCourseFeedbackBody,
   submitCourseFeedback,
-} from "../services/studentCourseFeedbackService.js";
+} from "../services/courseFeedbackService.js";
 
 function pathStudentId(req: Request): string {
   const v = req.params.studentId;
   if (Array.isArray(v)) return v[0] ?? "";
   return v ?? "";
+}
+
+function parseYearQuery(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isInteger(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "") {
+    const n = Number(raw);
+    if (Number.isFinite(n) && Math.floor(n) === n) return n;
+  }
+  return null;
 }
 
 export async function getStudentCourseFeedback(
@@ -21,8 +30,33 @@ export async function getStudentCourseFeedback(
       res.status(400).json({ error: "Missing student id" });
       return;
     }
-    const payload = await getCourseFeedbackForStudentApi(sid);
-    res.json(payload);
+    const q = req.query;
+    const term =
+      typeof q.term === "string"
+        ? q.term.trim()
+        : Array.isArray(q.term)
+          ? String(q.term[0] ?? "").trim()
+          : "";
+    const courseCode =
+      typeof q.courseCode === "string"
+        ? q.courseCode.trim()
+        : Array.isArray(q.courseCode)
+          ? String(q.courseCode[0] ?? "").trim()
+          : "";
+    const year = parseYearQuery(q.year);
+    if (!term || !courseCode || year == null) {
+      res.status(400).json({
+        error:
+          "Missing or invalid query: require term, year (integer), and courseCode.",
+      });
+      return;
+    }
+    const record = await getCourseFeedbackForQuery(sid, {
+      term,
+      year,
+      courseCode,
+    });
+    res.json(record);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to load course feedback" });
@@ -43,7 +77,7 @@ export async function postStudentCourseFeedback(
     if (parsed == null) {
       res.status(400).json({
         error:
-          "Invalid body: require courseCode, term, year, rating, workloadRating, difficultyRating (1–5 each).",
+          "Invalid body: require term, year (integer), courseCode, q1Rating–q5Rating and overallRating (integers 1–5 each).",
       });
       return;
     }
@@ -52,7 +86,7 @@ export async function postStudentCourseFeedback(
       res.status(result.status).json({ error: result.message });
       return;
     }
-    res.status(201).json({ id: result.id, ok: true });
+    res.json({ ok: true });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Failed to submit course feedback" });

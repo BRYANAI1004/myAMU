@@ -240,7 +240,7 @@ export async function getStudentAcademicsPayload(
     const code = (e as { code?: string }).code;
     if (code === "ER_NO_SUCH_TABLE") {
       console.warn(
-        "[academics] student_course_feedback missing; enrollment feedback flags omitted",
+        "[academics] course_feedback missing; enrollment feedback flags omitted",
       );
       return payload;
     }
