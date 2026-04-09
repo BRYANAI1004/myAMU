@@ -3,6 +3,13 @@ import { parseDisplayTimeRangeToHhMmSs } from '../../lib/formatScheduleTime'
 import { shortWeekdayDisplayToStorage } from '../../lib/weekdaySchedule'
 import type { CourseBinItem } from './CourseBinContext'
 
+function unitsFromCourseBinItemDisplay(raw: string): number | null {
+  const t = raw.trim()
+  if (t === '' || t === '—') return null
+  const n = Number(t)
+  return Number.isFinite(n) ? n : null
+}
+
 function courseBinItemToSyntheticSection(
   item: CourseBinItem,
   index: number,
@@ -42,6 +49,7 @@ function courseBinItemToSyntheticSection(
     room: item.location === 'TBA' ? null : item.location.trim() || null,
     instructor: item.instructor === 'TBA' ? null : item.instructor.trim() || null,
     notes: null,
+    units: unitsFromCourseBinItemDisplay(item.units),
     enrolled_count: 0,
   }
 }
