@@ -7000,67 +7000,137 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   color: var(--portal-text-muted);
 }
 
-.admin-course-sections-table th:nth-child(10),
-.admin-course-sections-table td:nth-child(10) {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+/* Course Sections page only: English / Chinese timetable tables (overrides .portal-table last-col right align) */
+.admin-course-sections-page .admin-course-sections-table {
+  table-layout: fixed;
+  width: 100%;
 }
 
-.admin-course-sections-table th:nth-child(2),
-.admin-course-sections-table td:nth-child(2) {
-  min-width: 7rem;
-  max-width: 15rem;
-  word-break: break-word;
-}
-
-.admin-course-sections-table th:first-child,
-.admin-course-sections-table td:first-child {
-  white-space: nowrap;
-}
-
-.admin-course-sections-table td.admin-course-sections-table__notes {
-  max-width: 12rem;
-  font-size: 0.8125rem;
-  color: var(--portal-text-muted);
-  word-break: break-word;
+.admin-course-sections-page .admin-course-sections-table th,
+.admin-course-sections-page .admin-course-sections-table td {
+  text-align: center;
   vertical-align: middle;
 }
 
-.admin-course-sections-table td.admin-course-sections-table__empty-row {
-  text-align: left;
+.admin-course-sections-page .admin-course-sections-table th:last-child,
+.admin-course-sections-page .admin-course-sections-table td:last-child {
+  text-align: center;
+}
+
+/* 13 columns — percentage widths for an even, stable layout under table-layout: fixed */
+.admin-course-sections-page .admin-course-sections-table th:nth-child(1),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(1) {
+  width: 6%;
+  white-space: nowrap;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(2),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(2) {
+  width: 14%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(3),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(3) {
+  width: 5%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(4),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(4) {
+  width: 8%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(5),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(5),
+.admin-course-sections-page .admin-course-sections-table th:nth-child(6),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(6) {
+  width: 5%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(7),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(7) {
+  width: 8%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(8),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(8) {
+  width: 6%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(9),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(9) {
+  width: 11%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(10),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(10) {
+  width: 5%;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(11),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(11) {
+  width: 7%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(12),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(12) {
+  width: 8%;
+}
+
+.admin-course-sections-page .admin-course-sections-table th:nth-child(13),
+.admin-course-sections-page .admin-course-sections-table td:nth-child(13) {
+  width: 12%;
+}
+
+.admin-course-sections-page .admin-course-sections-table td.admin-course-sections-table__notes {
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  word-break: break-word;
+  overflow-wrap: break-word;
+  hyphens: auto;
+}
+
+.admin-course-sections-page .admin-course-sections-table td.admin-course-sections-table__empty-row {
+  text-align: center;
   color: var(--portal-text-muted);
   font-size: 0.875rem;
   padding-top: 1rem;
   padding-bottom: 1rem;
 }
 
-.admin-course-sections-table__reg-none {
+.admin-course-sections-page .admin-course-sections-table__reg-none {
   font-size: 0.8125rem;
   color: var(--portal-text-muted);
 }
 
-.admin-course-sections-table__reg-open {
+.admin-course-sections-page .admin-course-sections-table__reg-open {
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--portal-text);
 }
 
-.admin-course-sections-table td.admin-course-sections-table__actions {
-  vertical-align: middle;
+.admin-course-sections-page .admin-course-sections-table td.admin-course-sections-table__actions {
   padding-top: 0.6rem;
   padding-bottom: 0.6rem;
 }
 
-.admin-course-sections-table__action-stack {
-  display: inline-flex;
+.admin-course-sections-page .admin-course-sections-table__action-stack {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 0.35rem;
   min-width: 7.85rem;
-  margin-left: auto;
+  width: fit-content;
+  max-width: 100%;
+  margin-inline: auto;
 }
 
-.admin-course-sections-table__action-stack .portal-btn {
+.admin-course-sections-page .admin-course-sections-table__action-stack .portal-btn {
   width: 100%;
   box-sizing: border-box;
 }

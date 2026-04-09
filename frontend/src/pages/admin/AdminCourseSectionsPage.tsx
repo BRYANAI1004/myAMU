@@ -852,7 +852,7 @@ export function AdminCourseSectionsPage() {
       ) : null}
 
       {!sectionsLoading && sections != null && sections.length > 0 ? (
-        <div className="admin-course-sections-list">
+        <div className="admin-course-sections-page admin-course-sections-list">
           <AdminCourseSectionGroupTable
             ariaLabelledBy="admin-course-sections-en-heading"
             title="English Timetable Sections"
