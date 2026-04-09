@@ -5202,8 +5202,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   padding: 0 0 0.75rem;
 }
 
-.portal-dashboard-courses-week-status,
-.portal-dashboard-courses-list-empty {
+.portal-dashboard-courses-week-status {
   margin: 0.5rem 1rem 0.625rem;
   font-size: 0.8125rem;
   line-height: 1.45;
@@ -5266,59 +5265,6 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   color: var(--portal-text-muted);
 }
 
-/* Fills card body below header; centers empty-state copy + CTA (Courses / Week tabs unchanged above) */
-.portal-dashboard-courses-empty {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: clamp(1.25rem, 3vh, 2rem) 1.5rem;
-  box-sizing: border-box;
-}
-
-.portal-dashboard-courses-empty-title {
-  margin: 0 0 0.625rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--portal-text);
-}
-
-.portal-dashboard-courses-empty-text {
-  margin: 0 0 1.125rem;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: var(--portal-text-muted);
-  max-width: 28rem;
-  width: min(100%, 28rem);
-  box-sizing: border-box;
-}
-
-.portal-dashboard-courses-empty-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  text-decoration: none;
-  color: #fff;
-  background: #6e1622;
-  border: 1px solid color-mix(in srgb, #6e1622 88%, #000);
-}
-
-.portal-dashboard-courses-empty-cta:hover {
-  filter: brightness(1.05);
-}
-
-.portal-dashboard-courses-empty-cta:focus-visible {
-  outline: 2px solid #6e1622;
-  outline-offset: 2px;
-}
-
 .portal-dashboard-courses-week-placeholder {
   margin: 0 0 0.75rem;
   padding: 0 1.5rem;
@@ -5327,64 +5273,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   color: var(--portal-text-muted);
 }
 
-/* MY CALENDAR — Courses / Week: header tabs (no segmented control / outer chrome) */
-.portal-dashboard-courses-view-tabs {
-  display: inline-flex;
-  align-items: flex-end;
-  flex-shrink: 0;
-  gap: 0.125rem;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
-.portal-dashboard-courses-view-tab {
-  --portal-calendar-tab-active: #6e1622;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.125rem 0.5rem 0.375rem;
-  margin: 0;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  font-family: inherit;
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--portal-text-muted);
-  background: transparent;
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    border-color 0.15s ease,
-    font-weight 0.15s ease;
-}
-
-.portal-dashboard-courses-view-tab:hover:not([aria-selected='true']) {
-  color: #3d4454;
-  border-bottom-color: color-mix(in srgb, var(--portal-text-muted) 38%, transparent);
-}
-
-.portal-dashboard-courses-view-tab:focus-visible {
-  outline: 2px solid var(--portal-calendar-tab-active);
-  outline-offset: 2px;
-}
-
-.portal-dashboard-courses-view-tab[aria-selected='true'] {
-  color: var(--portal-calendar-tab-active);
-  font-weight: 700;
-  border-bottom-color: var(--portal-calendar-tab-active);
-}
-
-.portal-dashboard-courses-view-tab[aria-selected='true']:hover {
-  color: var(--portal-calendar-tab-active);
-  border-bottom-color: var(--portal-calendar-tab-active);
-}
-
-/* Bilingual timetable (student offered + admin scheduling): EN / CN tabs — same spirit as My Calendar */
+/* Bilingual timetable (student offered + admin scheduling): EN / CN tabs */
 .portal-timetable-lang-head {
   display: flex;
   justify-content: flex-end;
@@ -5463,11 +5352,6 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-timetable-lang-tab[aria-selected='true']:hover {
   color: var(--portal-calendar-tab-active);
   border-bottom-color: var(--portal-calendar-tab-active);
-}
-
-.portal-dashboard-courses-view-tab-icon {
-  flex-shrink: 0;
-  color: currentColor;
 }
 
 .portal-dashboard-service-list {
@@ -5636,187 +5520,6 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   box-shadow: var(--portal-shadow);
   padding: 0;
   overflow: hidden;
-}
-
-.portal-dashboard-courses-table-wrap {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.portal-dashboard-courses-table {
-  width: 100%;
-  min-width: 32rem;
-  table-layout: fixed;
-  border-collapse: collapse;
-  font-size: 0.9375rem;
-  color: var(--portal-text);
-}
-
-.portal-dashboard-courses-col-course {
-  width: 15%;
-}
-
-.portal-dashboard-courses-col-title {
-  width: 28%;
-}
-
-.portal-dashboard-courses-col-schedule {
-  width: 22%;
-}
-
-.portal-dashboard-courses-col-instructor {
-  width: 18%;
-}
-
-.portal-dashboard-courses-col-location {
-  width: 17%;
-}
-
-.portal-dashboard-courses-table th,
-.portal-dashboard-courses-table td {
-  padding: 0.9375rem 1.125rem;
-}
-
-/* Course overview: card-like cells (not a spreadsheet). */
-.portal-dashboard-courses-table thead th {
-  padding: 1.125rem 1.125rem;
-  text-align: center;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #6b7280;
-  background: #f3f4f6;
-  border-bottom: 1px solid #e5e7eb;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.portal-dashboard-courses-table tbody td {
-  text-align: center;
-  vertical-align: middle;
-  padding: 1.875rem 1.25rem;
-  border-bottom: 1px solid var(--portal-border-subtle);
-  box-sizing: border-box;
-}
-
-.portal-dashboard-courses-table tbody td.portal-dashboard-courses-title-cell {
-  text-align: center;
-}
-
-.portal-dashboard-courses-table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.portal-dashboard-courses-code {
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.portal-dashboard-courses-course-code {
-  display: inline-block;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  line-height: 1.4;
-  color: #6e1622;
-}
-
-.portal-dashboard-courses-title-cell {
-  min-width: 0;
-}
-
-/* Title: one block, centered; darker gray, semi-bold, step above schedule body */
-.portal-dashboard-courses-title-text {
-  display: block;
-  margin: 0 auto;
-  max-width: 100%;
-  font-weight: 600;
-  font-size: 1rem;
-  line-height: 1.4;
-  color: #374151;
-  text-align: center;
-  overflow-wrap: break-word;
-}
-
-.portal-dashboard-courses-schedule {
-  min-width: 0;
-}
-
-.portal-dashboard-courses-schedule-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  width: 100%;
-  text-align: center;
-}
-
-.portal-dashboard-courses-schedule-block {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  max-width: 100%;
-}
-
-.portal-dashboard-courses-schedule-day {
-  display: block;
-  font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  color: #374151;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-.portal-dashboard-courses-schedule-time {
-  display: block;
-  font-weight: 400;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: #9ca3af;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-.portal-dashboard-courses-location {
-  min-width: 0;
-  vertical-align: middle;
-}
-
-.portal-dashboard-courses-location-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  text-align: center;
-  line-height: 1.4;
-  max-width: 100%;
-}
-
-.portal-dashboard-courses-location-building {
-  display: block;
-  font-weight: 500;
-  font-size: 0.875rem;
-  line-height: 1.4;
-  color: #374151;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-.portal-dashboard-courses-location-detail {
-  display: block;
-  font-weight: 400;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: #9ca3af;
-  overflow-wrap: break-word;
-  max-width: 100%;
 }
 
 .portal-dashboard-courses-timetable-wrap {

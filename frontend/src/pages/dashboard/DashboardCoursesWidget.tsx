@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
 import {
   fetchAcademicTerms,
@@ -13,12 +12,7 @@ import {
 import { enrolledSectionsToScheduleRows } from '../../lib/enrolledSectionsToScheduleRows'
 import { resolveAcademicTermIdForPortalTerm } from '../../lib/resolveAcademicTermIdForPortalTerm'
 import { mergeTermOptions } from '../registration/registrationTermSearch'
-import {
-  currentTermLabel,
-  formatPortalCourseInstructor,
-  formatPortalCourseLocation,
-  noCurrentCoursesMessage,
-} from '../../lib/academicCourseRecordsDisplay'
+import { currentTermLabel } from '../../lib/academicCourseRecordsDisplay'
 import {
   accountScheduleRowsHaveWeekGridData,
   blockVerticalStyle,
@@ -30,10 +24,7 @@ import {
   WEEKDAY_LONG_LABEL,
   WEEKDAY_SHORT_LABEL,
 } from '../../lib/dashboardWeekTimetable'
-import type { MahmAccountMock } from '../../mock/mahmAccountMock'
 import type { ScheduleRow } from '../../types/billing'
-
-type CalendarView = 'list' | 'week'
 
 type CalendarWeekTermKey = { term: string; year: number }
 
@@ -63,119 +54,6 @@ type WeekTimetableCacheEntry = {
   /** From enrolled-sections when `academic_term_id` fetch; null when rows came from legacy account only. */
   scheduleMeta: StudentEnrolledSectionsScheduleMeta | null
   loadFailed: boolean
-}
-
-/**
- * Split free-text location into building/place (line 1) and room/suite/virtual detail (line 2).
- * Handles trailing room numbers, trailing "Suite", and parenthetical qualifiers (e.g. synchronous virtual).
- */
-function splitLocationDisplay(raw: string): { line1: string; line2: string } {
-  const s = raw.trim()
-  if (!s) return { line1: '', line2: '' }
-
-  const paren = s.match(/^(.+?)\s*\(([^)]+)\)\s*$/)
-  if (paren) {
-    return { line1: paren[1]!.trim(), line2: `(${paren[2]!})` }
-  }
-
-  const words = s.split(/\s+/)
-  if (words.length >= 2) {
-    const last = words[words.length - 1]!
-    if (/^\d+[A-Za-z]?$/.test(last)) {
-      return { line1: words.slice(0, -1).join(' '), line2: last }
-    }
-    if (last.toLowerCase() === 'suite') {
-      return { line1: words.slice(0, -1).join(' '), line2: last }
-    }
-  }
-
-  return { line1: s, line2: '' }
-}
-
-function LocationCell({ location }: { location: string }) {
-  const { line1, line2 } = splitLocationDisplay(location)
-  return (
-    <div className="portal-dashboard-courses-location-stack">
-      <span className="portal-dashboard-courses-location-building">{line1}</span>
-      {line2 ? <span className="portal-dashboard-courses-location-detail">{line2}</span> : null}
-    </div>
-  )
-}
-
-/**
- * Parse meeting text into card blocks: days (line 1) + time range (line 2).
- * Semicolons separate distinct meeting patterns (e.g. Mon/Thu blocks).
- */
-function parseScheduleBlocks(schedule: string): { line1: string; line2: string }[] {
-  const parts = schedule
-    .split(/\s*;\s*/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const timeTail = /^(.+?),\s*(\d{1,2}:\d{2}\s*(?:AM|PM)\s*[–-]\s*\d{1,2}:\d{2}\s*(?:AM|PM))\s*$/i
-  const blocks: { line1: string; line2: string }[] = []
-  for (const part of parts) {
-    const m = part.match(timeTail)
-    if (m) {
-      blocks.push({ line1: m[1]!.trim(), line2: m[2]!.trim() })
-    } else {
-      blocks.push({ line1: part, line2: '' })
-    }
-  }
-  return blocks.length ? blocks : [{ line1: schedule.trim(), line2: '' }]
-}
-
-function ScheduleCell({ schedule }: { schedule: string }) {
-  const blocks = parseScheduleBlocks(schedule)
-  return (
-    <div className="portal-dashboard-courses-schedule-stack">
-      {blocks.map((b, i) => (
-        <div key={i} className="portal-dashboard-courses-schedule-block">
-          <span className="portal-dashboard-courses-schedule-day">{b.line1}</span>
-          {b.line2 ? <span className="portal-dashboard-courses-schedule-time">{b.line2}</span> : null}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ListIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
-function WeekGridIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" strokeWidth="2" />
-      <path d="M3 9h18M9 4v16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  )
-}
-
-function scheduleRowKey(row: ScheduleRow, index: number): string {
-  const code = row.courseCode?.trim() || 'course'
-  return `${code}-${index}`
-}
-
-function browseTermDisplayLabel(account: MahmAccountMock): string {
-  const t = account.student.term?.trim()
-  const y = account.student.year
-  const match = account.availableScheduleTerms?.find(
-    (x) => x.term.trim().toLowerCase() === t.toLowerCase() && x.year === y,
-  )
-  if (match?.label?.trim()) return match.label.trim()
-  return currentTermLabel(
-    t && Number.isFinite(y) && y > 0 ? { term: t, year: y } : null,
-  )
 }
 
 function scheduleTermOptionValue(term: string, year: number): string {
@@ -301,7 +179,6 @@ function DashboardWeekTimetableGrid({ model }: { model: WeekTimetableModel }) {
 }
 
 export function DashboardCoursesWidget() {
-  const [view, setView] = useState<CalendarView>('week')
   const [calendarWeekTerm, setCalendarWeekTerm] = useState<CalendarWeekTermKey | null>(null)
   const [weekTermRows, setWeekTermRows] = useState<ScheduleRow[] | null>(null)
   const [weekFetchLoading, setWeekFetchLoading] = useState(false)
@@ -391,8 +268,6 @@ export function DashboardCoursesWidget() {
     return () => ac.abort()
   }, [accountHasScheduleTermOptions, isAuthenticated])
 
-  const registration = account.registration
-  const browseLabel = browseTermDisplayLabel(account)
   const weekTermSelectOptions: DashboardWeekTermOption[] = useMemo(() => {
     if (accountHasScheduleTermOptions) {
       return accountScheduleTerms.map((o) => ({
@@ -419,8 +294,6 @@ export function DashboardCoursesWidget() {
         undefined,
     }))
   }, [weekTermSelectOptions, academicTerms])
-
-  const listScheduleRows = account.scheduleRows
 
   const isLoadingAccount = Boolean(loading && isAuthenticated)
 
@@ -461,7 +334,7 @@ export function DashboardCoursesWidget() {
   )
 
   useEffect(() => {
-    if (!isAuthenticated || !currentStudentId?.trim() || view !== 'week') {
+    if (!isAuthenticated || !currentStudentId?.trim()) {
       setWeekTermRows(null)
       setWeekFetchLoading(false)
       setWeekFetchError(false)
@@ -643,14 +516,10 @@ export function DashboardCoursesWidget() {
     resolvedAcademicTermId,
     resolvedWeekTerm?.term,
     resolvedWeekTerm?.year,
-    view,
   ])
 
   const weekScheduleLoading =
-    isAuthenticated &&
-    view === 'week' &&
-    resolvedWeekTerm != null &&
-    weekFetchLoading
+    isAuthenticated && resolvedWeekTerm != null && weekFetchLoading
 
   const effectiveWeekRows: ScheduleRow[] = weekScheduleLoading
     ? []
@@ -705,19 +574,7 @@ export function DashboardCoursesWidget() {
       : ''
 
   const showWeekTermSelect =
-    !isLoadingAccount && view === 'week' && weekTermSelectOptions.length > 0
-
-  const showListCourseTable =
-    !isLoadingAccount && view === 'list' && listScheduleRows.length > 0
-
-  const showWeekPanel = !isLoadingAccount && view === 'week'
-
-  /** Large banner only on Courses tab when the account says not registered and there is no schedule table to show. */
-  const showGlobalEmptyState =
-    !isLoadingAccount &&
-    view === 'list' &&
-    registration.status !== 'registered' &&
-    listScheduleRows.length === 0
+    !isLoadingAccount && weekTermSelectOptions.length > 0
 
   return (
     <section className="portal-dashboard-courses" aria-labelledby="portal-dashboard-courses-heading">
@@ -725,8 +582,8 @@ export function DashboardCoursesWidget() {
         <h2 id="portal-dashboard-courses-heading" className="portal-dashboard-card-panel-title">
           My Calendar
         </h2>
-        <div className="portal-dashboard-courses-head-actions">
-          {showWeekTermSelect ? (
+        {showWeekTermSelect ? (
+          <div className="portal-dashboard-courses-head-actions">
             <div className="portal-dashboard-courses-head-term">
               <label htmlFor="portal-dashboard-courses-week-term-select" className="visually-hidden">
                 Term for week view
@@ -757,36 +614,8 @@ export function DashboardCoursesWidget() {
                 ))}
               </select>
             </div>
-          ) : null}
-          <div
-            className="portal-dashboard-courses-view-tabs"
-            role="tablist"
-            aria-label="Calendar view"
-          >
-            <button
-              type="button"
-              role="tab"
-              className="portal-dashboard-courses-view-tab"
-              aria-selected={view === 'list'}
-              id="portal-dashboard-calendar-tab-courses"
-              onClick={() => setView('list')}
-            >
-              <ListIcon className="portal-dashboard-courses-view-tab-icon" />
-              <span>Courses</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className="portal-dashboard-courses-view-tab"
-              aria-selected={view === 'week'}
-              id="portal-dashboard-calendar-tab-week"
-              onClick={() => setView('week')}
-            >
-              <WeekGridIcon className="portal-dashboard-courses-view-tab-icon" />
-              <span>Week</span>
-            </button>
           </div>
-        </div>
+        ) : null}
       </header>
       <div className="portal-dashboard-card-panel-divider" aria-hidden />
 
@@ -796,82 +625,7 @@ export function DashboardCoursesWidget() {
         </div>
       ) : null}
 
-      {!isLoadingAccount && showGlobalEmptyState ? (
-        <div className="portal-dashboard-courses-empty" aria-live="polite">
-          <h3 className="portal-dashboard-courses-empty-title">No courses registered</h3>
-          <p className="portal-dashboard-courses-empty-text">
-            {registration.emptyReason?.trim()
-              ? registration.emptyReason.trim()
-              : noCurrentCoursesMessage(browseLabel)}
-          </p>
-          <Link to="/registration" className="portal-dashboard-courses-empty-cta">
-            Go to Registration
-          </Link>
-        </div>
-      ) : null}
-
-      {!isLoadingAccount &&
-      registration.status === 'registered' &&
-      view === 'list' &&
-      listScheduleRows.length === 0 ? (
-        <p className="portal-text-muted portal-dashboard-courses-list-empty" role="status">
-          No courses in your schedule for the current term.
-        </p>
-      ) : null}
-
-      {!isLoadingAccount && showListCourseTable ? (
-        <div className="portal-dashboard-courses-table-wrap">
-          <table className="portal-dashboard-courses-table">
-            <colgroup>
-              <col className="portal-dashboard-courses-col-course" />
-              <col className="portal-dashboard-courses-col-title" />
-              <col className="portal-dashboard-courses-col-schedule" />
-              <col className="portal-dashboard-courses-col-instructor" />
-              <col className="portal-dashboard-courses-col-location" />
-            </colgroup>
-            <thead>
-              <tr>
-                <th scope="col">Course</th>
-                <th scope="col">Title</th>
-                <th scope="col">Schedule</th>
-                <th scope="col">Instructor</th>
-                <th scope="col">Location</th>
-              </tr>
-            </thead>
-            <tbody>
-              {listScheduleRows.map((c, i) => {
-                const sched =
-                  c.schedule != null && String(c.schedule).trim() !== ''
-                    ? String(c.schedule)
-                    : '—'
-                const loc = formatPortalCourseLocation(c.location)
-                const inst = formatPortalCourseInstructor(c.instructor)
-                return (
-                  <tr key={scheduleRowKey(c, i)}>
-                    <td className="portal-dashboard-courses-code">
-                      <span className="portal-dashboard-courses-course-code">{c.courseCode}</span>
-                    </td>
-                    <td className="portal-dashboard-courses-title-cell">
-                      <span className="portal-dashboard-courses-title-text">
-                        {c.title?.trim() ? c.title.trim() : '—'}
-                      </span>
-                    </td>
-                    <td className="portal-dashboard-courses-schedule">
-                      <ScheduleCell schedule={sched} />
-                    </td>
-                    <td className="portal-dashboard-courses-instructor">{inst}</td>
-                    <td className="portal-dashboard-courses-location">
-                      <LocationCell location={loc} />
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-
-      {showWeekPanel ? (
+      {!isLoadingAccount ? (
         <div
           className="portal-dashboard-courses-week-panel"
           role="region"
@@ -927,8 +681,8 @@ export function DashboardCoursesWidget() {
           effectiveWeekRows.length > 0 &&
           !weekHasParsableMeetings ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Some courses do not include weekly times on this grid. Use the Courses tab for full
-              meeting details.
+              Some courses do not include weekly times on this grid. Check Registration or Academics
+              for more details.
             </p>
           ) : null}
 
