@@ -5562,12 +5562,11 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 }
 
 .portal-dashboard-gcal-add-all__icon {
-  height: 1.2em;
+  height: 1.125em;
   width: auto;
   display: inline-block;
   object-fit: contain;
   flex-shrink: 0;
-  transform: translateY(1px);
 }
 
 .portal-dashboard-gcal-add-all img {

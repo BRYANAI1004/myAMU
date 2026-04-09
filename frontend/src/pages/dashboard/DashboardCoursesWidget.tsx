@@ -729,7 +729,7 @@ export function DashboardCoursesWidget() {
             >
               <span>Add to</span>
               <img
-                src="/googlecalendar.gif"
+                src="/googlecalendar-button.png"
                 alt=""
                 className="portal-dashboard-gcal-add-all__icon"
                 decoding="async"
