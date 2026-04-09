@@ -25,10 +25,8 @@ async function assertEnrollmentAllowsMarkGrade(db, studentId, courseCode, legacy
      FROM portal_enrollments e
      INNER JOIN portal_courses pc ON pc.course_id = e.course_id
      WHERE TRIM(e.student_external_id) = TRIM(?)
-       AND pc.course_code COLLATE utf8mb4_unicode_ci =
-           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
-       AND e.term COLLATE utf8mb4_unicode_ci =
-           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       AND TRIM(pc.course_code) = TRIM(?)
+       AND TRIM(e.term) = TRIM(?)
        AND e.year = ?
      LIMIT 1`, [sid, code, term, year]);
     if (rows.length === 0) {
@@ -85,8 +83,14 @@ export async function setAdminStudentMarkGrade(input) {
         });
     }
     catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        return { ok: false, status: 500, error: msg };
+        const o = e;
+        const dbOrMsg = o?.sqlMessage ?? (e instanceof Error ? e.message : String(e));
+        console.error("[admin-marks] upsertMarkGrade failed (see staged logs above if DB):", dbOrMsg);
+        return {
+            ok: false,
+            status: 500,
+            error: "Failed to save grade.",
+        };
     }
     return { ok: true };
 }

@@ -1,9 +1,13 @@
+function logAdminMarksStageFailure(stage, err) {
+    const o = err;
+    const dbMsg = o?.sqlMessage ?? o?.message ?? String(err);
+    console.error(`[admin-marks] ${stage} failed:`, dbMsg, o?.code != null ? `(code=${o.code})` : "");
+}
 async function findLatestMarksSeq(pool, input) {
     const [rows] = await pool.query(`SELECT m.seqNumber AS seq
      FROM marks m
      WHERE TRIM(m.id) = TRIM(?)
-       AND m.code COLLATE utf8mb4_unicode_ci =
-           CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
+       AND TRIM(m.code) = TRIM(?)
        AND LOWER(TRIM(m.term)) = LOWER(TRIM(?))
        AND m.year = ?
      ORDER BY m.seqNumber DESC
@@ -59,32 +63,67 @@ export async function upsertMarkGrade(pool, input) {
     const grade2 = input.grade2Numeric != null && Number.isFinite(input.grade2Numeric)
         ? input.grade2Numeric
         : 0;
-    const seq = await findLatestMarksSeq(pool, input);
+    let seq;
+    try {
+        seq = await findLatestMarksSeq(pool, input);
+    }
+    catch (err) {
+        logAdminMarksStageFailure("latest-seq lookup", err);
+        throw err;
+    }
     if (seq != null) {
-        await pool.query(`UPDATE marks SET grade = ?, grade2 = ? WHERE seqNumber = ?`, [input.grade.trim(), grade2, seq]);
+        try {
+            await pool.query(`UPDATE marks SET grade = ?, grade2 = ? WHERE seqNumber = ?`, [input.grade.trim(), grade2, seq]);
+        }
+        catch (err) {
+            logAdminMarksStageFailure("marks update", err);
+            throw err;
+        }
         return;
     }
-    const name = await resolveStudentNameForMarks(pool, input.studentId);
+    let name;
+    try {
+        name = await resolveStudentNameForMarks(pool, input.studentId);
+    }
+    catch (err) {
+        logAdminMarksStageFailure("student lookup", err);
+        throw err;
+    }
     if (name == null) {
+        console.error("[admin-marks] student lookup: no student name found for marks insert", { studentId: input.studentId.trim() });
         throw new Error("Student not found for marks insert.");
     }
-    const course = await resolveCourseTitleAndUnits(pool, input.courseCode);
+    let course;
+    try {
+        course = await resolveCourseTitleAndUnits(pool, input.courseCode);
+    }
+    catch (err) {
+        logAdminMarksStageFailure("course lookup", err);
+        throw err;
+    }
     if (course == null) {
+        console.error("[admin-marks] course lookup: no portal_courses row for marks insert", { courseCode: input.courseCode.trim() });
         throw new Error("Course not found in portal_courses for marks insert.");
     }
-    await pool.query(`INSERT INTO marks (
+    try {
+        await pool.query(`INSERT INTO marks (
        name, id, regis, code, grade, grade2, course_title, units,
        days, time_from, time_to, instructor, term, year, language, indie_study
      ) VALUES (?, ?, 0, ?, ?, ?, ?, ?, '', '00:00:00', '00:00:00', '', ?, ?, 'English', '')`, [
-        name,
-        input.studentId.trim(),
-        input.courseCode.trim(),
-        input.grade.trim(),
-        grade2,
-        course.title,
-        course.units,
-        input.legacyTerm.trim(),
-        input.year,
-    ]);
+            name,
+            input.studentId.trim(),
+            input.courseCode.trim(),
+            input.grade.trim(),
+            grade2,
+            course.title,
+            course.units,
+            input.legacyTerm.trim(),
+            input.year,
+        ]);
+    }
+    catch (err) {
+        logAdminMarksStageFailure("marks insert", err);
+        throw err;
+    }
 }
 //# sourceMappingURL=adminMarksRepository.js.map
