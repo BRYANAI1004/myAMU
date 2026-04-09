@@ -5,5 +5,5 @@
  * `frontend/src/components/academics/CourseFeedbackModal.tsx`. If either list
  * changes, update the other so exports stay aligned with the live form.
  */
-export declare const COURSE_FEEDBACK_CSV_QUESTION_RATING_HEADERS: readonly ["Course Content & Organization Rating", "Instructor Explanation Rating", "Course Pace Rating", "Assignments & Learning Activities Rating", "Recommend Course Rating"];
+export declare const COURSE_FEEDBACK_CSV_QUESTION_RATING_HEADERS: readonly ["Course Content & Organization Rating", "Instructor Explanation Rating", "Course Pace Rating", "Assignments & Activities Rating", "Recommend Course Rating"];
 //# sourceMappingURL=courseFeedbackCsvColumns.d.ts.map

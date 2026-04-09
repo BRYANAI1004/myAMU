@@ -1,4 +1,5 @@
 import { COURSE_FEEDBACK_CSV_QUESTION_RATING_HEADERS } from "../constants/courseFeedbackCsvColumns.js";
+import { env } from "../config/env.js";
 import { pool } from "../lib/db.js";
 import { mapCourseFeedbackByStudentForCourseTermYear } from "../repositories/courseFeedbackRepository.js";
 import { getCourseSectionById } from "../repositories/courseSectionRepository.js";
@@ -74,6 +75,9 @@ const CSV_HEADERS = [
     "Feedback Comment",
     "Grade",
 ];
+/** Exposed so the HTTP handler can log the same header list that was used to build the CSV. */
+export const REGISTERED_STUDENTS_CSV_HEADERS = CSV_HEADERS;
+const CSV_FIRST_LINE_MARKER = "Course Content & Organization Rating";
 export async function buildRegisteredStudentsCsvForSection(sectionId) {
     const section = await getCourseSectionById(sectionId);
     if (!section) {
@@ -96,7 +100,9 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
         }),
     ]);
     const lines = [];
-    lines.push(CSV_HEADERS.map((h) => csvEscapeCell(h)).join(","));
+    const headerLine = CSV_HEADERS.map((h) => csvEscapeCell(h)).join(",");
+    lines.push(headerLine);
+    let firstFlattenedRow;
     for (const row of enrollments) {
         const sid = row.studentId.trim();
         if (sid === "")
@@ -139,6 +145,15 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
             gradeCell,
         ];
         lines.push(values.map(csvEscapeCell).join(","));
+        if (firstFlattenedRow === undefined) {
+            firstFlattenedRow = values;
+        }
+    }
+    const csvBody = lines.join("\r\n");
+    if (env.nodeEnv === "development") {
+        if (!headerLine.includes(CSV_FIRST_LINE_MARKER)) {
+            console.error("[adminExportRegisteredStudentsCsv] CSV header line missing per-question columns (wrong service or stale build?)", { headerLine });
+        }
     }
     const filename = buildAttachmentFilename({
         courseCode: section.course_code,
@@ -149,7 +164,16 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
     return {
         ok: true,
         filename,
-        csvBody: lines.join("\r\n"),
+        csvBody,
+        ...(env.nodeEnv === "development" && firstFlattenedRow !== undefined
+            ? {
+                devDiagnostic: {
+                    headerLabels: CSV_HEADERS,
+                    firstFlattenedRow,
+                    csvFirstLine: headerLine,
+                },
+            }
+            : {}),
     };
 }
 //# sourceMappingURL=adminExportRegisteredStudentsCsvService.js.map
