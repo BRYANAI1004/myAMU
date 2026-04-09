@@ -1,8 +1,9 @@
 function mapFullRow(r) {
     const row = r;
+    const sidRaw = row.student_id ?? row.student_external_id;
     return {
         id: Number(row.id),
-        student_external_id: String(row.student_external_id ?? "").trim(),
+        student_id: String(sidRaw ?? "").trim(),
         course_code: String(row.course_code ?? "").trim(),
         term: String(row.term ?? "").trim(),
         year: Number(row.year),
@@ -16,12 +17,6 @@ function mapFullRow(r) {
         submitted_at: row.submitted_at instanceof Date
             ? row.submitted_at
             : new Date(String(row.submitted_at)),
-        created_at: row.created_at instanceof Date
-            ? row.created_at
-            : new Date(String(row.created_at)),
-        updated_at: row.updated_at instanceof Date
-            ? row.updated_at
-            : new Date(String(row.updated_at)),
     };
 }
 function mapKeyRow(r) {
@@ -37,7 +32,7 @@ function mapKeyRow(r) {
 }
 export async function createCourseFeedback(pool, input) {
     const [res] = await pool.query(`INSERT INTO course_feedback (
-      student_external_id, course_code, term, year,
+      student_id, course_code, term, year,
       q1_rating, q2_rating, q3_rating, q4_rating, q5_rating,
       overall_rating, comment
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
@@ -56,11 +51,11 @@ export async function createCourseFeedback(pool, input) {
     return res.insertId;
 }
 export async function findCourseFeedbackByStudentCourseTerm(pool, args) {
-    const [rows] = await pool.query(`SELECT id, student_external_id, course_code, term, year,
+    const [rows] = await pool.query(`SELECT id, student_id, course_code, term, year,
             q1_rating, q2_rating, q3_rating, q4_rating, q5_rating,
-            overall_rating, comment, submitted_at, created_at, updated_at
+            overall_rating, comment, submitted_at
      FROM course_feedback
-     WHERE student_external_id = ?
+     WHERE student_id = ?
        AND course_code = ?
        AND term = ?
        AND year = ?
@@ -78,7 +73,7 @@ export async function findCourseFeedbackByStudentCourseTerm(pool, args) {
 export async function listCourseFeedbackSubmittedKeysForStudent(pool, studentExternalId) {
     const [rows] = await pool.query(`SELECT course_code, term, year, submitted_at
      FROM course_feedback
-     WHERE student_external_id = ?
+     WHERE student_id = ?
      ORDER BY year DESC, submitted_at DESC`, [studentExternalId.trim()]);
     return rows.map(mapKeyRow);
 }

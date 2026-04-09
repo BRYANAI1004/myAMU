@@ -10,7 +10,7 @@ import { getCourseSections, getCourses } from "../controllers/courseController.j
 import { getHealth, getHealthDb } from "../controllers/healthController.js";
 import { getAccountingLedger, getAccountingQuarters, } from "../controllers/studentLedgerController.js";
 import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
-import { getStudentCourseFeedback, postStudentCourseFeedback, } from "../controllers/studentCourseFeedbackController.js";
+import { getAdminStudentCourseFeedback, getStudentCourseFeedback, postStudentCourseFeedback, } from "../controllers/studentCourseFeedbackController.js";
 import { getStudentTranscriptPreview } from "../controllers/studentTranscriptController.js";
 import { getDemoAccount, getDemoActivity, getStudentAccount, getStudentActivity, getStudentProfile, } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
@@ -47,6 +47,7 @@ adminRouter.post("/students", postAdminStudent);
 adminRouter.post("/students/delete-selected", postDeleteSelectedAdminStudents);
 adminRouter.get("/students/:studentId", getAdminStudent);
 adminRouter.put("/students/:studentId", putAdminStudent);
+adminRouter.get("/students/:studentId/course-feedback", getAdminStudentCourseFeedback);
 adminRouter.get("/courses/open-for-registration", getAdminCoursesOpenForRegistration);
 adminRouter.get("/course-sections/enrollments", getAdminCourseSectionEnrollments);
 adminRouter.get("/course-sections", getAdminCourseSections);

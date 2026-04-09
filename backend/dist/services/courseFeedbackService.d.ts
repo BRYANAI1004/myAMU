@@ -1,6 +1,5 @@
 export type CourseFeedbackApiRecord = {
     id: number;
-    studentExternalId: string;
     courseCode: string;
     term: string;
     year: number;
@@ -12,8 +11,6 @@ export type CourseFeedbackApiRecord = {
     overallRating: number;
     comment: string | null;
     submittedAt: string;
-    createdAt: string;
-    updatedAt: string;
 };
 export type SubmitCourseFeedbackBody = {
     term: string;

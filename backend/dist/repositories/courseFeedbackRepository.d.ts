@@ -1,7 +1,7 @@
 import type { Pool } from "mysql2/promise";
 export type CourseFeedbackDbRow = {
     id: number;
-    student_external_id: string;
+    student_id: string;
     course_code: string;
     term: string;
     year: number;
@@ -13,8 +13,6 @@ export type CourseFeedbackDbRow = {
     overall_rating: number;
     comment: string | null;
     submitted_at: Date;
-    created_at: Date;
-    updated_at: Date;
 };
 /** Minimal row for academics “feedback submitted” map. */
 export type CourseFeedbackSubmittedKeyRow = Pick<CourseFeedbackDbRow, "course_code" | "term" | "year" | "submitted_at">;

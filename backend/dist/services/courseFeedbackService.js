@@ -7,7 +7,6 @@ function toIso(d) {
 function rowToApi(r) {
     return {
         id: r.id,
-        studentExternalId: r.student_external_id,
         courseCode: r.course_code,
         term: r.term,
         year: r.year,
@@ -19,12 +18,18 @@ function rowToApi(r) {
         overallRating: r.overall_rating,
         comment: r.comment,
         submittedAt: toIso(r.submitted_at),
-        createdAt: toIso(r.created_at),
-        updatedAt: toIso(r.updated_at),
     };
 }
-function isRating1to5(n) {
-    return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 5;
+function parseRating1to5(raw) {
+    if (typeof raw === "number" && Number.isInteger(raw) && raw >= 1 && raw <= 5) {
+        return raw;
+    }
+    if (typeof raw === "string" && raw.trim() !== "") {
+        const n = Number(raw.trim());
+        if (Number.isInteger(n) && n >= 1 && n <= 5)
+            return n;
+    }
+    return null;
 }
 export function parseSubmitCourseFeedbackBody(body) {
     if (body == null || typeof body !== "object")
@@ -33,22 +38,27 @@ export function parseSubmitCourseFeedbackBody(body) {
     const term = typeof o.term === "string" ? o.term.trim() : "";
     const courseCode = typeof o.courseCode === "string" ? o.courseCode.trim() : "";
     const yearRaw = o.year;
-    const year = typeof yearRaw === "number" ? yearRaw : Number(yearRaw);
+    const year = typeof yearRaw === "number" && Number.isInteger(yearRaw)
+        ? yearRaw
+        : typeof yearRaw === "string" && yearRaw.trim() !== ""
+            ? Number(yearRaw.trim())
+            : NaN;
     if (!term || !courseCode || !Number.isFinite(year) || Math.floor(year) !== year) {
         return null;
     }
-    const q1 = o.q1Rating ?? o.q1_rating;
-    const q2 = o.q2Rating ?? o.q2_rating;
-    const q3 = o.q3Rating ?? o.q3_rating;
-    const q4 = o.q4Rating ?? o.q4_rating;
-    const q5 = o.q5Rating ?? o.q5_rating;
-    const overall = o.overallRating ?? o.overall_rating;
-    if (!isRating1to5(q1) ||
-        !isRating1to5(q2) ||
-        !isRating1to5(q3) ||
-        !isRating1to5(q4) ||
-        !isRating1to5(q5) ||
-        !isRating1to5(overall)) {
+    const yearInt = Math.trunc(year);
+    const q1 = parseRating1to5(o.q1Rating ?? o.q1_rating);
+    const q2 = parseRating1to5(o.q2Rating ?? o.q2_rating);
+    const q3 = parseRating1to5(o.q3Rating ?? o.q3_rating);
+    const q4 = parseRating1to5(o.q4Rating ?? o.q4_rating);
+    const q5 = parseRating1to5(o.q5Rating ?? o.q5_rating);
+    const overall = parseRating1to5(o.overallRating ?? o.overall_rating);
+    if (q1 == null ||
+        q2 == null ||
+        q3 == null ||
+        q4 == null ||
+        q5 == null ||
+        overall == null) {
         return null;
     }
     let comment = null;
@@ -60,7 +70,7 @@ export function parseSubmitCourseFeedbackBody(body) {
     }
     return {
         term,
-        year,
+        year: yearInt,
         courseCode,
         q1Rating: q1,
         q2Rating: q2,

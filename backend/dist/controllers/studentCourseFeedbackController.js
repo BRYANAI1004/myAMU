@@ -15,37 +15,50 @@ function parseYearQuery(raw) {
     }
     return null;
 }
+async function getCourseFeedbackForStudentQuery(req, res) {
+    const sid = pathStudentId(req).trim();
+    if (sid === "") {
+        res.status(400).json({ error: "Missing student id" });
+        return;
+    }
+    const q = req.query;
+    const term = typeof q.term === "string"
+        ? q.term.trim()
+        : Array.isArray(q.term)
+            ? String(q.term[0] ?? "").trim()
+            : "";
+    const courseCode = typeof q.courseCode === "string"
+        ? q.courseCode.trim()
+        : Array.isArray(q.courseCode)
+            ? String(q.courseCode[0] ?? "").trim()
+            : "";
+    const year = parseYearQuery(q.year);
+    if (!term || !courseCode || year == null) {
+        res.status(400).json({
+            error: "Missing or invalid query: require term, year (integer), and courseCode.",
+        });
+        return;
+    }
+    const record = await getCourseFeedbackForQuery(sid, {
+        term,
+        year,
+        courseCode,
+    });
+    res.json(record);
+}
 export async function getStudentCourseFeedback(req, res) {
     try {
-        const sid = pathStudentId(req).trim();
-        if (sid === "") {
-            res.status(400).json({ error: "Missing student id" });
-            return;
-        }
-        const q = req.query;
-        const term = typeof q.term === "string"
-            ? q.term.trim()
-            : Array.isArray(q.term)
-                ? String(q.term[0] ?? "").trim()
-                : "";
-        const courseCode = typeof q.courseCode === "string"
-            ? q.courseCode.trim()
-            : Array.isArray(q.courseCode)
-                ? String(q.courseCode[0] ?? "").trim()
-                : "";
-        const year = parseYearQuery(q.year);
-        if (!term || !courseCode || year == null) {
-            res.status(400).json({
-                error: "Missing or invalid query: require term, year (integer), and courseCode.",
-            });
-            return;
-        }
-        const record = await getCourseFeedbackForQuery(sid, {
-            term,
-            year,
-            courseCode,
-        });
-        res.json(record);
+        await getCourseFeedbackForStudentQuery(req, res);
+    }
+    catch (e) {
+        console.error(e);
+        res.status(500).json({ error: "Failed to load course feedback" });
+    }
+}
+/** Same query contract as GET /api/students/:studentId/course-feedback (admin route). */
+export async function getAdminStudentCourseFeedback(req, res) {
+    try {
+        await getCourseFeedbackForStudentQuery(req, res);
     }
     catch (e) {
         console.error(e);
