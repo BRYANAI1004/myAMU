@@ -144,3 +144,61 @@ export async function listCourseFeedbackSubmittedKeysForStudent(
   );
   return rows.map(mapKeyRow);
 }
+
+/** One row per student for a course / calendar term / year (matches UNIQUE uniq_feedback). */
+export type CourseFeedbackExportSlice = {
+  student_id: string;
+  overall_rating: number;
+  comment: string | null;
+};
+
+/**
+ * Batch-load `course_feedback` for many students in one course + term + year.
+ * Map key: trimmed `student_id` (legacy login id, same as `portal_enrollments.student_external_id`).
+ */
+export async function mapCourseFeedbackByStudentForCourseTermYear(
+  pool: Pool,
+  args: {
+    courseCode: string;
+    term: string;
+    year: number;
+    studentIds: string[];
+  },
+): Promise<Map<string, CourseFeedbackExportSlice>> {
+  const code = args.courseCode.trim();
+  const term = args.term.trim();
+  const year = Math.trunc(args.year);
+  const ids = [
+    ...new Set(
+      args.studentIds.map((s) => String(s ?? "").trim()).filter((s) => s !== ""),
+    ),
+  ];
+  const out = new Map<string, CourseFeedbackExportSlice>();
+  if (ids.length === 0 || code === "" || term === "" || !Number.isFinite(year)) {
+    return out;
+  }
+  const ph = ids.map(() => "?").join(", ");
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT student_id, overall_rating, comment
+     FROM course_feedback
+     WHERE course_code = ?
+       AND term = ?
+       AND year = ?
+       AND student_id IN (${ph})`,
+    [code, term, year, ...ids],
+  );
+  for (const r of rows) {
+    const sid = String(r.student_id ?? "").trim();
+    if (sid === "") continue;
+    const overall = Number(r.overall_rating);
+    const commentRaw = r.comment;
+    const comment =
+      commentRaw == null ? null : String(commentRaw).trim() || null;
+    out.set(sid, {
+      student_id: sid,
+      overall_rating: Number.isFinite(overall) ? overall : 0,
+      comment,
+    });
+  }
+  return out;
+}

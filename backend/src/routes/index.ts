@@ -11,6 +11,7 @@ import {
   deleteAdminCourseSection,
   getAdminCourseSectionEnrollments,
   getAdminCourseSections,
+  getAdminExportRegisteredStudentsCsv,
   patchAdminCourseSection,
   postAdminCourseSection,
 } from "../controllers/adminCourseSectionController.js";
@@ -151,6 +152,10 @@ adminRouter.get(
 adminRouter.get(
   "/course-sections/enrollments",
   getAdminCourseSectionEnrollments,
+);
+adminRouter.get(
+  "/course-sections/:id/export-registered-students.csv",
+  getAdminExportRegisteredStudentsCsv,
 );
 adminRouter.get("/course-sections", getAdminCourseSections);
 adminRouter.post("/course-sections", postAdminCourseSection);

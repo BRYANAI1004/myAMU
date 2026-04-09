@@ -1,5 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import type { AdminCourseSection } from '../../lib/api'
+import {
+  downloadAdminRegisteredStudentsCsv,
+  type AdminCourseSection,
+} from '../../lib/api'
 import {
   getPreferredCourseTitle,
   getSecondaryCourseTitle,
@@ -43,6 +47,14 @@ export function AdminCourseSectionDetailModal({
   returnSearch = '',
   onClose,
 }: Props) {
+  const [csvExporting, setCsvExporting] = useState(false)
+  const [csvExportError, setCsvExportError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setCsvExportError(null)
+    setCsvExporting(false)
+  }, [section?.id])
+
   if (section == null) return null
 
   const titleFields: CourseTitleFields = {
@@ -105,7 +117,37 @@ export function AdminCourseSectionDetailModal({
           {row('Instructor', section.instructor?.trim() ? section.instructor : '—')}
           {row('Notes', section.notes?.trim() ? section.notes : '—')}
         </dl>
+        {csvExportError != null ? (
+          <p
+            className="portal-card-note portal-profile-state--error"
+            role="alert"
+          >
+            {csvExportError}
+          </p>
+        ) : null}
         <div className="admin-section-detail-modal__actions">
+          <button
+            type="button"
+            className="portal-btn portal-btn--secondary portal-btn--compact"
+            disabled={csvExporting}
+            onClick={() => {
+              setCsvExportError(null)
+              setCsvExporting(true)
+              void (async () => {
+                try {
+                  await downloadAdminRegisteredStudentsCsv(section.id)
+                } catch (e) {
+                  setCsvExportError(
+                    e instanceof Error ? e.message : 'CSV export failed.',
+                  )
+                } finally {
+                  setCsvExporting(false)
+                }
+              })()
+            }}
+          >
+            {csvExporting ? 'Exporting…' : 'Export CSV'}
+          </button>
           {academicTermId != null &&
             academicTermId !== '' &&
             section.course_code.trim() !== '' && (

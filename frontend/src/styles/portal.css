@@ -6838,6 +6838,10 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 
 .admin-course-section-roster__top {
   margin-bottom: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-course-section-roster__back {

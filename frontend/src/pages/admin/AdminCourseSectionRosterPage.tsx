@@ -4,8 +4,10 @@ import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParam
 import { AdminCourseFeedbackModal } from '../../components/admin/AdminCourseFeedbackModal'
 import {
   deleteAdminPortalEnrollment,
+  downloadAdminRegisteredStudentsCsv,
   fetchAcademicTerms,
   fetchAdminCourseSectionEnrollments,
+  fetchAdminCourseSections,
   postAdminMarksSetGrade,
   type AcademicTerm,
   type AdminCourseSectionEnrollmentRow,
@@ -54,6 +56,7 @@ export function AdminCourseSectionRosterPage() {
   const q = searchParams.get('q') ?? ''
   const sectionCode = searchParams.get('section')?.trim() ?? ''
   const trackRaw = searchParams.get('track')?.trim() ?? ''
+  const sectionIdFromUrl = searchParams.get('sectionId')?.trim() ?? ''
 
   const trackNormalized =
     trackRaw !== '' ? normalizeScheduleTrackValue(trackRaw) : null
@@ -81,6 +84,16 @@ export function AdminCourseSectionRosterPage() {
   const [feedbackStudentId, setFeedbackStudentId] = useState<string | null>(
     null,
   )
+  const [resolvedExportSectionId, setResolvedExportSectionId] = useState<
+    number | null
+  >(null)
+  const [resolveSectionMessage, setResolveSectionMessage] = useState<
+    string | null
+  >(null)
+  const [rosterCsvExporting, setRosterCsvExporting] = useState(false)
+  const [rosterCsvExportError, setRosterCsvExportError] = useState<
+    string | null
+  >(null)
 
   const termLabel = useMemo(() => {
     if (termId === '') return null
@@ -100,6 +113,77 @@ export function AdminCourseSectionRosterPage() {
     if (termId === '') return null
     return terms?.find((x) => x.id === termId)?.term_name ?? null
   }, [terms, termId])
+
+  const sectionIdParamParsed = useMemo(() => {
+    if (sectionIdFromUrl === '') return null
+    const n = Number(sectionIdFromUrl)
+    return Number.isInteger(n) && n > 0 ? n : null
+  }, [sectionIdFromUrl])
+
+  useEffect(() => {
+    if (missingContext) {
+      setResolvedExportSectionId(null)
+      setResolveSectionMessage(null)
+      return
+    }
+    if (sectionIdParamParsed != null) {
+      setResolvedExportSectionId(sectionIdParamParsed)
+      setResolveSectionMessage(null)
+      return
+    }
+    if (
+      termId === '' ||
+      courseCode === '' ||
+      sectionCode === '' ||
+      trackNormalized == null
+    ) {
+      setResolvedExportSectionId(null)
+      setResolveSectionMessage(
+        'Add section and track to the URL (open roster from Course Sections), or use Export CSV on the section row.',
+      )
+      return
+    }
+    const ac = new AbortController()
+    setResolveSectionMessage(null)
+    void (async () => {
+      try {
+        const rows = await fetchAdminCourseSections({
+          academicTermId: termId,
+          courseCode,
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) return
+        const match = rows.find(
+          (r) =>
+            r.section_code.trim() === sectionCode.trim() &&
+            r.schedule_track === trackNormalized,
+        )
+        if (match) {
+          setResolvedExportSectionId(match.id)
+          setResolveSectionMessage(null)
+        } else {
+          setResolvedExportSectionId(null)
+          setResolveSectionMessage(
+            'Could not match this roster to a scheduled section for CSV export.',
+          )
+        }
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setResolvedExportSectionId(null)
+        setResolveSectionMessage(
+          e instanceof Error ? e.message : 'Could not resolve section for export.',
+        )
+      }
+    })()
+    return () => ac.abort()
+  }, [
+    missingContext,
+    sectionIdParamParsed,
+    termId,
+    courseCode,
+    sectionCode,
+    trackNormalized,
+  ])
 
   useEffect(() => {
     if (termId === '') {
@@ -240,6 +324,36 @@ export function AdminCourseSectionRosterPage() {
         >
           ← Back to Course Sections
         </Link>
+        {!missingContext && resolvedExportSectionId != null ? (
+          <button
+            type="button"
+            className="portal-btn portal-btn--secondary portal-btn--compact"
+            disabled={
+              rosterCsvExporting ||
+              busyId != null ||
+              busyGradeId != null
+            }
+            onClick={() => {
+              setRosterCsvExportError(null)
+              setRosterCsvExporting(true)
+              void (async () => {
+                try {
+                  await downloadAdminRegisteredStudentsCsv(
+                    resolvedExportSectionId,
+                  )
+                } catch (e) {
+                  setRosterCsvExportError(
+                    e instanceof Error ? e.message : 'CSV export failed.',
+                  )
+                } finally {
+                  setRosterCsvExporting(false)
+                }
+              })()
+            }}
+          >
+            {rosterCsvExporting ? 'Exporting…' : 'Export CSV'}
+          </button>
+        ) : null}
       </div>
 
       <h1 className="admin-page__title">Course roster</h1>
@@ -320,6 +434,19 @@ export function AdminCourseSectionRosterPage() {
           {termsError != null && (
             <p className="portal-text-muted admin-course-section-roster__terms-warn" role="status">
               {termsError}
+            </p>
+          )}
+
+          {resolveSectionMessage != null &&
+            resolvedExportSectionId == null && (
+              <p className="portal-text-muted admin-form-hint" role="status">
+                {resolveSectionMessage}
+              </p>
+            )}
+
+          {rosterCsvExportError != null && (
+            <p className="admin-form-message" role="alert">
+              {rosterCsvExportError}
             </p>
           )}
 

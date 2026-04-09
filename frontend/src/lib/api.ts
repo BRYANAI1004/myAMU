@@ -3361,6 +3361,69 @@ export async function deleteAdminCourseSection(
   throw new Error(`Request failed (HTTP ${res.status})`)
 }
 
+function parseAttachmentFilenameFromContentDisposition(
+  header: string | null,
+): string | null {
+  if (header == null || header.trim() === '') return null
+  const m = /filename\s*=\s*("([^"]+)"|([^;\s]+))/i.exec(header)
+  if (!m) return null
+  const quoted = m[2]
+  const bare = m[3]
+  const raw = quoted ?? bare ?? ''
+  const t = raw.trim()
+  return t === '' ? null : t
+}
+
+/**
+ * GET /api/admin/course-sections/:id/export-registered-students.csv — triggers a browser download.
+ */
+export async function downloadAdminRegisteredStudentsCsv(
+  sectionId: number,
+  options?: { signal?: AbortSignal },
+): Promise<void> {
+  const path = `/api/admin/course-sections/${encodeURIComponent(String(sectionId))}/export-registered-students.csv`
+  const res = await apiFetch(path, { signal: options?.signal })
+  if (!res.ok) {
+    const text = await res.text()
+    let msg = `Export failed (HTTP ${res.status}).`
+    const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+    if (ct.includes('application/json') && text.trim() !== '') {
+      try {
+        const body = JSON.parse(text) as {
+          error?: string
+          message?: string
+        }
+        if (typeof body.message === 'string' && body.message.trim() !== '') {
+          msg = body.message.trim()
+        } else if (typeof body.error === 'string' && body.error.trim() !== '') {
+          msg = body.error.trim()
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new Error(msg)
+  }
+  const blob = await res.blob()
+  const fromHeader = parseAttachmentFilenameFromContentDisposition(
+    res.headers.get('content-disposition'),
+  )
+  const filename =
+    fromHeader ?? `registered-students-${sectionId}.csv`
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 export type AdminPortalEnrollmentDeleteResponse = {
   success: boolean
   removedCount: number

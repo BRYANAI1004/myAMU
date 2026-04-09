@@ -249,6 +249,73 @@ export async function loadLegacyStudentProfileRow(
   return rows[0]!;
 }
 
+/** Columns aligned with admin student profile (`getAdminStudentDetail` / `students` table). */
+export type LegacyStudentProfileExportRow = {
+  id: string;
+  name: string | null;
+  gender: string | null;
+  email: string | null;
+  program: string | null;
+  highestDegree: string | null;
+  backgroundSchool: string | null;
+};
+
+function strCell(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  return s === "" ? null : s;
+}
+
+/**
+ * Batch-load legacy `students` rows for CSV export (same source as admin profile).
+ */
+export async function mapLegacyStudentProfileExportRowsById(
+  pool: Pool,
+  studentIds: string[],
+): Promise<Map<string, LegacyStudentProfileExportRow>> {
+  const ids = [
+    ...new Set(
+      studentIds.map((s) => String(s ?? "").trim()).filter((s) => s !== ""),
+    ),
+  ];
+  const out = new Map<string, LegacyStudentProfileExportRow>();
+  if (ids.length === 0) return out;
+  const ph = ids.map(() => "?").join(", ");
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+       TRIM(id) AS id,
+       name,
+       gender,
+       email,
+       requirements_id,
+       tertiary,
+       background
+     FROM students
+     WHERE TRIM(id) IN (${ph})`,
+    ids,
+  );
+  for (const r of rows) {
+    const id = strCell(r.id);
+    if (id == null) continue;
+    const name = strCell(r.name);
+    const gender = strCell(r.gender);
+    const email = strCell(r.email);
+    const req = strCell(r.requirements_id);
+    const tertiary = strCell(r.tertiary);
+    const bg = strCell(r.background);
+    out.set(id, {
+      id,
+      name,
+      gender,
+      email,
+      program: req,
+      highestDegree: tertiary,
+      backgroundSchool: bg,
+    });
+  }
+  return out;
+}
+
 export async function loadLegacyAccountingRows(
   pool: Pool,
   studentId: string,

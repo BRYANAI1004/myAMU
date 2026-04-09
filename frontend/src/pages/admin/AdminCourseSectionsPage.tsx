@@ -8,6 +8,7 @@ import { AdminTime12hFields } from '../../components/admin/AdminTime12hFields'
 import {
   createAdminCourseSection,
   deleteAdminCourseSection,
+  downloadAdminRegisteredStudentsCsv,
   fetchAcademicTerms,
   fetchAdminCourseSections,
   fetchCourses,
@@ -108,7 +109,9 @@ type AdminCourseSectionGroupTableProps = {
   emptyMessage: string
   catalog: CourseCatalogItem | null
   busy: boolean
+  csvExportSectionId: number | null
   onViewStudents: (row: AdminCourseSection) => void
+  onExportCsv: (row: AdminCourseSection) => void
   onEdit: (row: AdminCourseSection) => void
   onDeleteRow: (row: AdminCourseSection) => void
 }
@@ -120,7 +123,9 @@ function AdminCourseSectionGroupTable({
   emptyMessage,
   catalog,
   busy,
+  csvExportSectionId,
   onViewStudents,
+  onExportCsv,
   onEdit,
   onDeleteRow,
 }: AdminCourseSectionGroupTableProps) {
@@ -205,6 +210,16 @@ function AdminCourseSectionGroupTable({
                       <button
                         type="button"
                         className="portal-btn portal-btn--secondary portal-btn--compact"
+                        disabled={busy || csvExportSectionId === row.id}
+                        onClick={() => onExportCsv(row)}
+                      >
+                        {csvExportSectionId === row.id
+                          ? 'Exporting…'
+                          : 'Export CSV'}
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
                         disabled={busy}
                         onClick={() => onEdit(row)}
                       >
@@ -244,6 +259,10 @@ export function AdminCourseSectionsPage() {
   const [form, setForm] = useState<FormState>(() => emptyForm())
   const [editingId, setEditingId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [csvExportSectionId, setCsvExportSectionId] = useState<number | null>(
+    null,
+  )
+  const [csvExportError, setCsvExportError] = useState<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | null>(null)
   /** Bumped after create/update/delete so the sections query re-runs without changing term/course. */
   const [listVersion, setListVersion] = useState(0)
@@ -640,9 +659,29 @@ export function AdminCourseSectionsPage() {
       if (q !== '') p.set('q', q)
       p.set('section', row.section_code)
       p.set('track', row.schedule_track)
+      p.set('sectionId', String(row.id))
       navigate(`/admin/course-sections/roster?${p.toString()}`)
     },
     [academicTermId, courseCode, courseSearch, navigate],
+  )
+
+  const onExportCsvForSection = useCallback(
+    (row: AdminCourseSection) => {
+      setCsvExportError(null)
+      setCsvExportSectionId(row.id)
+      void (async () => {
+        try {
+          await downloadAdminRegisteredStudentsCsv(row.id)
+        } catch (e) {
+          setCsvExportError(
+            e instanceof Error ? e.message : 'CSV export failed.',
+          )
+        } finally {
+          setCsvExportSectionId(null)
+        }
+      })()
+    },
+    [],
   )
 
   const onDeleteRow = async (row: AdminCourseSection) => {
@@ -786,6 +825,12 @@ export function AdminCourseSectionsPage() {
         </p>
       )}
 
+      {csvExportError != null && (
+        <p className="admin-form-message" role="alert">
+          {csvExportError}
+        </p>
+      )}
+
       {sectionsLoading ? (
         <div
           className="portal-table-wrap admin-table-wrap admin-course-sections-list__state-wrap"
@@ -815,7 +860,9 @@ export function AdminCourseSectionsPage() {
             emptyMessage="None for this course in this term."
             catalog={selectedCourseCatalog}
             busy={busy}
+            csvExportSectionId={csvExportSectionId}
             onViewStudents={openRosterForSection}
+            onExportCsv={onExportCsvForSection}
             onEdit={beginEdit}
             onDeleteRow={onDeleteRow}
           />
@@ -826,7 +873,9 @@ export function AdminCourseSectionsPage() {
             emptyMessage="None for this course in this term."
             catalog={selectedCourseCatalog}
             busy={busy}
+            csvExportSectionId={csvExportSectionId}
             onViewStudents={openRosterForSection}
+            onExportCsv={onExportCsvForSection}
             onEdit={beginEdit}
             onDeleteRow={onDeleteRow}
           />
