@@ -95,6 +95,12 @@ export function AdminCourseSectionRosterPage() {
     return terms?.find((x) => x.id === termId)?.year ?? null
   }, [terms, termId])
 
+  /** Same `term` string as `portal_enrollments.term` / student feedback (not academic term row id). */
+  const rosterTermName = useMemo(() => {
+    if (termId === '') return null
+    return terms?.find((x) => x.id === termId)?.term_name ?? null
+  }, [terms, termId])
+
   useEffect(() => {
     if (termId === '') {
       setTerms([])
@@ -217,11 +223,12 @@ export function AdminCourseSectionRosterPage() {
     <main className="admin-page admin-course-section-roster">
       {feedbackStudentId != null &&
       !missingContext &&
-      rosterTermYear != null ? (
+      rosterTermYear != null &&
+      rosterTermName != null ? (
         <AdminCourseFeedbackModal
           studentId={feedbackStudentId}
           courseCode={courseCode}
-          term={termId}
+          term={rosterTermName}
           year={rosterTermYear}
           onClose={() => setFeedbackStudentId(null)}
         />

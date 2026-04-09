@@ -1974,26 +1974,37 @@ export type CourseFeedbackApiItem = {
   comments?: string | null
 }
 
-export type CourseFeedbackListResponse = {
-  studentId: string
-  items: CourseFeedbackApiItem[]
-}
-
-/** GET /api/students/:studentId/course-feedback */
+/** GET /api/students/:studentId/course-feedback?courseCode=&term=&year= */
 export async function fetchStudentCourseFeedback(
   studentId: string,
+  params: {
+    courseCode: string
+    term: string
+    year: number
+  },
   options?: { signal?: AbortSignal },
-): Promise<CourseFeedbackListResponse> {
-  const path = `/api/students/${encodeURIComponent(studentId)}/course-feedback`
-  const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
-  if (data == null || typeof data !== 'object') {
+): Promise<CourseFeedbackApiItem | null> {
+  const qs = new URLSearchParams()
+  qs.set('courseCode', params.courseCode.trim())
+  qs.set('term', params.term.trim())
+  qs.set('year', String(params.year))
+
+  const path = `/api/students/${encodeURIComponent(studentId)}/course-feedback?${qs.toString()}`
+  const data = await fetchApiJson(path, { signal: options?.signal })
+  if (data == null) return null
+  if (typeof data !== 'object') {
     throw new Error('Unexpected course feedback response')
   }
   const o = data as Record<string, unknown>
-  if (typeof o.studentId !== 'string' || !Array.isArray(o.items)) {
+  if (
+    typeof o.id !== 'number' ||
+    typeof o.courseCode !== 'string' ||
+    typeof o.term !== 'string' ||
+    typeof o.year !== 'number'
+  ) {
     throw new Error('Unexpected course feedback response')
   }
-  return data as CourseFeedbackListResponse
+  return data as CourseFeedbackApiItem
 }
 
 /** GET /api/admin/students/:studentId/course-feedback?courseCode=&term=&year= */

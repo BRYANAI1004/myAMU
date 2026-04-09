@@ -98,6 +98,8 @@ export function AdminCourseFeedbackModal({
           <code className="admin-code">{studentId}</code>
           <br />
           <code className="admin-code">{courseCode.trim()}</code>
+          <br />
+          {term.trim()} {year}
         </p>
         {loading ? (
           <p className="portal-card-note">Loading…</p>

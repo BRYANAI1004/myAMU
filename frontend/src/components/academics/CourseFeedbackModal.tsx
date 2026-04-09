@@ -9,20 +9,6 @@ import { courseRowDisplayTitle } from '../../lib/academicsTranscriptDisplay'
 
 export type EnrollmentHistoryRow = StudentAcademicsResponse['enrollmentHistory'][number]
 
-function findFeedbackItemForRow(
-  items: CourseFeedbackApiItem[],
-  row: Pick<EnrollmentHistoryRow, 'courseCode' | 'term' | 'year'>,
-): CourseFeedbackApiItem | undefined {
-  const code = row.courseCode.trim()
-  const term = row.term.trim().toLowerCase()
-  return items.find(
-    (it) =>
-      it.courseCode.trim() === code &&
-      it.year === row.year &&
-      it.term.trim().toLowerCase() === term,
-  )
-}
-
 function ratingSelectField(
   id: string,
   label: string,
@@ -71,14 +57,21 @@ export function CourseFeedbackModal({
     const ac = new AbortController()
     ;(async () => {
       try {
-        const res = await fetchStudentCourseFeedback(studentId, { signal: ac.signal })
+        const res = await fetchStudentCourseFeedback(
+          studentId,
+          {
+            courseCode: row.courseCode.trim(),
+            term: row.term.trim(),
+            year: row.year,
+          },
+          { signal: ac.signal },
+        )
         if (ac.signal.aborted) return
-        const item = findFeedbackItemForRow(res.items, row)
-        if (!item) {
+        if (!res) {
           setViewItem(null)
           setViewError('Could not find submitted feedback for this course.')
         } else {
-          setViewItem(item)
+          setViewItem(res)
           setViewError(null)
         }
       } catch (e) {

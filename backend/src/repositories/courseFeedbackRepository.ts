@@ -2,7 +2,7 @@ import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 
 export type CourseFeedbackDbRow = {
   id: number;
-  student_external_id: string;
+  student_id: string;
   course_code: string;
   term: string;
   year: number;
@@ -14,8 +14,6 @@ export type CourseFeedbackDbRow = {
   overall_rating: number;
   comment: string | null;
   submitted_at: Date;
-  created_at: Date;
-  updated_at: Date;
 };
 
 /** Minimal row for academics “feedback submitted” map. */
@@ -26,9 +24,10 @@ export type CourseFeedbackSubmittedKeyRow = Pick<
 
 function mapFullRow(r: RowDataPacket): CourseFeedbackDbRow {
   const row = r as Record<string, unknown>;
+  const sidRaw = row.student_id ?? row.student_external_id;
   return {
     id: Number(row.id),
-    student_external_id: String(row.student_external_id ?? "").trim(),
+    student_id: String(sidRaw ?? "").trim(),
     course_code: String(row.course_code ?? "").trim(),
     term: String(row.term ?? "").trim(),
     year: Number(row.year),
@@ -44,14 +43,6 @@ function mapFullRow(r: RowDataPacket): CourseFeedbackDbRow {
       row.submitted_at instanceof Date
         ? row.submitted_at
         : new Date(String(row.submitted_at)),
-    created_at:
-      row.created_at instanceof Date
-        ? row.created_at
-        : new Date(String(row.created_at)),
-    updated_at:
-      row.updated_at instanceof Date
-        ? row.updated_at
-        : new Date(String(row.updated_at)),
   };
 }
 
@@ -88,7 +79,7 @@ export async function createCourseFeedback(
 ): Promise<number> {
   const [res] = await pool.query<ResultSetHeader>(
     `INSERT INTO course_feedback (
-      student_external_id, course_code, term, year,
+      student_id, course_code, term, year,
       q1_rating, q2_rating, q3_rating, q4_rating, q5_rating,
       overall_rating, comment
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -119,11 +110,11 @@ export async function findCourseFeedbackByStudentCourseTerm(
   },
 ): Promise<CourseFeedbackDbRow | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT id, student_external_id, course_code, term, year,
+    `SELECT id, student_id, course_code, term, year,
             q1_rating, q2_rating, q3_rating, q4_rating, q5_rating,
-            overall_rating, comment, submitted_at, created_at, updated_at
+            overall_rating, comment, submitted_at
      FROM course_feedback
-     WHERE student_external_id = ?
+     WHERE student_id = ?
        AND course_code = ?
        AND term = ?
        AND year = ?
@@ -147,7 +138,7 @@ export async function listCourseFeedbackSubmittedKeysForStudent(
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT course_code, term, year, submitted_at
      FROM course_feedback
-     WHERE student_external_id = ?
+     WHERE student_id = ?
      ORDER BY year DESC, submitted_at DESC`,
     [studentExternalId.trim()],
   );
