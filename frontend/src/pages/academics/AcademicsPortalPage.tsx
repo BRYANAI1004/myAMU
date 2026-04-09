@@ -11,12 +11,8 @@ import {
 } from '../../lib/api'
 import {
   academicStatusLabel,
-  currentTermLabel,
-  formatAcademicTimeRange,
   formatCreditsCell,
-  formatDaysCell,
   formatGradeCell,
-  noCurrentCoursesMessage,
 } from '../../lib/academicCourseRecordsDisplay'
 import {
   courseRowDisplayTitle,
@@ -26,7 +22,7 @@ import {
   termYearKey,
 } from '../../lib/academicsTranscriptDisplay'
 
-type AcademicsTab = 'current' | 'history' | 'transcript'
+type AcademicsTab = 'history' | 'transcript'
 
 type EnrollmentHistoryRow = StudentAcademicsResponse['enrollmentHistory'][number]
 
@@ -369,7 +365,7 @@ function instructorCell(v: string | null | undefined): string {
 
 export function AcademicsPortalPage() {
   const { currentStudentId } = useAccount()
-  const [tab, setTab] = useState<AcademicsTab>('current')
+  const [tab, setTab] = useState<AcademicsTab>('history')
   const [academics, setAcademics] = useState<StudentAcademicsResponse | null>(null)
   const [academicsError, setAcademicsError] = useState<string | null>(null)
   const [academicsLoading, setAcademicsLoading] = useState(false)
@@ -467,8 +463,6 @@ export function AcademicsPortalPage() {
   const showTranscriptError =
     transcriptPreviewError != null && transcriptPreview === null && !transcriptPreviewLoading
 
-  const termPhrase = academics ? currentTermLabel(academics.currentTerm) : 'the current term'
-
   return (
     <main className="portal-page portal-stack">
       {id && feedbackModal ? (
@@ -487,17 +481,6 @@ export function AcademicsPortalPage() {
         aria-label="Academics sections"
       >
         <div className="portal-tab-group portal-academics-portal-tabs">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'current'}
-            className={['portal-tab', tab === 'current' ? 'portal-tab--active' : '']
-              .filter(Boolean)
-              .join(' ')}
-            onClick={() => setTab('current')}
-          >
-            Current Courses
-          </button>
           <button
             type="button"
             role="tab"
@@ -530,89 +513,10 @@ export function AcademicsPortalPage() {
         >
           <p className="portal-profile-state__title">Sign in to view academics</p>
           <p className="portal-profile-state__detail">
-            Your courses, registration history, and transcript appear here after you log in with your
-            student account.
+            Your registration history and transcript appear here after you log in with your student
+            account.
           </p>
         </section>
-      ) : null}
-
-      {!showEmpty && tab === 'current' ? (
-        <>
-          {academicsBlocking ? (
-            <section className="portal-card portal-profile-state" aria-busy="true" aria-live="polite">
-              <p className="portal-profile-state__title">Loading courses</p>
-              <p className="portal-profile-state__detail">Please wait while we load your schedule.</p>
-            </section>
-          ) : null}
-          {showAcademicsError ? (
-            <section
-              className="portal-card portal-profile-state portal-profile-state--error"
-              role="alert"
-              aria-live="assertive"
-            >
-              <p className="portal-profile-state__title">We could not load your courses</p>
-              <p className="portal-profile-state__detail">{academicsError}</p>
-              <div className="portal-actions portal-profile-state__actions">
-                <button
-                  type="button"
-                  className="portal-btn portal-btn--secondary"
-                  onClick={() => setReloadKey((k) => k + 1)}
-                >
-                  Try again
-                </button>
-              </div>
-            </section>
-          ) : null}
-          {!academicsBlocking && !showAcademicsError && academics ? (
-            <section className="portal-stack" aria-label="Current courses">
-              {academics.currentSchedule.length === 0 ? (
-                <div className="portal-card portal-academics-empty-state" aria-live="polite">
-                  <h2 className="portal-academics-empty-state__title">No courses this term</h2>
-                  <p className="portal-academics-empty-state__text">
-                    {academics.currentTerm
-                      ? noCurrentCoursesMessage(termPhrase)
-                      : 'There is no active enrollment term on file. Completed coursework appears under Registration History and Transcript.'}
-                  </p>
-                </div>
-              ) : (
-                <div className="portal-table-wrap">
-                  <table className={GRADES_TABLE_CLASS}>
-                    <thead>
-                      <tr>
-                        <th scope="col">Course code</th>
-                        <th scope="col">Course title</th>
-                        <th scope="col">Credits</th>
-                        <th scope="col">Days / meeting pattern</th>
-                        <th scope="col">Time</th>
-                        <th scope="col">Instructor</th>
-                        <th scope="col">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {academics.currentSchedule.map((row, idx) => (
-                        <tr
-                          key={`${row.courseCode}-${row.term}-${row.year}-${idx}`}
-                        >
-                          <td>{row.courseCode}</td>
-                          <td className="portal-academics-course-title-cell">
-                            <span className="portal-academics-course-title__en">
-                              {courseRowDisplayTitle(row)}
-                            </span>
-                          </td>
-                          <td>{formatCreditsCell(row.credits)}</td>
-                          <td>{formatDaysCell(row.days)}</td>
-                          <td>{formatAcademicTimeRange(row.timeFrom, row.timeTo)}</td>
-                          <td>{instructorCell(row.instructor)}</td>
-                          <td>{academicStatusLabel(row.status)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
-          ) : null}
-        </>
       ) : null}
 
       {!showEmpty && tab === 'history' ? (
@@ -650,7 +554,8 @@ export function AcademicsPortalPage() {
                 <div className="portal-card portal-academics-empty-state" aria-live="polite">
                   <h2 className="portal-academics-empty-state__title">No registration history</h2>
                   <p className="portal-academics-empty-state__text">
-                    No course registrations are on file yet.
+                    No course registrations are on file yet. When you enroll, rows will appear here by
+                    term. Use the Transcript tab for the unofficial transcript view.
                   </p>
                 </div>
               ) : (
