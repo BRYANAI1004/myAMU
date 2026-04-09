@@ -176,6 +176,12 @@ export function assembleLegacyStudentAccountPayload(
     (p) => p.status !== "withdrawn",
   ).length;
 
+  /**
+   * Portal rows from `listPortalEnrollmentRowsForStudentAcademics` include `weekday`,
+   * `start_time`, `end_time`, and optional `instructor` via `course_sections` joined on
+   * catalog `course_code` + enrollment `term` + `year`, so `scheduleRowsFromAcademicCourseRecords`
+   * can render timetables for terms without marks.
+   */
   const portalBrowseRecords = portalRowsForBrowseTerm.map((p) =>
     portalEnrollmentRowToAcademicCourseRecord(
       snap.studentId,
