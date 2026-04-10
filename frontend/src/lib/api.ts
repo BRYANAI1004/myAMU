@@ -3203,9 +3203,49 @@ export async function postStudentWithdraw(
 }
 
 /** GET /api/admin/course-sections/course-meta — Chinese-first title + optional instructor suggestion. */
+export type AdminInstructorSuggestion = {
+  source: 'timetable' | 'marks'
+  instructorId: string | null
+  nameEng: string | null
+  nameChi: string | null
+  rawText: string | null
+}
+
 export type AdminCourseSectionCourseMeta = {
   title: string
   suggestedInstructor: string | null
+  instructorSuggestion: AdminInstructorSuggestion | null
+}
+
+function trimStrOrNull(v: unknown): string | null {
+  if (v == null) return null
+  if (typeof v !== 'string') return null
+  const t = v.trim()
+  return t === '' ? null : t
+}
+
+function parseAdminInstructorSuggestion(
+  raw: unknown,
+): AdminInstructorSuggestion | null {
+  if (raw == null || typeof raw !== 'object') return null
+  const o = raw as Record<string, unknown>
+  const sourceRaw = o.source
+  const source =
+    sourceRaw === 'timetable' || sourceRaw === 'marks' ? sourceRaw : null
+  if (source == null) return null
+  const instructorId = trimStrOrNull(
+    o.instructorId ?? o.instructor_id,
+  )
+  const nameEng = trimStrOrNull(o.nameEng ?? o.name_eng)
+  const nameChi = trimStrOrNull(o.nameChi ?? o.name_chi)
+  const rawText = trimStrOrNull(o.rawText ?? o.raw_text)
+  return {
+    source,
+    instructorId,
+    nameEng,
+    nameChi,
+    rawText,
+  }
 }
 
 function parseAdminCourseSectionCourseMeta(
@@ -3226,7 +3266,23 @@ function parseAdminCourseSectionCourseMeta(
       : typeof suggested === 'string' && suggested.trim() !== ''
         ? suggested.trim()
         : null
-  return { title: title.trim() || '', suggestedInstructor }
+  const nested =
+    o.instructorSuggestion ?? o.instructor_suggestion ?? undefined
+  let instructorSuggestion = parseAdminInstructorSuggestion(nested)
+  if (instructorSuggestion == null && suggestedInstructor != null) {
+    instructorSuggestion = {
+      source: 'marks',
+      instructorId: null,
+      nameEng: null,
+      nameChi: null,
+      rawText: suggestedInstructor,
+    }
+  }
+  return {
+    title: title.trim() || '',
+    suggestedInstructor,
+    instructorSuggestion,
+  }
 }
 
 export async function fetchAdminCourseSectionCourseMeta(

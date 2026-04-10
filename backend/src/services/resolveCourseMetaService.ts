@@ -2,12 +2,22 @@ import {
   selectCourseNamesByCode,
   selectDistinctMarksInstructorsForCourse,
   selectDistinctTimetableInstructorIdsForCourse,
-  selectInstructorDisplayNameByInstructorId,
+  selectInstructorNamesByInstructorId,
 } from "../repositories/adminCourseMetaRepository.js";
+
+export type InstructorSuggestion = {
+  source: "timetable" | "marks";
+  instructorId: string | null;
+  nameEng: string | null;
+  nameChi: string | null;
+  rawText: string | null;
+};
 
 export type ResolvedCourseMeta = {
   title: string;
+  /** @deprecated Prefer `instructorSuggestion` + track-aware display; kept Chinese-first for compatibility. */
   suggestedInstructor: string | null;
+  instructorSuggestion: InstructorSuggestion | null;
 };
 
 function titleFromCourseRow(
@@ -19,6 +29,33 @@ function titleFromCourseRow(
     if (row.eng_name.trim() !== "") return row.eng_name.trim();
   }
   return courseCode;
+}
+
+function trimOrNull(s: string): string | null {
+  const t = s.trim();
+  return t === "" ? null : t;
+}
+
+/** Chinese-first string for legacy `suggestedInstructor` consumers. */
+function legacySuggestedInstructor(s: InstructorSuggestion): string | null {
+  const eng = s.nameEng?.trim() ?? "";
+  const chi = s.nameChi?.trim() ?? "";
+  const raw = s.rawText?.trim() ?? "";
+  if (chi !== "") return chi;
+  if (eng !== "") return eng;
+  return raw !== "" ? raw : null;
+}
+
+function buildMeta(
+  title: string,
+  suggestion: InstructorSuggestion | null,
+): ResolvedCourseMeta {
+  return {
+    title,
+    instructorSuggestion: suggestion,
+    suggestedInstructor:
+      suggestion != null ? legacySuggestedInstructor(suggestion) : null,
+  };
 }
 
 /**
@@ -38,18 +75,36 @@ export async function resolveCourseMeta(
     course_code,
   );
   if (timetableIds.length === 1) {
-    const display = await selectInstructorDisplayNameByInstructorId(
-      timetableIds[0]!,
-    );
-    if (display != null && display.trim() !== "") {
-      return { title, suggestedInstructor: display.trim() };
+    const instructorId = timetableIds[0]!;
+    const row = await selectInstructorNamesByInstructorId(instructorId);
+    const nameChi = row != null ? trimOrNull(row.name_chi) : null;
+    const nameEng = row != null ? trimOrNull(row.name_eng) : null;
+    const rawText =
+      nameChi == null && nameEng == null ? instructorId.trim() || null : null;
+    const suggestion: InstructorSuggestion = {
+      source: "timetable",
+      instructorId,
+      nameEng,
+      nameChi,
+      rawText,
+    };
+    if (nameChi != null || nameEng != null || rawText != null) {
+      return buildMeta(title, suggestion);
     }
   }
 
   const marksNames = await selectDistinctMarksInstructorsForCourse(course_code);
   if (marksNames.length === 1) {
-    return { title, suggestedInstructor: marksNames[0]!.trim() };
+    const raw = marksNames[0]!.trim();
+    const suggestion: InstructorSuggestion = {
+      source: "marks",
+      instructorId: null,
+      nameEng: null,
+      nameChi: null,
+      rawText: raw !== "" ? raw : null,
+    };
+    return buildMeta(title, suggestion);
   }
 
-  return { title, suggestedInstructor: null };
+  return buildMeta(title, null);
 }

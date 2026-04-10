@@ -40,6 +40,8 @@ import {
   getPreferredCourseTitle,
   type CourseTitleFields,
 } from '../../lib/courseDisplayName'
+import { getPreferredInstructorDisplay } from '../../lib/instructorDisplayName'
+import type { AdminInstructorSuggestion } from '../../lib/api'
 import { scheduleTrackTableLabel } from '../../lib/scheduleTrack'
 import { formatCatalogCredits } from './courses/courseCatalogDisplay'
 
@@ -271,23 +273,29 @@ export function AdminCourseSectionsPage() {
   }, [editingId])
 
   /**
-   * Optional legacy title from GET course-meta (same course as `courseCode` only);
-   * used only when catalog `eng_name` / `chi_name` are both empty.
+   * Course-meta for the selected `courseCode` only (stale rows cleared when code changes).
+   * Legacy title is used when catalog `eng_name` / `chi_name` are both empty.
+   * `instructorSuggestion` drives create-mode instructor auto-fill by schedule track.
    */
   const [resolvedCourseMeta, setResolvedCourseMeta] = useState<{
     courseCode: string
     legacyTitle: string | null
+    instructorSuggestion: AdminInstructorSuggestion | null
   } | null>(null)
 
   /** Create/edit: auto-filled course title; `locked` stops track-driven overwrites after manual edits. */
   const [courseTitleDraft, setCourseTitleDraft] = useState('')
   const [courseTitleLocked, setCourseTitleLocked] = useState(false)
 
+  /** Create mode: after a manual instructor edit, do not overwrite from meta/track. */
+  const [instructorLocked, setInstructorLocked] = useState(false)
+
   const resetForm = useCallback(() => {
     setForm(emptyForm())
     setEditingId(null)
     setFormMessage(null)
     setCourseTitleLocked(false)
+    setInstructorLocked(false)
   }, [])
 
   useEffect(() => {

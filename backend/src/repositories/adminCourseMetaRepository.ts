@@ -63,9 +63,15 @@ export async function selectDistinctTimetableInstructorIdsForCourse(
   return out;
 }
 
-export async function selectInstructorDisplayNameByInstructorId(
+export type InstructorNamesRow = {
+  name_chi: string;
+  name_eng: string;
+};
+
+/** Bilingual names for timetable `instructor_id` → `instructors` (first row by sequence). */
+export async function selectInstructorNamesByInstructorId(
   instructorId: string,
-): Promise<string | null> {
+): Promise<InstructorNamesRow | null> {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT name_chi, name_eng
      FROM instructors
@@ -76,10 +82,19 @@ export async function selectInstructorDisplayNameByInstructorId(
   );
   if (!Array.isArray(rows) || rows.length === 0) return null;
   const r = rows[0] as RowDataPacket;
-  const chi = trimOrEmpty(r.name_chi);
-  if (chi !== "") return chi;
-  const eng = trimOrEmpty(r.name_eng);
-  return eng !== "" ? eng : null;
+  return {
+    name_chi: trimOrEmpty(r.name_chi),
+    name_eng: trimOrEmpty(r.name_eng),
+  };
+}
+
+export async function selectInstructorDisplayNameByInstructorId(
+  instructorId: string,
+): Promise<string | null> {
+  const row = await selectInstructorNamesByInstructorId(instructorId);
+  if (row == null) return null;
+  if (row.name_chi !== "") return row.name_chi;
+  return row.name_eng !== "" ? row.name_eng : null;
 }
 
 /**
