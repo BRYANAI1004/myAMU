@@ -270,7 +270,7 @@ export function AdminCourseSectionsPage() {
   /**
    * Course-meta for the selected `courseCode` only (stale rows cleared when code changes).
    * Legacy title is used when catalog `eng_name` / `chi_name` are both empty.
-   * `instructorSuggestion` drives create-mode instructor auto-fill by schedule track.
+   * `instructorSuggestion` drives create-mode instructor auto-fill (stable eng → chi → raw).
    */
   const [resolvedCourseMeta, setResolvedCourseMeta] = useState<{
     courseCode: string
@@ -282,7 +282,7 @@ export function AdminCourseSectionsPage() {
   const [courseTitleDraft, setCourseTitleDraft] = useState('')
   const [courseTitleLocked, setCourseTitleLocked] = useState(false)
 
-  /** Create mode: after a manual instructor edit, do not overwrite from meta/track. */
+  /** Create mode: after a manual instructor edit, do not overwrite until reset/create/cancel. */
   const [instructorLocked, setInstructorLocked] = useState(false)
 
   const resetForm = useCallback(() => {
@@ -511,9 +511,8 @@ export function AdminCourseSectionsPage() {
     if (resolvedCourseMeta.courseCode !== code) return ''
     return getPreferredInstructorDisplay(
       resolvedCourseMeta.instructorSuggestion,
-      form.schedule_track,
     )
-  }, [editingId, courseCode, resolvedCourseMeta, form.schedule_track])
+  }, [editingId, courseCode, resolvedCourseMeta])
 
   useEffect(() => {
     if (editingId != null) return

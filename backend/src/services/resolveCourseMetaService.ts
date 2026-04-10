@@ -15,7 +15,7 @@ export type InstructorSuggestion = {
 
 export type ResolvedCourseMeta = {
   title: string;
-  /** @deprecated Prefer `instructorSuggestion` + track-aware display; kept Chinese-first for compatibility. */
+  /** @deprecated Prefer `instructorSuggestion` + stable display (eng → chi → raw); kept Chinese-first for compatibility. */
   suggestedInstructor: string | null;
   instructorSuggestion: InstructorSuggestion | null;
 };
