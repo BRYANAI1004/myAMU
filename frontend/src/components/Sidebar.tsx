@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import type { ComponentType, SVGProps } from 'react'
-import { useLanguage } from '@/LanguageContext'
-import { portalStudentLabel } from '@/lib/portalLocaleStrings'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 import {
   IconAcademics,
   IconClinical,
@@ -19,15 +19,15 @@ function navClassName(isActive: boolean) {
 
 const MAIN_NAV_ITEMS: readonly {
   to: string
-  label: string
+  labelKey: StudentPortalKey
   icon: ComponentType<SVGProps<SVGSVGElement>>
 }[] = [
-  { to: '/registration', label: 'Registration', icon: IconRegistration },
-  { to: '/finances', label: 'Finances', icon: IconFinance },
-  { to: '/academics', label: 'Academics', icon: IconAcademics },
-  { to: '/clinical', label: 'Clinical', icon: IconClinical },
-  { to: '/documents', label: 'Documents', icon: IconDocument },
-  { to: '/profile', label: 'My Account', icon: IconMyAccount },
+  { to: '/registration', labelKey: 'registrationModule', icon: IconRegistration },
+  { to: '/finances', labelKey: 'finances', icon: IconFinance },
+  { to: '/academics', labelKey: 'academics', icon: IconAcademics },
+  { to: '/clinical', labelKey: 'clinicalModule', icon: IconClinical },
+  { to: '/documents', labelKey: 'documents', icon: IconDocument },
+  { to: '/profile', labelKey: 'myAccount', icon: IconMyAccount },
 ]
 
 /** `dashboard` = module icons (e.g. entry nav). `internal` = text-only sidebar / drawer. */
@@ -39,7 +39,7 @@ type SidebarNavListProps = {
 }
 
 export function SidebarNavList({ onItemClick, variant = 'internal' }: SidebarNavListProps) {
-  const { locale } = useLanguage()
+  const t = useStudentPortalT()
   const handleClick = () => {
     onItemClick?.()
   }
@@ -55,8 +55,7 @@ export function SidebarNavList({ onItemClick, variant = 'internal' }: SidebarNav
     <ul className={listClass}>
       {MAIN_NAV_ITEMS.map((item) => {
         const Icon = item.icon
-        const label =
-          item.to === '/registration' ? portalStudentLabel(locale, 'registrationModule') : item.label
+        const label = t(item.labelKey)
         return (
           <li key={item.to}>
             <NavLink
@@ -84,12 +83,13 @@ type SidebarProps = {
 
 /** Fixed left sidebar — visible on desktop only (see `portal.css`). */
 export function Sidebar({ variant = 'internal' }: SidebarProps) {
+  const t = useStudentPortalT()
   return (
     <aside
       className={['portal-sidebar', 'portal-sidebar--desktop', `portal-sidebar--nav-${variant}`].join(' ')}
-      aria-label="Main navigation"
+      aria-label={t('mainNavigationAria')}
     >
-      <nav className="portal-sidebar-nav" aria-label="Portal modules">
+      <nav className="portal-sidebar-nav" aria-label={t('portalModulesAria')}>
         <SidebarNavList variant={variant} />
       </nav>
     </aside>

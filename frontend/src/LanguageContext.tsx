@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import { t as studentPortalT, type PortalLocale, type StudentPortalKey } from '@/lib/i18n'
 
-export type PortalLocale = 'en' | 'zh'
+export type { PortalLocale }
 
 const STORAGE_KEY = 'portal-locale'
 
@@ -63,4 +64,10 @@ export function useLanguage(): LanguageContextValue {
     )
   }
   return ctx
+}
+
+/** Student portal UI strings; switches with {@link useLanguage}. */
+export function useStudentPortalT(): (key: StudentPortalKey) => string {
+  const { locale } = useLanguage()
+  return useCallback((key: StudentPortalKey) => studentPortalT(locale, key), [locale])
 }

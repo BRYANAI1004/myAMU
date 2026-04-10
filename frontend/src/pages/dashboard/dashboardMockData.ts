@@ -2,41 +2,16 @@
 
 export type DashboardService = {
   to: string
-  title: string
   icon: 'registration' | 'finances' | 'academics' | 'clinical' | 'documents' | 'account'
 }
 
 export const DASHBOARD_SERVICES: DashboardService[] = [
-  {
-    to: '/registration',
-    title: 'Registration',
-    icon: 'registration',
-  },
-  {
-    to: '/finances',
-    title: 'Finances',
-    icon: 'finances',
-  },
-  {
-    to: '/academics',
-    title: 'Academics',
-    icon: 'academics',
-  },
-  {
-    to: '/clinical',
-    title: 'Clinical',
-    icon: 'clinical',
-  },
-  {
-    to: '/documents',
-    title: 'Documents',
-    icon: 'documents',
-  },
-  {
-    to: '/profile',
-    title: 'My Account',
-    icon: 'account',
-  },
+  { to: '/registration', icon: 'registration' },
+  { to: '/finances', icon: 'finances' },
+  { to: '/academics', icon: 'academics' },
+  { to: '/clinical', icon: 'clinical' },
+  { to: '/documents', icon: 'documents' },
+  { to: '/profile', icon: 'account' },
 ]
 
 export type DashboardCourse = {
