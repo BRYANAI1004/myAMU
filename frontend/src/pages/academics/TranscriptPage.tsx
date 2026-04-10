@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalT } from '../../LanguageContext'
 import {
   fetchStudentAcademics,
   type StudentAcademicsResponse,
@@ -8,11 +9,11 @@ import {
 type TranscriptRow = StudentAcademicsResponse['transcript'][number]
 
 function termRank(term: string): number {
-  const t = term.trim().toLowerCase()
-  if (t === 'fall') return 4
-  if (t === 'summer') return 3
-  if (t === 'spring') return 2
-  if (t === 'winter') return 1
+  const tr = term.trim().toLowerCase()
+  if (tr === 'fall') return 4
+  if (tr === 'summer') return 3
+  if (tr === 'spring') return 2
+  if (tr === 'winter') return 1
   return 0
 }
 
@@ -50,7 +51,9 @@ function groupTranscriptByTermYear(
 }
 
 export function TranscriptPage() {
+  const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const dash = t('dashEm')
 
   const [academics, setAcademics] = useState<StudentAcademicsResponse | null>(
     null,
@@ -83,7 +86,7 @@ export function TranscriptPage() {
         if (ac.signal.aborted) return
         setAcademics(null)
         setError(
-          e instanceof Error ? e.message : 'Could not load your transcript.',
+          e instanceof Error ? e.message : t('couldNotLoadTranscriptStandaloneFallback'),
         )
       } finally {
         if (!ac.signal.aborted) {
@@ -93,7 +96,7 @@ export function TranscriptPage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, reloadKey])
+  }, [currentStudentId, reloadKey, t])
 
   const grouped = useMemo(
     () =>
@@ -112,10 +115,9 @@ export function TranscriptPage() {
 
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Transcript</h2>
+      <h2 className="portal-section-heading">{t('transcriptHeading')}</h2>
       <p className="portal-page-lede">
-        Your transcript is the official record of your academic work. Unofficial copies are available for your
-        review; official transcripts are issued on request and may incur a processing fee.
+        {t('transcriptPageLede')}
       </p>
 
       {showEmpty ? (
@@ -123,9 +125,9 @@ export function TranscriptPage() {
           className="portal-card portal-profile-state"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Sign in to view your transcript</p>
+          <p className="portal-profile-state__title">{t('signInToViewTranscript')}</p>
           <p className="portal-profile-state__detail">
-            Your coursework history appears here after you log in with your student account.
+            {t('signInToViewTranscriptStandaloneDetail')}
           </p>
         </section>
       ) : null}
@@ -136,9 +138,9 @@ export function TranscriptPage() {
           aria-busy="true"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Loading transcript</p>
+          <p className="portal-profile-state__title">{t('loadingTranscript')}</p>
           <p className="portal-profile-state__detail">
-            Please wait while we load your academic record.
+            {t('loadingTranscriptAcademicRecordDetail')}
           </p>
         </section>
       ) : null}
@@ -149,7 +151,7 @@ export function TranscriptPage() {
           role="alert"
           aria-live="assertive"
         >
-          <p className="portal-profile-state__title">We could not load your transcript</p>
+          <p className="portal-profile-state__title">{t('couldNotLoadTranscript')}</p>
           <p className="portal-profile-state__detail">{error}</p>
           <div className="portal-actions portal-profile-state__actions">
             <button
@@ -157,7 +159,7 @@ export function TranscriptPage() {
               className="portal-btn portal-btn--secondary"
               onClick={() => setReloadKey((k) => k + 1)}
             >
-              Try again
+              {t('tryAgain')}
             </button>
           </div>
         </section>
@@ -167,13 +169,13 @@ export function TranscriptPage() {
         <div className="portal-stack">
           <section className="portal-card portal-academics-transcript-section" aria-labelledby="unofficial-heading">
             <h3 id="unofficial-heading" className="portal-section-heading">
-              Unofficial transcript
+              {t('unofficialTranscriptSectionHeading')}
             </h3>
             <p className="portal-card-note portal-academics-transcript-desc">
-              View a web-based summary for advising and planning. This document is not certified for external use.
+              {t('unofficialTranscriptWebSummaryDesc')}
             </p>
             {grouped.length === 0 ? (
-              <p className="portal-card-note">No transcript rows on file yet.</p>
+              <p className="portal-card-note">{t('noTranscriptRows')}</p>
             ) : (
               <div className="portal-stack">
                 {grouped.map((g) => (
@@ -183,10 +185,10 @@ export function TranscriptPage() {
                       <table className="portal-table portal-table--grades">
                         <thead>
                           <tr>
-                            <th scope="col">Course</th>
-                            <th scope="col">Title</th>
-                            <th scope="col">Grade</th>
-                            <th scope="col">Numeric Grade</th>
+                            <th scope="col">{t('course')}</th>
+                            <th scope="col">{t('title')}</th>
+                            <th scope="col">{t('grade')}</th>
+                            <th scope="col">{t('numericGrade')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -198,14 +200,14 @@ export function TranscriptPage() {
                               <td>{row.courseTitle}</td>
                               <td>
                                 <span className="portal-status">
-                                  {row.grade?.trim() ? row.grade : '—'}
+                                  {row.grade?.trim() ? row.grade : dash}
                                 </span>
                               </td>
                               <td>
                                 {row.numericGrade != null &&
                                 Number.isFinite(row.numericGrade)
                                   ? String(row.numericGrade)
-                                  : '—'}
+                                  : dash}
                               </td>
                             </tr>
                           ))}
@@ -220,15 +222,14 @@ export function TranscriptPage() {
 
           <section className="portal-card portal-academics-transcript-section" aria-labelledby="official-heading">
             <h3 id="official-heading" className="portal-section-heading">
-              Official transcript
+              {t('officialTranscriptSectionHeading')}
             </h3>
             <p className="portal-card-note portal-academics-transcript-desc">
-              Order a certified transcript for employers, licensing boards, or other institutions. Delivery options
-              will be available in a later release.
+              {t('officialTranscriptOrderDesc')}
             </p>
             <div className="portal-actions portal-academics-transcript-actions">
               <button type="button" className="portal-btn portal-btn--secondary">
-                Request official transcript
+                {t('requestOfficialTranscriptButton')}
               </button>
             </div>
           </section>
@@ -238,12 +239,12 @@ export function TranscriptPage() {
       {!showEmpty && !sectionLoading && !error && academics ? (
         <section className="portal-module-panel" aria-labelledby="terms-heading">
           <h3 id="terms-heading" className="portal-module-panel-heading">
-            Terms on record
+            {t('termsOnRecordHeading')}
           </h3>
           <ul className="portal-module-list">
             {termsOnRecord.length === 0 ? (
               <li className="portal-module-list-item">
-                <span className="portal-module-list-label">None yet</span>
+                <span className="portal-module-list-label">{t('noneYet')}</span>
               </li>
             ) : (
               termsOnRecord.map((term) => (
@@ -258,11 +259,10 @@ export function TranscriptPage() {
 
       {!showEmpty && !sectionLoading && !error && academics ? (
         <div className="portal-card portal-academics-summary-block">
-          <p className="portal-card-label">Summary</p>
+          <p className="portal-card-label">{t('summary')}</p>
           <p className="portal-card-value">{academics.studentName}</p>
           <p className="portal-card-note">
-            Credits earned and GPA details may appear in a later release. This summary reflects your unofficial
-            transcript data only.
+            {t('summaryTranscriptStudentFooterNote')}
           </p>
         </div>
       ) : null}

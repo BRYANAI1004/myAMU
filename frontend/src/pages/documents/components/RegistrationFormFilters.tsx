@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import {
   REGISTRATION_QUARTERS,
   type RegistrationQuarter,
@@ -22,10 +23,11 @@ export function RegistrationFormFilters({
   onGenerate,
   busy,
 }: RegistrationFormFiltersProps) {
+  const t = useStudentPortalT()
   return (
     <div className="portal-registration-form-filters portal-academics-print-hide">
       <label className="portal-registration-form-filters__field">
-        <span className="portal-registration-form-filters__label">Registration Year</span>
+        <span className="portal-registration-form-filters__label">{t('documentsRegistrationYear')}</span>
         <select
           className="portal-account-ledger__select"
           value={String(year)}
@@ -39,7 +41,7 @@ export function RegistrationFormFilters({
         </select>
       </label>
       <label className="portal-registration-form-filters__field">
-        <span className="portal-registration-form-filters__label">Quarter</span>
+        <span className="portal-registration-form-filters__label">{t('documentsQuarter')}</span>
         <select
           className="portal-account-ledger__select"
           value={quarter}
@@ -61,7 +63,7 @@ export function RegistrationFormFilters({
           onClick={onGenerate}
           disabled={busy}
         >
-          {busy ? 'Loading…' : 'Generate'}
+          {busy ? t('loadingEllipsis') : t('documentsRegFormGenerate')}
         </button>
       </div>
     </div>

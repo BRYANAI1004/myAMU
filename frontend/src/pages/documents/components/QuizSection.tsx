@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import {
   DOCUMENT_QUIZZES,
   type QuizId,
@@ -41,6 +42,7 @@ export function QuizSection({
   requirementsByQuiz,
   onRefresh,
 }: QuizSectionProps) {
+  const t = useStudentPortalT()
   const [expandedQuizId, setExpandedQuizId] = useState<QuizId | null>(null)
   const [answersByQuiz, setAnswersByQuiz] =
     useState<Record<QuizId, Record<string, string>>>(emptyAnswers)
@@ -90,7 +92,7 @@ export function QuizSection({
       if (!sid || !tid) {
         setErrorByQuiz((prev) => ({
           ...prev,
-          [quizId]: 'Missing student or term. Reload the page and try again.',
+          [quizId]: t('documentsAgreementMissingStudentTerm'),
         }))
         return
       }
@@ -116,14 +118,14 @@ export function QuizSection({
         await onRefresh()
       } catch (e) {
         const message =
-          e instanceof Error ? e.message : 'Could not submit the quiz. Try again.'
+          e instanceof Error ? e.message : t('documentsQuizSubmitFailed')
         setErrorByQuiz((prev) => ({ ...prev, [quizId]: message }))
       } finally {
         submitInFlightRef.current = false
         setSubmittingQuizId(null)
       }
     },
-    [academicTermId, answersByQuiz, onRefresh, requirementsByQuiz, studentId],
+    [academicTermId, answersByQuiz, onRefresh, requirementsByQuiz, studentId, t],
   )
 
   return (

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AIAssistantPageContext } from '../data/aiMockReplies'
 import { getWelcomeLines } from '../data/aiMockReplies'
+import { useLanguage } from '../LanguageContext'
 import { buildApiUrl } from '../lib/api'
+import { t as portalT, type PortalLocale } from '../lib/i18n'
 import type { SendAssistantAttachmentPayload } from '../lib/sendAssistantMessage'
 
 export type AIAssistantChatRole = 'user' | 'assistant'
@@ -19,13 +21,27 @@ export type AIAssistantAttachment = SendAssistantAttachmentPayload
 
 const AMU_AI_OPEN = 'amu-ai-open'
 const AMU_AI_MESSAGES = 'amu-ai-messages'
+const PORTAL_LOCALE_KEY = 'portal-locale'
+
+function readStoredLocale(): PortalLocale {
+  try {
+    const v = localStorage.getItem(PORTAL_LOCALE_KEY)
+    if (v === 'zh' || v === 'en') return v
+  } catch {
+    /* ignore */
+  }
+  return 'en'
+}
 
 function newId(): string {
   return crypto.randomUUID()
 }
 
-function assistantWelcomeMessage(pageContext: AIAssistantPageContext): AIAssistantChatMessage {
-  const lines = getWelcomeLines(pageContext)
+function assistantWelcomeMessage(
+  pageContext: AIAssistantPageContext,
+  locale: PortalLocale,
+): AIAssistantChatMessage {
+  const lines = getWelcomeLines(locale, pageContext)
   return {
     id: newId(),
     role: 'assistant',
@@ -43,7 +59,7 @@ function userMessage(content: string): AIAssistantChatMessage {
   return { id: newId(), role: 'user', content, createdAt: Date.now() }
 }
 
-function formatSourcesAppendix(sources: unknown): string {
+function formatSourcesAppendix(sources: unknown, locale: PortalLocale): string {
   if (!Array.isArray(sources) || sources.length === 0) return ''
   const lines: string[] = []
   for (const item of sources) {
@@ -55,10 +71,16 @@ function formatSourcesAppendix(sources: unknown): string {
       typeof o.chunkIndex === 'number' && Number.isFinite(o.chunkIndex)
         ? o.chunkIndex
         : null
-    lines.push(chunk != null ? `- ${src} (chunk ${chunk})` : `- ${src}`)
+    lines.push(
+      chunk != null
+        ? portalT(locale, 'aiSourceBulletChunk')
+            .replace('{src}', src)
+            .replace('{chunk}', String(chunk))
+        : portalT(locale, 'aiSourceBullet').replace('{src}', src),
+    )
   }
   if (lines.length === 0) return ''
-  return `\n\nSources:\n${lines.join('\n')}`
+  return `\n\n${portalT(locale, 'sourcesHeading')}\n${lines.join('\n')}`
 }
 
 function isChatMessageRecord(v: unknown): v is AIAssistantChatMessage {
@@ -121,19 +143,21 @@ function persistPanelOpen(state: AIAssistantPanelState): void {
 function buildInitialMessages(
   pageContext: AIAssistantPageContext,
   panelState: AIAssistantPanelState,
+  locale: PortalLocale,
 ): AIAssistantChatMessage[] {
   const stored = readStoredMessages()
   if (stored && stored.length > 0) return stored
   if (panelState === 'open' || panelState === 'minimized') {
-    return [assistantWelcomeMessage(pageContext)]
+    return [assistantWelcomeMessage(pageContext, locale)]
   }
   return []
 }
 
 export function useAIAssistant(pageContext: AIAssistantPageContext) {
+  const { locale } = useLanguage()
   const [panelState, setPanelState] = useState<AIAssistantPanelState>(() => readPanelOpen())
   const [messages, setMessages] = useState<AIAssistantChatMessage[]>(() =>
-    buildInitialMessages(pageContext, readPanelOpen()),
+    buildInitialMessages(pageContext, readPanelOpen(), readStoredLocale()),
   )
   const [draft, setDraft] = useState('')
   const [attachments, setAttachments] = useState<AIAssistantAttachment[]>([])
@@ -158,9 +182,9 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
   const ensureWelcome = useCallback(() => {
     setMessages((prev) => {
       if (prev.length > 0) return prev
-      return [assistantWelcomeMessage(pageContext)]
+      return [assistantWelcomeMessage(pageContext, locale)]
     })
-  }, [pageContext])
+  }, [pageContext, locale])
 
   const openPanel = useCallback(() => {
     ensureWelcome()
@@ -194,8 +218,8 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
       }
       return []
     })
-    setMessages([assistantWelcomeMessage(pageContext)])
-  }, [pageContext])
+    setMessages([assistantWelcomeMessage(pageContext, locale)])
+  }, [pageContext, locale])
 
   const addAttachments = useCallback((files: FileList | File[]) => {
     const list = Array.from(files)
@@ -232,7 +256,8 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
     if ((text === '' && attachments.length === 0) || isAwaitingReply) return
 
     const outgoingAttachments = attachments
-    const userLine = text || (outgoingAttachments.length > 0 ? 'Sent file(s).' : '')
+    const userLine =
+      text || (outgoingAttachments.length > 0 ? portalT(locale, 'sentFiles') : '')
 
     if (userLine) {
       setMessages((m) => [...m, userMessage(userLine)])
@@ -278,16 +303,14 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
       }
 
       const answer = (data as { answer: string; sources?: unknown }).answer
-      const appendix = formatSourcesAppendix((data as { sources?: unknown }).sources)
+      const appendix = formatSourcesAppendix((data as { sources?: unknown }).sources, locale)
       setMessages((m) => [...m, assistantTextMessage(answer + appendix)])
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return
       console.error(e)
       setMessages((m) => [
         ...m,
-        assistantTextMessage(
-          "Sorry, I'm having trouble connecting to the server. Please try again.",
-        ),
+        assistantTextMessage(portalT(locale, 'aiConnectionError')),
       ])
     } finally {
       revokeAttachmentUrls(outgoingAttachments)
@@ -296,16 +319,16 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
         setIsAwaitingReply(false)
       }
     }
-  }, [attachments, draft, isAwaitingReply, revokeAttachmentUrls])
+  }, [attachments, draft, isAwaitingReply, locale, revokeAttachmentUrls])
 
   useEffect(() => {
     setMessages((prev) => {
       if (prev.length !== 1) return prev
       const m = prev[0]
       if (m.role !== 'assistant' || !m.welcomeLines?.length) return prev
-      return [assistantWelcomeMessage(pageContext)]
+      return [assistantWelcomeMessage(pageContext, locale)]
     })
-  }, [pageContext])
+  }, [pageContext, locale])
 
   useEffect(() => {
     if (panelState !== 'open') return

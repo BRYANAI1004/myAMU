@@ -1,6 +1,7 @@
 import Lottie from 'lottie-react'
 import type { CSSProperties, MouseEvent, PointerEvent as ReactPointerEvent } from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useCatLottieData } from './useCatLottieData'
 
 type AIAssistantPetProps = {
@@ -102,6 +103,7 @@ export function AIAssistantDockCat({
   onOpenAssistant,
   onRequestHideCat,
 }: AIAssistantDockCatProps) {
+  const t = useStudentPortalT()
   const [menuOpen, setMenuOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
   const menuRef = useRef<HTMLDivElement>(null)
@@ -143,7 +145,7 @@ export function AIAssistantDockCat({
         className="portal-ai-assistant-dock__cat-hit"
         role="button"
         tabIndex={0}
-        aria-label="Open AMU AI Assist"
+        aria-label={t('aiOpenAmuAssist')}
         aria-haspopup={contextMenuEnabled ? 'menu' : undefined}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -165,7 +167,7 @@ export function AIAssistantDockCat({
           ref={menuRef}
           className="portal-ai-assistant-cat-context-menu"
           role="menu"
-          aria-label="Cat actions"
+          aria-label={t('aiCatActions')}
           style={{ left: menuPos.x, top: menuPos.y }}
         >
           <button
@@ -177,7 +179,7 @@ export function AIAssistantDockCat({
               closeMenu()
             }}
           >
-            Hide AMU AI Cat
+            {t('hideAmuAiCat')}
           </button>
         </div>
       ) : null}

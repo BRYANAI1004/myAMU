@@ -55,6 +55,5 @@ export function pickDefaultRegistrationTermId(
   return resolveSelectedRegistrationTermId(null, options, current)
 }
 
-/** User-facing copy when term APIs fail (never show raw transport/SQL text). */
-export const REGISTRATION_TERMS_LOAD_ERROR =
-  'Academic terms are not available right now. If this continues, contact the registrar.'
+/** Sentinel for translated copy via `t('registrationTermsLoadError')` in the registration UI. */
+export const REGISTRATION_TERMS_LOAD_ERROR = '__REGISTRATION_TERMS_LOAD_ERROR__'

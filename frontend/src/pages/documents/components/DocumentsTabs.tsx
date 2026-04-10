@@ -1,3 +1,5 @@
+import { useStudentPortalT } from '@/LanguageContext'
+
 export type DocumentsTabId = 'registration' | 'quiz' | 'agreements'
 
 type DocumentsTabsProps = {
@@ -5,21 +7,23 @@ type DocumentsTabsProps = {
   onChange: (id: DocumentsTabId) => void
 }
 
-const ITEMS: { id: DocumentsTabId; label: string }[] = [
-  { id: 'registration', label: 'Registration Forms' },
-  { id: 'quiz', label: 'Quiz' },
-  { id: 'agreements', label: 'Agreements' },
+const TAB_IDS: { id: DocumentsTabId; labelKey: 'documentsTabRegistrationForms' | 'documentsTabQuiz' | 'documentsTabsAgreements' }[] = [
+  { id: 'registration', labelKey: 'documentsTabRegistrationForms' },
+  { id: 'quiz', labelKey: 'documentsTabQuiz' },
+  { id: 'agreements', labelKey: 'documentsTabsAgreements' },
 ]
 
 export function DocumentsTabs({ active, onChange }: DocumentsTabsProps) {
+  const t = useStudentPortalT()
+
   return (
     <div
       className="portal-academics-print-hide"
       role="tablist"
-      aria-label="Documents and forms sections"
+      aria-label={t('documentsTabsSectionsAria')}
     >
       <div className="portal-tab-group portal-academics-portal-tabs">
-        {ITEMS.map(({ id, label }) => (
+        {TAB_IDS.map(({ id, labelKey }) => (
           <button
             key={id}
             type="button"
@@ -33,7 +37,7 @@ export function DocumentsTabs({ active, onChange }: DocumentsTabsProps) {
               .join(' ')}
             onClick={() => onChange(id)}
           >
-            {label}
+            {t(labelKey)}
           </button>
         ))}
       </div>

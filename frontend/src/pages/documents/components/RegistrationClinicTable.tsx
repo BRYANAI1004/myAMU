@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import type { RegistrationClinicRow } from '../../../lib/registrationFormAdapter'
 
 type Props = {
@@ -6,6 +7,7 @@ type Props = {
 }
 
 export function RegistrationClinicTable({ rows, totalHours }: Props) {
+  const t = useStudentPortalT()
   const displayRows = rows.length > 0 ? rows : []
   const padRows = 4
   const emptySlots = Math.max(0, padRows - displayRows.length)
@@ -15,12 +17,12 @@ export function RegistrationClinicTable({ rows, totalHours }: Props) {
       <table className="portal-registration-form-table">
         <thead>
           <tr>
-            <th scope="col">Course No.</th>
-            <th scope="col">Clinic Course Title</th>
-            <th scope="col">Hours</th>
-            <th scope="col">Day</th>
-            <th scope="col">Time</th>
-            <th scope="col">Supervisor&apos;s Name</th>
+            <th scope="col">{t('documentsRegFormColCourseNo')}</th>
+            <th scope="col">{t('documentsRegFormColClinicCourseTitle')}</th>
+            <th scope="col">{t('documentsRegFormColHours')}</th>
+            <th scope="col">{t('documentsRegFormColDay')}</th>
+            <th scope="col">{t('documentsRegFormColTime')}</th>
+            <th scope="col">{t('documentsRegFormColSupervisorName')}</th>
           </tr>
         </thead>
         <tbody>
@@ -48,7 +50,7 @@ export function RegistrationClinicTable({ rows, totalHours }: Props) {
         <tfoot>
           <tr>
             <th scope="row" colSpan={2}>
-              Total Hours
+              {t('documentsRegFormTotalHours')}
             </th>
             <td colSpan={4}>{totalHours}</td>
           </tr>

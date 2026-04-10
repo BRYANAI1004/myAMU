@@ -1,4 +1,5 @@
 import { useCallback, useRef, type Ref } from 'react'
+import { useStudentPortalT } from '../../LanguageContext'
 import type { AIAssistantAttachment } from '../../hooks/useAIAssistant'
 
 const IMAGE_ACCEPT = 'image/*'
@@ -28,6 +29,7 @@ export function AIAssistantInput({
   onAddAttachments,
   onRemoveAttachment,
 }: AIAssistantInputProps) {
+  const t = useStudentPortalT()
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -45,7 +47,7 @@ export function AIAssistantInput({
   return (
     <div className="portal-ai-assistant-input-stack">
       {attachments.length > 0 ? (
-        <div className="portal-ai-assistant-attachments" aria-label="Selected attachments">
+        <div className="portal-ai-assistant-attachments" aria-label={t('selectedAttachmentsAria')}>
           <ul className="portal-ai-assistant-attachments__list">
             {attachments.map((a) => (
               <li key={a.id} className="portal-ai-assistant-attachments__item">
@@ -75,7 +77,7 @@ export function AIAssistantInput({
                   type="button"
                   className="portal-ai-assistant-attachments__remove"
                   onClick={() => onRemoveAttachment(a.id)}
-                  aria-label={`Remove ${a.name}`}
+                  aria-label={`${t('removeAttachmentNamed')} ${a.name}`}
                   disabled={disabled}
                 >
                   ×
@@ -113,17 +115,17 @@ export function AIAssistantInput({
         }}
       />
 
-      <p className="portal-ai-assistant-attribution">Powered by AHMC WanPanel AI</p>
+      <p className="portal-ai-assistant-attribution">{t('poweredByAhmc')}</p>
 
       <div className="portal-ai-assistant-compose">
-        <div className="portal-ai-assistant-compose__leading" role="group" aria-label="Add attachments">
+        <div className="portal-ai-assistant-compose__leading" role="group" aria-label={t('addAttachmentsGroupAria')}>
           <button
             type="button"
             className="portal-ai-assistant-upload-btn"
             onClick={onPickImage}
             disabled={disabled}
-            aria-label="Add images"
-            title="Add images"
+            aria-label={t('addImages')}
+            title={t('addImagesTitle')}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
               <rect
@@ -150,8 +152,8 @@ export function AIAssistantInput({
             className="portal-ai-assistant-upload-btn"
             onClick={onPickFile}
             disabled={disabled}
-            aria-label="Add files"
-            title="Add files (PDF, Word, text)"
+            aria-label={t('addFiles')}
+            title={t('addFilesTitle')}
           >
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" aria-hidden>
               <path
@@ -165,7 +167,7 @@ export function AIAssistantInput({
           </button>
         </div>
         <label htmlFor={id} className="visually-hidden">
-          Message to AMU AI Assistant
+          {t('messageToAmuAssistant')}
         </label>
         <textarea
           ref={inputRef}
@@ -181,7 +183,7 @@ export function AIAssistantInput({
             e.preventDefault()
             onSubmit()
           }}
-          placeholder="Ask a question…"
+          placeholder={t('askAQuestionPlaceholder')}
           autoComplete="off"
         />
         <button
@@ -189,9 +191,9 @@ export function AIAssistantInput({
           className="portal-ai-assistant-send"
           onClick={onSubmit}
           disabled={sendDisabled}
-          aria-label="Send message"
+          aria-label={t('sendMessage')}
         >
-          Send
+          {t('send')}
         </button>
       </div>
     </div>

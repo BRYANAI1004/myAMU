@@ -1,20 +1,23 @@
 import { NavLink } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 
 function linkClass(isActive: boolean) {
   return ['portal-tab', isActive ? 'portal-tab--active' : ''].filter(Boolean).join(' ')
 }
 
-const ITEMS = [
-  { to: 'search', label: 'Course Search' },
-  { to: 'offered-timetable', label: 'Offered Timetable' },
-  { to: 'course-bin', label: 'My CourseBin' },
-  { to: 'add-drop', label: 'Add/Drop' },
-  { to: 'schedule', label: 'My Timetable' },
-] as const
+const ITEMS: { to: string; labelKey: StudentPortalKey }[] = [
+  { to: 'search', labelKey: 'courseSearch' },
+  { to: 'offered-timetable', labelKey: 'offeredTimetable' },
+  { to: 'course-bin', labelKey: 'myCourseBin' },
+  { to: 'add-drop', labelKey: 'addDrop' },
+  { to: 'schedule', labelKey: 'myTimetable' },
+]
 
 export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) {
+  const t = useStudentPortalT()
   return (
-    <nav className="portal-registration-nav" aria-label="Registration">
+    <nav className="portal-registration-nav" aria-label={t('registrationNavAria')}>
       <ul className="portal-tab-group">
         {ITEMS.map((item) => (
           <li key={item.to}>
@@ -22,7 +25,7 @@ export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) 
               to={`${item.to}${termLinkSearch}`}
               className={({ isActive }) => linkClass(isActive)}
             >
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           </li>
         ))}

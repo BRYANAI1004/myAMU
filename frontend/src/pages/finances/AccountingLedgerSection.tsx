@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import {
   fetchAccountingLedger,
@@ -23,11 +24,11 @@ function ledgerPaymentCell(credit: number): string {
   return formatMoney(credit)
 }
 
-function formatLedgerDate(iso: string): string {
+function formatLedgerDate(iso: string, locale: string): string {
   if (!iso || iso.trim() === '') return '—'
   const d = new Date(`${iso.trim()}T12:00:00`)
   if (Number.isNaN(d.getTime())) return iso.trim()
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(locale, {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -42,6 +43,9 @@ function quarterKey(q: AccountingQuarterOption): string {
  * Quarter selector + legacy `accounting` detail table (real students only; hidden when no quarters).
  */
 export function AccountingLedgerSection() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
+  const dateLocale = locale === 'zh' ? 'zh-TW' : 'en-US'
   const { currentStudentId, isAuthenticated } = useAccount()
   const [quarters, setQuarters] = useState<AccountingQuarterOption[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -70,7 +74,6 @@ export function AccountingLedgerSection() {
         const res = await fetchAccountingQuarters(studentId, { signal: ac.signal })
         if (ac.signal.aborted) return
         setQuarters(res.quarters)
-        // API returns quarters newest-first; default selection is the latest term/year.
         const newest = res.quarters[0]
         setSelectedKey(newest ? quarterKey(newest) : null)
         setLedger(null)
@@ -79,9 +82,7 @@ export function AccountingLedgerSection() {
         setQuarters([])
         setSelectedKey(null)
         setLedger(null)
-        setError(
-          e instanceof Error ? e.message : 'Could not load accounting quarters.',
-        )
+        setError(e instanceof Error ? e.message : t('couldNotLoadAccountingQuartersFallback'))
       } finally {
         if (!ac.signal.aborted) setLoadingQuarters(false)
       }
@@ -115,11 +116,7 @@ export function AccountingLedgerSection() {
       } catch (e) {
         if (!ac.signal.aborted) {
           setLedger(null)
-          setError(
-            e instanceof Error
-              ? e.message
-              : 'Could not load ledger for this quarter.',
-          )
+          setError(e instanceof Error ? e.message : t('couldNotLoadAccountingQuartersFallback'))
         }
       } finally {
         if (!ac.signal.aborted) setLoadingLedger(false)
@@ -135,7 +132,7 @@ export function AccountingLedgerSection() {
   if (loadingQuarters && quarters.length === 0) {
     return (
       <section className="portal-stack" aria-busy="true" aria-live="polite">
-        <p className="portal-inline-note portal-inline-note--flush">Loading accounting quarters…</p>
+        <p className="portal-inline-note portal-inline-note--flush">{t('loadingAccountingQuarters')}</p>
       </section>
     )
   }
@@ -144,9 +141,9 @@ export function AccountingLedgerSection() {
     if (error) {
       return (
         <section className="portal-stack" aria-live="polite">
-          <h2 className="portal-section-heading">Accounting ledger by quarter</h2>
+          <h2 className="portal-section-heading">{t('accountingLedgerByQuarter')}</h2>
           <p className="portal-inline-note portal-inline-note--flush" role="alert">
-            Could not load accounting quarters. {error}
+            {t('couldNotLoadAccountingQuarters')} {error}
           </p>
         </section>
       )
@@ -159,13 +156,10 @@ export function AccountingLedgerSection() {
   const showMakePaymentControl = selectedQuarter != null && quarters.length > 0
 
   return (
-    <section
-      className="portal-stack"
-      aria-labelledby="accounting-ledger-heading"
-    >
+    <section className="portal-stack" aria-labelledby="accounting-ledger-heading">
       <div className="portal-account-ledger__toolbar">
         <h2 id="accounting-ledger-heading" className="portal-section-heading">
-          Accounting ledger by quarter
+          {t('accountingLedgerByQuarter')}
         </h2>
         <div className="portal-account-ledger__toolbar-actions">
           {showMakePaymentControl ? (
@@ -174,7 +168,7 @@ export function AccountingLedgerSection() {
                 to="/plan"
                 className="portal-btn portal-btn--primary portal-account-ledger__pay-btn"
               >
-                Make Payment
+                {t('makePayment')}
               </Link>
             ) : (
               <button
@@ -182,12 +176,12 @@ export function AccountingLedgerSection() {
                 className="portal-btn portal-btn--primary portal-account-ledger__pay-btn"
                 disabled={loadingLedger || ledger === null}
               >
-                Make Payment
+                {t('makePayment')}
               </button>
             )
           ) : null}
           <label className="portal-account-ledger__quarter-label" htmlFor="accounting-quarter-select">
-            <span className="visually-hidden">Quarter</span>
+            <span className="visually-hidden">{t('quarterVisuallyHidden')}</span>
             <select
               id="accounting-quarter-select"
               className="portal-account-ledger__select"
@@ -210,35 +204,35 @@ export function AccountingLedgerSection() {
 
       {error ? (
         <p className="portal-inline-note portal-inline-note--flush" role="alert">
-          Ledger could not be loaded. {error}
+          {t('ledgerCouldNotLoad')} {error}
         </p>
       ) : null}
 
       {loadingLedger && ledger == null ? (
         <p className="portal-inline-note portal-inline-note--flush" aria-busy="true">
-          Loading ledger…
+          {t('loadingLedger')}
         </p>
       ) : ledger ? (
         <>
           <div className="portal-table-wrap">
             <table className="portal-table portal-table--courses">
               <caption className="visually-hidden">
-                Detailed accounting entries for {ledger.term} {ledger.year}
+                {t('ledgerCaptionPrefix')} {ledger.term} {ledger.year}
               </caption>
               <thead>
                 <tr>
-                  <th scope="col">Date</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Code</th>
-                  <th scope="col">Description</th>
-                  <th scope="col">Charge</th>
-                  <th scope="col">Payment</th>
+                  <th scope="col">{t('date')}</th>
+                  <th scope="col">{t('type')}</th>
+                  <th scope="col">{t('code')}</th>
+                  <th scope="col">{t('description')}</th>
+                  <th scope="col">{t('charge')}</th>
+                  <th scope="col">{t('payment')}</th>
                 </tr>
               </thead>
               <tbody>
                 {ledger.rows.map((row, index) => (
                   <tr key={`${row.date}-${index}-${row.memo}`}>
-                    <td>{formatLedgerDate(row.date)}</td>
+                    <td>{formatLedgerDate(row.date, dateLocale)}</td>
                     <td className="portal-table-cell-capitalize">{dashText(row.type)}</td>
                     <td>{dashText(row.code)}</td>
                     <td>{dashText(row.memo)}</td>
@@ -250,21 +244,21 @@ export function AccountingLedgerSection() {
               <tfoot>
                 <tr>
                   <th scope="row" colSpan={4}>
-                    Total charges
+                    {t('totalCharges')}
                   </th>
                   <td>{formatMoney(ledger.summary.totalCharges)}</td>
                   <td>—</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={4}>
-                    Total payments
+                    {t('totalPayments')}
                   </th>
                   <td>—</td>
                   <td>{formatMoney(ledger.summary.totalPayments)}</td>
                 </tr>
                 <tr>
                   <th scope="row" colSpan={4}>
-                    Balance
+                    {t('balance')}
                   </th>
                   <td colSpan={2}>{formatMoney(ledger.summary.balance)}</td>
                 </tr>

@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useLanguage, useStudentPortalT } from '../../LanguageContext'
+import type { PortalLocale } from '../../lib/i18n'
 import {
   fetchStudentAcademics,
   fetchStudentTranscriptPreview,
@@ -25,12 +27,10 @@ type AcademicsTab = 'history' | 'transcript'
 
 type EnrollmentHistoryRow = StudentAcademicsResponse['enrollmentHistory'][number]
 
-/** Displayed in transcript masthead (print + screen). */
-const SCHOOL_TITLE = 'ALHAMBRA MEDICAL UNIVERSITY'
-
-function formatIssueDate(): string {
+function formatIssueDate(locale: PortalLocale): string {
+  const loc = locale === 'zh' ? 'zh-Hant' : 'en-US'
   try {
-    return new Date().toLocaleDateString(undefined, {
+    return new Date().toLocaleDateString(loc, {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -45,13 +45,16 @@ const GRADES_TABLE_CLASS =
 
 const REGISTRATION_HISTORY_TABLE_CLASS = `${GRADES_TABLE_CLASS} portal-academics-registration-history-table`
 
-function instructorCell(v: string | null | undefined): string {
+function instructorCell(v: string | null | undefined, dash: string): string {
   const s = v?.trim()
-  return s && s.length > 0 ? s : '—'
+  return s && s.length > 0 ? s : dash
 }
 
 export function AcademicsPortalPage() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const dash = t('dashEm')
   const [tab, setTab] = useState<AcademicsTab>('history')
   const [academics, setAcademics] = useState<StudentAcademicsResponse | null>(null)
   const [academicsError, setAcademicsError] = useState<string | null>(null)
@@ -97,7 +100,7 @@ export function AcademicsPortalPage() {
         if (ac.signal.aborted) return
         setAcademics(null)
         setAcademicsError(
-          e instanceof Error ? e.message : 'Could not load academic records.',
+          e instanceof Error ? e.message : t('couldNotLoadAcademicRecordsFallback'),
         )
       } finally {
         if (!ac.signal.aborted) setAcademicsLoading(false)
@@ -114,7 +117,7 @@ export function AcademicsPortalPage() {
         if (ac.signal.aborted) return
         setTranscriptPreview(null)
         setTranscriptPreviewError(
-          e instanceof Error ? e.message : 'Could not load transcript preview.',
+          e instanceof Error ? e.message : t('couldNotLoadTranscriptPreviewFallback'),
         )
       } finally {
         if (!ac.signal.aborted) setTranscriptPreviewLoading(false)
@@ -122,7 +125,7 @@ export function AcademicsPortalPage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, reloadKey])
+  }, [currentStudentId, reloadKey, t])
 
   const registrationGroups = useMemo(
     () => (academics ? groupRowsByTermYear(academics.enrollmentHistory) : []),
@@ -137,7 +140,7 @@ export function AcademicsPortalPage() {
 
   const id = currentStudentId?.trim()
   const showEmpty = !id
-  const issueDate = formatIssueDate()
+  const issueDate = formatIssueDate(locale)
 
   const academicsBlocking =
     academicsLoading && academics === null && academicsError === null
@@ -165,7 +168,7 @@ export function AcademicsPortalPage() {
       <div
         className="portal-academics-print-hide"
         role="tablist"
-        aria-label="Academics sections"
+        aria-label={t('academicsSectionsAria')}
       >
         <div className="portal-tab-group portal-academics-portal-tabs">
           <button
@@ -177,7 +180,7 @@ export function AcademicsPortalPage() {
               .join(' ')}
             onClick={() => setTab('history')}
           >
-            Registration History
+            {t('tabRegistrationHistory')}
           </button>
           <button
             type="button"
@@ -188,7 +191,7 @@ export function AcademicsPortalPage() {
               .join(' ')}
             onClick={() => setTab('transcript')}
           >
-            Transcript
+            {t('transcriptHeading')}
           </button>
         </div>
       </div>
@@ -198,10 +201,9 @@ export function AcademicsPortalPage() {
           className="portal-card portal-profile-state"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Sign in to view academics</p>
+          <p className="portal-profile-state__title">{t('signInToViewAcademics')}</p>
           <p className="portal-profile-state__detail">
-            Your registration history and transcript appear here after you log in with your student
-            account.
+            {t('academicsPortalSignInDetail')}
           </p>
         </section>
       ) : null}
@@ -210,9 +212,9 @@ export function AcademicsPortalPage() {
         <>
           {academicsBlocking ? (
             <section className="portal-card portal-profile-state" aria-busy="true" aria-live="polite">
-              <p className="portal-profile-state__title">Loading registration history</p>
+              <p className="portal-profile-state__title">{t('loadingRegistrationHistory')}</p>
               <p className="portal-profile-state__detail">
-                Please wait while we load your enrollment record.
+                {t('loadingRegistrationHistoryEnrollmentDetail')}
               </p>
             </section>
           ) : null}
@@ -222,7 +224,7 @@ export function AcademicsPortalPage() {
               role="alert"
               aria-live="assertive"
             >
-              <p className="portal-profile-state__title">We could not load registration history</p>
+              <p className="portal-profile-state__title">{t('couldNotLoadRegistrationHistory')}</p>
               <p className="portal-profile-state__detail">{academicsError}</p>
               <div className="portal-actions portal-profile-state__actions">
                 <button
@@ -230,19 +232,18 @@ export function AcademicsPortalPage() {
                   className="portal-btn portal-btn--secondary"
                   onClick={() => setReloadKey((k) => k + 1)}
                 >
-                  Try again
+                  {t('tryAgain')}
                 </button>
               </div>
             </section>
           ) : null}
           {!academicsBlocking && !showAcademicsError && academics ? (
-            <section className="portal-stack portal-academics-registration-history" aria-label="Registration history">
+            <section className="portal-stack portal-academics-registration-history" aria-label={t('registrationHistorySectionAria')}>
               {registrationGroups.length === 0 ? (
                 <div className="portal-card portal-academics-empty-state" aria-live="polite">
-                  <h2 className="portal-academics-empty-state__title">No registration history</h2>
+                  <h2 className="portal-academics-empty-state__title">{t('noRegistrationHistoryTitle')}</h2>
                   <p className="portal-academics-empty-state__text">
-                    No course registrations are on file yet. When you enroll, rows will appear here by
-                    term. Use the Transcript tab for the unofficial transcript view.
+                    {t('noRegistrationHistoryDetail')}
                   </p>
                 </div>
               ) : (
@@ -255,13 +256,13 @@ export function AcademicsPortalPage() {
                       <table className={REGISTRATION_HISTORY_TABLE_CLASS}>
                         <thead>
                           <tr>
-                            <th scope="col">Course code</th>
-                            <th scope="col">Course title</th>
-                            <th scope="col">Credits</th>
-                            <th scope="col">Status</th>
-                            <th scope="col">Grade</th>
-                            <th scope="col">Instructor</th>
-                            <th scope="col">Course feedback</th>
+                            <th scope="col">{t('courseCode')}</th>
+                            <th scope="col">{t('courseTitle')}</th>
+                            <th scope="col">{t('credits')}</th>
+                            <th scope="col">{t('status')}</th>
+                            <th scope="col">{t('grade')}</th>
+                            <th scope="col">{t('instructor')}</th>
+                            <th scope="col">{t('courseFeedbackColumn')}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -274,9 +275,9 @@ export function AcademicsPortalPage() {
                                 </span>
                               </td>
                               <td>{formatCreditsCell(row.credits)}</td>
-                              <td>{academicStatusLabel(row.status)}</td>
+                              <td>{academicStatusLabel(row.status, locale)}</td>
                               <td>{formatGradeCell(row.grade)}</td>
-                              <td>{instructorCell(row.instructor)}</td>
+                              <td>{instructorCell(row.instructor, dash)}</td>
                               <td>
                                 <CourseFeedbackCell
                                   row={row}
@@ -301,8 +302,8 @@ export function AcademicsPortalPage() {
         <>
           {transcriptBlocking ? (
             <section className="portal-card portal-profile-state" aria-busy="true" aria-live="polite">
-              <p className="portal-profile-state__title">Loading transcript</p>
-              <p className="portal-profile-state__detail">Please wait while we load your transcript.</p>
+              <p className="portal-profile-state__title">{t('loadingTranscript')}</p>
+              <p className="portal-profile-state__detail">{t('transcriptLoadingDetail')}</p>
             </section>
           ) : null}
           {showTranscriptError ? (
@@ -311,7 +312,7 @@ export function AcademicsPortalPage() {
               role="alert"
               aria-live="assertive"
             >
-              <p className="portal-profile-state__title">We could not load your transcript</p>
+              <p className="portal-profile-state__title">{t('couldNotLoadTranscript')}</p>
               <p className="portal-profile-state__detail">{transcriptPreviewError}</p>
               <div className="portal-actions portal-profile-state__actions">
                 <button
@@ -319,7 +320,7 @@ export function AcademicsPortalPage() {
                   className="portal-btn portal-btn--secondary"
                   onClick={() => setReloadKey((k) => k + 1)}
                 >
-                  Try again
+                  {t('tryAgain')}
                 </button>
               </div>
             </section>
@@ -332,7 +333,7 @@ export function AcademicsPortalPage() {
                   className="portal-btn portal-btn--secondary"
                   onClick={() => window.print()}
                 >
-                  Print
+                  {t('printButton')}
                 </button>
               </div>
 
@@ -344,28 +345,28 @@ export function AcademicsPortalPage() {
                       src="/AMULogo.png"
                       alt=""
                     />
-                    <p className="portal-academics-transcript-sheet__school">{SCHOOL_TITLE}</p>
-                    <p className="portal-academics-transcript-sheet__title">UNOFFICIAL TRANSCRIPT</p>
+                    <p className="portal-academics-transcript-sheet__school">{t('amuOfficialTranscriptSchoolName')}</p>
+                    <p className="portal-academics-transcript-sheet__title">{t('unofficialTranscript')}</p>
                   </div>
                 </header>
 
                 <dl className="portal-academics-transcript-sheet__meta">
                   <div className="portal-academics-transcript-sheet__meta-row">
-                    <dt>Student name</dt>
+                    <dt>{t('studentName')}</dt>
                     <dd>{transcriptPreview.studentName}</dd>
                   </div>
                   <div className="portal-academics-transcript-sheet__meta-row">
-                    <dt>Student ID</dt>
+                    <dt>{t('studentId')}</dt>
                     <dd>{transcriptPreview.studentId}</dd>
                   </div>
                   <div className="portal-academics-transcript-sheet__meta-row">
-                    <dt>Date issued</dt>
+                    <dt>{t('dateIssued')}</dt>
                     <dd>{issueDate}</dd>
                   </div>
                 </dl>
 
                 {groupedPreview.length === 0 ? (
-                  <p className="portal-card-note">No transcript rows on file yet.</p>
+                  <p className="portal-card-note">{t('noTranscriptRows')}</p>
                 ) : (
                   <div className="portal-academics-transcript-sheet__terms">
                     {groupedPreview.map((g) => (
@@ -382,11 +383,11 @@ export function AcademicsPortalPage() {
                           >
                             <thead>
                               <tr>
-                                <th scope="col">Code</th>
-                                <th scope="col">Course title</th>
-                                <th scope="col">Grade</th>
-                                <th scope="col">Numeric</th>
-                                <th scope="col">Credit</th>
+                                <th scope="col">{t('tableCode')}</th>
+                                <th scope="col">{t('courseTitle')}</th>
+                                <th scope="col">{t('grade')}</th>
+                                <th scope="col">{t('numeric')}</th>
+                                <th scope="col">{t('credit')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -398,11 +399,11 @@ export function AcademicsPortalPage() {
                                       {courseRowDisplayTitle(row)}
                                     </span>
                                   </td>
-                                  <td>{row.grade?.trim() ? row.grade : '—'}</td>
+                                  <td>{row.grade?.trim() ? row.grade : dash}</td>
                                   <td>
                                     {row.numericGrade != null && Number.isFinite(row.numericGrade)
                                       ? String(row.numericGrade)
-                                      : '—'}
+                                      : dash}
                                   </td>
                                   <td>{formatCreditCell(row)}</td>
                                 </tr>
@@ -423,27 +424,27 @@ export function AcademicsPortalPage() {
                     id="transcript-cumulative-heading"
                     className="portal-academics-transcript-sheet__cumulative-heading"
                   >
-                    Cumulative Total
+                    {t('cumulativeTotal')}
                   </h3>
                   <dl className="portal-academics-transcript-sheet__cumulative-dl">
                     <div className="portal-academics-transcript-sheet__cumulative-row">
-                      <dt>Units Transferred</dt>
+                      <dt>{t('unitsTransferred')}</dt>
                       <dd>45.0</dd>
                     </div>
                     <div className="portal-academics-transcript-sheet__cumulative-row">
-                      <dt>Clinic Hour Transferred</dt>
+                      <dt>{t('clinicHourTransferred')}</dt>
                       <dd>100 Hours</dd>
                     </div>
                     <div className="portal-academics-transcript-sheet__cumulative-row">
-                      <dt>Units Completed</dt>
+                      <dt>{t('unitsCompleted')}</dt>
                       <dd>198.0</dd>
                     </div>
                     <div className="portal-academics-transcript-sheet__cumulative-row">
-                      <dt>Clinic Completed</dt>
+                      <dt>{t('clinicCompleted')}</dt>
                       <dd>980 Hours</dd>
                     </div>
                     <div className="portal-academics-transcript-sheet__cumulative-row">
-                      <dt>GPA</dt>
+                      <dt>{t('gpa')}</dt>
                       <dd>3.76</dd>
                     </div>
                   </dl>

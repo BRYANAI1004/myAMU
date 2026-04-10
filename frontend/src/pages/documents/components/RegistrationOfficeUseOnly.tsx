@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import type { RegistrationOfficeFees } from '../../../lib/registrationFormAdapter'
 
 type Props = {
@@ -10,31 +11,32 @@ function money(n: number): string {
 }
 
 export function RegistrationOfficeUseOnly({ fees }: Props) {
+  const t = useStudentPortalT()
   return (
-    <section className="portal-registration-form-office" aria-label="Office use only">
-      <h3 className="portal-registration-form-office__title">Office Use Only</h3>
+    <section className="portal-registration-form-office" aria-label={t('documentsRegFormOfficeAria')}>
+      <h3 className="portal-registration-form-office__title">{t('documentsRegFormOfficeTitle')}</h3>
       <div className="portal-registration-form-office__grid">
         <div className="portal-registration-form-office__col">
-          <p className="portal-registration-form-office__label">FEES</p>
+          <p className="portal-registration-form-office__label">{t('documentsRegFormFeesHeading')}</p>
           <ul className="portal-registration-form-office__list">
             <li>
-              <span>TUITION</span>
+              <span>{t('documentsRegFormTuition')}</span>
               <span>{money(fees.tuition)}</span>
             </li>
             <li>
-              <span>Clinic Insurances</span>
+              <span>{t('documentsRegFormClinicInsurances')}</span>
               <span>{money(0)}</span>
             </li>
             <li>
-              <span>Others</span>
+              <span>{t('documentsRegFormOthers')}</span>
               <span>{money(fees.other)}</span>
             </li>
             <li>
-              <span>Application Fee</span>
+              <span>{t('documentsRegFormApplicationFee')}</span>
               <span>{money(fees.applicationFee)}</span>
             </li>
             <li>
-              <span>Discount</span>
+              <span>{t('documentsRegFormDiscount')}</span>
               <span>{money(fees.discount)}</span>
             </li>
           </ul>
@@ -43,36 +45,36 @@ export function RegistrationOfficeUseOnly({ fees }: Props) {
           <p className="portal-registration-form-office__label">&nbsp;</p>
           <ul className="portal-registration-form-office__list">
             <li>
-              <span>Registration</span>
+              <span>{t('documentsRegFormRegistration')}</span>
               <span>{money(fees.registration)}</span>
             </li>
             <li>
-              <span>Clinic</span>
+              <span>{t('documentsRegFormClinic')}</span>
               <span>{money(fees.clinic)}</span>
             </li>
             <li>
-              <span>Total Fees</span>
+              <span>{t('documentsRegFormTotalFees')}</span>
               <span>{money(fees.totalFees)}</span>
             </li>
           </ul>
         </div>
         <div className="portal-registration-form-office__col">
-          <p className="portal-registration-form-office__label">Payment</p>
+          <p className="portal-registration-form-office__label">{t('documentsRegFormPaymentHeading')}</p>
           <ul className="portal-registration-form-office__list">
             <li>
-              <span>Payment received</span>
+              <span>{t('documentsRegFormPaymentReceived')}</span>
               <span>{money(0)}</span>
             </li>
             <li>
-              <span>Date</span>
+              <span>{t('documentsRegFormDateLabel')}</span>
               <span>—</span>
             </li>
             <li>
-              <span>Receipt #</span>
+              <span>{t('documentsRegFormReceiptNumber')}</span>
               <span>—</span>
             </li>
             <li>
-              <span>Handled by</span>
+              <span>{t('documentsRegFormHandledBy')}</span>
               <span>—</span>
             </li>
           </ul>

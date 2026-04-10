@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalT } from '../../LanguageContext'
 import { CARD_CONVENIENCE_RATE } from '../../lib/api'
 import {
   lateFeeFromLineItems,
@@ -15,6 +16,7 @@ function roundMoney(n: number) {
 
 /** Make a payment UI shared by Finances payment route and legacy `/payment`. */
 export function MakePaymentContent() {
+  const t = useStudentPortalT()
   const { account } = useAccount()
   const [paymentOption, setPaymentOption] = useState<'full-balance' | 'installment'>('full-balance')
   const [paymentMethod, setPaymentMethod] = useState<'ach' | 'credit-card'>('ach')
@@ -34,18 +36,25 @@ export function MakePaymentContent() {
   const totalDueToday = roundMoney(basePayToday + convenienceFee)
 
   const termLabel = portalTermLabel(account)
+  const pctStr = (CARD_CONVENIENCE_RATE * 100).toFixed(2)
+  const convenienceNote = useMemo(
+    () => t('convenienceFeePercentNote').replace('{pct}', pctStr),
+    [t, pctStr],
+  )
+  const lede = useMemo(
+    () => t('makePaymentLede').replace('{termLabel}', termLabel),
+    [t, termLabel],
+  )
 
   return (
     <>
       <p className="portal-page-lede">
-        Review the payment amount before you continue. Amounts come from your {termLabel} MAHM account
-        (catalog rates and posted charges). This screen is a static preview only; no payment will be
-        submitted or processed.
+        {lede}
       </p>
 
       <section className="portal-card portal-stack" aria-labelledby="payment-option-heading">
         <h2 id="payment-option-heading" className="portal-section-heading">
-          Payment Option
+          {t('paymentOptionHeading')}
         </h2>
         <div className="portal-actions">
           <button
@@ -54,7 +63,7 @@ export function MakePaymentContent() {
             onClick={() => setPaymentOption('full-balance')}
             aria-pressed={isFullBalance}
           >
-            Pay Full Balance
+            {t('payFullBalance')}
           </button>
           <button
             type="button"
@@ -63,89 +72,86 @@ export function MakePaymentContent() {
             aria-pressed={!isFullBalance}
             disabled={!installmentPlan.enabled}
           >
-            Use Installment Plan
+            {t('useInstallmentPlan')}
           </button>
         </div>
         {!installmentPlan.enabled ? (
           <p className="portal-inline-note">
-            You are not on a term installment plan; pay full balance or contact the bursar to change
-            your billing preference.
+            {t('notOnInstallmentPlanNote')}
           </p>
         ) : null}
       </section>
 
       <section className="portal-card portal-stack" aria-labelledby="payment-summary-heading">
         <h2 id="payment-summary-heading" className="portal-section-heading">
-          Payment summary
+          {t('paymentSummaryHeading')}
         </h2>
         <dl>
           {isFullBalance ? (
             <>
               <div className="portal-row">
-                <dt>Total charges (term)</dt>
+                <dt>{t('totalChargesTerm')}</dt>
                 <dd>{formatMoney(summary.totalCharges)}</dd>
               </div>
               <div className="portal-row">
-                <dt>Payments &amp; credits</dt>
+                <dt>{t('paymentsAndCredits')}</dt>
                 <dd>{formatMoney(summary.payments)}</dd>
               </div>
               {lateFee > 0 ? (
                 <div className="portal-row portal-row--fee-warning">
-                  <dt>Late fee</dt>
+                  <dt>{t('lateFee')}</dt>
                   <dd>{formatMoney(lateFee)}</dd>
                 </div>
               ) : null}
               <div className="portal-row">
-                <dt>Current outstanding balance</dt>
+                <dt>{t('currentOutstandingBalance')}</dt>
                 <dd>{formatMoney(summary.outstandingBalance)}</dd>
               </div>
               <div className="portal-row">
-                <dt>Selected payment amount</dt>
+                <dt>{t('selectedPaymentAmount')}</dt>
                 <dd>{formatMoney(fullSelected)}</dd>
               </div>
               <div className="portal-row">
-                <dt>Payment method</dt>
-                <dd>{isCreditCard ? 'Credit card — Visa ending in 4242' : 'ACH / Bank Transfer'}</dd>
+                <dt>{t('paymentMethodLabel')}</dt>
+                <dd>{isCreditCard ? t('creditCardVisaDemo') : t('achBankTransfer')}</dd>
               </div>
               {isCreditCard ? (
                 <div className="portal-row">
-                  <dt>Convenience fee</dt>
+                  <dt>{t('convenienceFee')}</dt>
                   <dd>
-                    {formatMoney(convenienceFee)} ({(CARD_CONVENIENCE_RATE * 100).toFixed(2)}% for credit
-                    card payments)
+                    {formatMoney(convenienceFee)} {convenienceNote}
                   </dd>
                 </div>
               ) : null}
               <div className="portal-row portal-payment-total">
-                <dt>Total due today</dt>
+                <dt>{t('totalDueToday')}</dt>
                 <dd>{formatMoney(totalDueToday)}</dd>
               </div>
             </>
           ) : (
             <>
               <div className="portal-row">
-                <dt>Current installment due</dt>
+                <dt>{t('currentInstallmentDue')}</dt>
                 <dd>{nextDue ? formatMoney(nextDue.amount) : formatMoney(0)}</dd>
               </div>
               <div className="portal-row">
-                <dt>Selected payment amount</dt>
+                <dt>{t('selectedPaymentAmount')}</dt>
                 <dd>{formatMoney(installmentSelected)}</dd>
               </div>
               <div className="portal-row">
-                <dt>Payment method</dt>
-                <dd>{isCreditCard ? 'Credit card — Visa ending in 4242' : 'ACH / Bank Transfer'}</dd>
+                <dt>{t('paymentMethodLabel')}</dt>
+                <dd>{isCreditCard ? t('creditCardVisaDemo') : t('achBankTransfer')}</dd>
               </div>
               {isCreditCard ? (
                 <div className="portal-row">
-                  <dt>Convenience fee</dt>
+                  <dt>{t('convenienceFee')}</dt>
                   <dd>
-                    {formatMoney(convenienceFee)} ({(CARD_CONVENIENCE_RATE * 100).toFixed(2)}% for credit
-                    card payments)
+                    {formatMoney(convenienceFee)} {convenienceNote}
                   </dd>
                 </div>
               ) : null}
               <div className="portal-row portal-payment-total">
-                <dt>Total due today</dt>
+                <dt>{t('totalDueToday')}</dt>
                 <dd>{formatMoney(totalDueToday)}</dd>
               </div>
             </>
@@ -155,7 +161,7 @@ export function MakePaymentContent() {
 
       <section className="portal-card portal-stack" aria-labelledby="payment-method-heading">
         <h2 id="payment-method-heading" className="portal-section-heading">
-          Payment Method
+          {t('paymentMethodHeading')}
         </h2>
         <div className="portal-actions">
           <button
@@ -164,7 +170,7 @@ export function MakePaymentContent() {
             onClick={() => setPaymentMethod('ach')}
             aria-pressed={!isCreditCard}
           >
-            ACH / Bank Transfer
+            {t('achBankTransfer')}
           </button>
           <button
             type="button"
@@ -172,14 +178,13 @@ export function MakePaymentContent() {
             onClick={() => setPaymentMethod('credit-card')}
             aria-pressed={isCreditCard}
           >
-            Credit Card
+            {t('creditCard')}
           </button>
         </div>
       </section>
 
       <p className="portal-inline-note">
-        ACH (bank transfer) payments may not incur a convenience fee. Card payments may include a fee
-        as shown above, in line with bursar policy.
+        {t('achFeeNote')}
       </p>
     </>
   )

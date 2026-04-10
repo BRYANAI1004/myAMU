@@ -1,29 +1,31 @@
 import { NavLink } from 'react-router-dom'
+import { useStudentPortalT } from '../../LanguageContext'
 
 function linkClass(isActive: boolean) {
   return ['portal-tab', isActive ? 'portal-tab--active' : ''].filter(Boolean).join(' ')
 }
 
-const ITEMS = [
-  { to: 'policies', label: 'Policies' },
-  { to: 'forms', label: 'Forms' },
-  { to: 'handbook', label: 'Handbook' },
-  { to: 'uploads', label: 'Uploads' },
-] as const
-
 export function DocumentsNav() {
+  const t = useStudentPortalT()
+  const ITEMS = [
+    { to: 'policies', labelKey: 'policies' as const },
+    { to: 'forms', labelKey: 'forms' as const },
+    { to: 'handbook', labelKey: 'handbook' as const },
+    { to: 'uploads', labelKey: 'uploads' as const },
+  ]
+
   return (
-    <nav className="portal-documents-nav" aria-label="Documents and forms">
+    <nav className="portal-documents-nav" aria-label={t('documentsNavAria')}>
       <ul className="portal-tab-group">
         <li>
           <NavLink to="/documents" end className={({ isActive }) => linkClass(isActive)}>
-            Overview
+            {t('navOverview')}
           </NavLink>
         </li>
         {ITEMS.map((item) => (
           <li key={item.to}>
             <NavLink to={item.to} className={({ isActive }) => linkClass(isActive)}>
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           </li>
         ))}

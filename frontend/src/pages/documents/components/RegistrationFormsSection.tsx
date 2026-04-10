@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../../context/AccountContext'
 import {
   buildRegistrationYearOptions,
@@ -27,6 +28,7 @@ import { RegistrationFormFilters } from './RegistrationFormFilters'
 import { RegistrationFormPreview } from './RegistrationFormPreview'
 
 export function RegistrationFormsSection() {
+  const t = useStudentPortalT()
   const { currentStudentId, account } = useAccount()
   const id = currentStudentId?.trim() ?? ''
 
@@ -74,7 +76,7 @@ export function RegistrationFormsSection() {
 
       const p = await fetchStudentTranscriptPreview(id, { signal: ac.signal }).catch((e) => {
         errors.push(
-          e instanceof Error ? e.message : 'Transcript preview could not be loaded.',
+          e instanceof Error ? e.message : t('documentsTranscriptPreviewLoadFailed'),
         )
         return null
       })
@@ -82,7 +84,7 @@ export function RegistrationFormsSection() {
 
       const a = await fetchStudentAcademics(id, { signal: ac.signal }).catch((e) => {
         errors.push(
-          e instanceof Error ? e.message : 'Academics schedule could not be loaded.',
+          e instanceof Error ? e.message : t('documentsAcademicsScheduleLoadFailed'),
         )
         return null
       })
@@ -90,7 +92,7 @@ export function RegistrationFormsSection() {
 
       const prof = await fetchStudentProfile(id, { signal: ac.signal }).catch((e) => {
         errors.push(
-          e instanceof Error ? e.message : 'Profile could not be loaded.',
+          e instanceof Error ? e.message : t('documentsProfileLoadFailed'),
         )
         return null
       })
@@ -108,7 +110,7 @@ export function RegistrationFormsSection() {
     })()
 
     return () => ac.abort()
-  }, [id])
+  }, [id, t])
 
   useEffect(() => {
     if (!preview || defaultsAppliedRef.current) return
@@ -183,9 +185,7 @@ export function RegistrationFormsSection() {
 
   if (!id) {
     return (
-      <p className="portal-registration-form-hint">
-        Sign in to generate your registration form.
-      </p>
+      <p className="portal-registration-form-hint">{t('documentsRegFormSignInToGenerate')}</p>
     )
   }
 
@@ -196,7 +196,7 @@ export function RegistrationFormsSection() {
           className="portal-registration-form-hint portal-registration-form-hint--warn portal-academics-print-hide"
           role="status"
         >
-          {loadNote} The form can still be generated; some fields may be empty.
+          {loadNote} {t('documentsRegFormLoadNoteSuffix')}
         </p>
       ) : null}
       <RegistrationFormFilters

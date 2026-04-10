@@ -1,4 +1,5 @@
 import { useId, useRef } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import { AIAssistantBrandTitle } from './AIAssistantBrandTitle'
 import { AIAssistantPanel } from './AIAssistantPanel'
 import { AIAssistantDockCat } from './AIAssistantPet'
@@ -15,6 +16,7 @@ import {
 import './aiAssistant.css'
 
 export function AIAssistantLauncher() {
+  const t = useStudentPortalT()
   const baseId = useId()
   const inputId = `${baseId}-input`
   const messagesRegionId = `${baseId}-messages`
@@ -108,7 +110,7 @@ export function AIAssistantLauncher() {
             onPointerMove={dragEnabled ? onDockPointerMove : undefined}
             onPointerUp={dragEnabled ? onDockPointerUp : undefined}
             onPointerCancel={dragEnabled ? onDockPointerCancel : undefined}
-            aria-label="Open AMU AI Assist"
+            aria-label={t('aiOpenAmuAssist')}
             aria-haspopup="dialog"
           >
             <span className="portal-ai-assistant-launcher__icon" aria-hidden="true">
@@ -138,18 +140,18 @@ export function AIAssistantLauncher() {
               type="button"
               className="portal-ai-assistant-minimized__expand"
               onClick={expandPanel}
-              aria-label="Expand AMU AI Assist"
+              aria-label={t('aiExpandAmuAssist')}
             >
               <span className="portal-ai-assistant-minimized__title">
                 <AIAssistantBrandTitle variant="minimized" />
               </span>
-              <span className="portal-ai-assistant-minimized__hint">Tap to expand</span>
+              <span className="portal-ai-assistant-minimized__hint">{t('tapToExpand')}</span>
             </button>
             <button
               type="button"
               className="portal-ai-assistant-icon-btn portal-ai-assistant-minimized__close"
               onClick={closePanel}
-              aria-label="Close chat panel"
+              aria-label={t('closeChatPanel')}
             >
               <span aria-hidden="true">×</span>
             </button>
@@ -192,12 +194,12 @@ export function AIAssistantLauncher() {
                       }
                     : expandPanel
                 }
-                aria-label="Expand AMU AI Assist"
+                aria-label={t('aiExpandAmuAssist')}
               >
                 <span className="portal-ai-assistant-minimized__title">
                   <AIAssistantBrandTitle variant="minimized" />
                 </span>
-                <span className="portal-ai-assistant-minimized__hint">Tap to expand</span>
+                <span className="portal-ai-assistant-minimized__hint">{t('tapToExpand')}</span>
               </button>
               <button
                 type="button"
@@ -206,7 +208,7 @@ export function AIAssistantLauncher() {
                   if (minimizedDragEnabled) e.stopPropagation()
                 }}
                 onClick={closePanel}
-                aria-label="Close chat panel"
+                aria-label={t('closeChatPanel')}
               >
                 <span aria-hidden="true">×</span>
               </button>

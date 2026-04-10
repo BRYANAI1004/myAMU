@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import {
   installmentPlanDisplayLabel,
@@ -10,6 +11,7 @@ import { formatMoney } from '../../lib/formatMoney'
 
 /** Account summary body shared by Finances overview and legacy `/overview` flows. */
 export function AccountSummaryContent() {
+  const t = useStudentPortalT()
   const { account } = useAccount()
   const { summary, installmentPlan, billingStatus } = account
   const otherTotal = summary.otherTotal ?? 0
@@ -30,65 +32,65 @@ export function AccountSummaryContent() {
         aria-labelledby="account-summary-heading"
       >
         <h2 id="account-summary-heading" className="portal-section-heading">
-          Student account summary
+          {t('studentAccountSummary')}
         </h2>
         <dl>
           <div className="portal-row">
-            <dt>Program</dt>
+            <dt>{t('program')}</dt>
             <dd>{account.program}</dd>
           </div>
           <div className="portal-row">
-            <dt>Term</dt>
+            <dt>{t('term')}</dt>
             <dd>{termLabel}</dd>
           </div>
           <div className="portal-row">
-            <dt>Billing status</dt>
+            <dt>{t('billingStatus')}</dt>
             <dd>{billingStatus}</dd>
           </div>
           <div className="portal-row">
-            <dt>Tuition (didactic / lab)</dt>
+            <dt>{t('tuitionDidacticLab')}</dt>
             <dd>{formatMoney(summary.tuitionTotal)}</dd>
           </div>
           <div className="portal-row">
-            <dt>Clinical</dt>
+            <dt>{t('clinicalCharges')}</dt>
             <dd>{formatMoney(summary.clinicalTotal)}</dd>
           </div>
           <div className="portal-row">
-            <dt>Fees</dt>
+            <dt>{t('fees')}</dt>
             <dd>{formatMoney(summary.feesTotal)}</dd>
           </div>
           {otherTotal > 0 ? (
             <div className="portal-row">
-              <dt>Other charges</dt>
+              <dt>{t('otherCharges')}</dt>
               <dd>{formatMoney(otherTotal)}</dd>
             </div>
           ) : null}
           <div className="portal-row portal-account-summary__divider" role="presentation">
-            <dt>Total charges</dt>
+            <dt>{t('totalCharges')}</dt>
             <dd>{formatMoney(summary.totalCharges)}</dd>
           </div>
           <div className="portal-row">
-            <dt>Payments</dt>
+            <dt>{t('payments')}</dt>
             <dd>{formatMoney(summary.payments)}</dd>
           </div>
           <div className="portal-row portal-payment-total portal-account-summary__balance">
-            <dt>Total outstanding balance</dt>
+            <dt>{t('totalOutstandingBalance')}</dt>
             <dd>{formatMoney(summary.outstandingBalance)}</dd>
           </div>
           <div className="portal-row">
-            <dt>Next due date</dt>
+            <dt>{t('nextDueDate')}</dt>
             <dd>
               {nextDueRow
-                ? `${nextDueRow.dueDate} (${formatMoney(nextDueRow.amount)} due)`
-                : 'No upcoming installment'}
+                ? `${nextDueRow.dueDate} (${formatMoney(nextDueRow.amount)} ${t('dueInParens')})`
+                : t('noUpcomingInstallment')}
             </dd>
           </div>
           <div className="portal-row">
-            <dt>Installment plan</dt>
+            <dt>{t('installmentPlan')}</dt>
             <dd>{planLabel}</dd>
           </div>
           <div className="portal-row">
-            <dt>Last account update</dt>
+            <dt>{t('lastAccountUpdate')}</dt>
             <dd>
               {lastUpdate
                 ? new Date(`${lastUpdate}T12:00:00`).toLocaleDateString('en-US', {
@@ -96,7 +98,7 @@ export function AccountSummaryContent() {
                     day: 'numeric',
                     year: 'numeric',
                   })
-                : '—'}
+                : t('dashEm')}
             </dd>
           </div>
         </dl>

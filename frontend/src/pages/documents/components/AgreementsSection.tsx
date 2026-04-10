@@ -1,15 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../../context/AccountContext'
 import {
   fetchStudentProfile,
   submitStudentDocumentAgreement,
   type StudentDocumentRequirement,
 } from '../../../lib/api'
-import {
-  COPYRIGHT_RELEASE_CLOSING_TEMPLATE,
-  COPYRIGHT_RELEASE_PARAGRAPHS,
-  COPYRIGHT_RELEASE_SUBMIT_NOTE,
-} from '../../../data/copyrightReleaseAgreement'
 
 type AgreementsSectionProps = {
   studentId: string
@@ -24,6 +20,7 @@ export function AgreementsSection({
   requirement,
   onRefresh,
 }: AgreementsSectionProps) {
+  const t = useStudentPortalT()
   const { account } = useAccount()
   const [profileName, setProfileName] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -47,21 +44,26 @@ export function AgreementsSection({
 
   const displayName = useMemo(() => {
     const n = profileName || account.student.name?.trim()
-    return n && n.length > 0 ? n : 'the student'
-  }, [profileName, account.student.name])
+    return n && n.length > 0 ? n : t('documentsAgreementStudentPlaceholder')
+  }, [profileName, account.student.name, t])
 
   const completed = requirement?.status === 'completed'
 
   const closing = useMemo(() => {
-    return COPYRIGHT_RELEASE_CLOSING_TEMPLATE.replace('{{NAME}}', displayName)
-  }, [displayName])
+    return t('copyrightReleaseClosing').replace('{{NAME}}', displayName)
+  }, [displayName, t])
+
+  const copyrightParagraphs = useMemo(
+    () => [t('copyrightReleasePara1'), t('copyrightReleasePara2'), t('copyrightReleasePara3')],
+    [t],
+  )
 
   const handleSubmit = useCallback(async () => {
     if (!agreed || completed || submitInFlightRef.current) return
     const sid = studentId.trim()
     const tid = academicTermId.trim()
     if (!sid || !tid) {
-      setError('Missing student or term. Reload the page and try again.')
+      setError(t('documentsAgreementMissingStudentTerm'))
       return
     }
     submitInFlightRef.current = true
@@ -78,33 +80,36 @@ export function AgreementsSection({
       setAgreed(false)
     } catch (e) {
       const message =
-        e instanceof Error ? e.message : 'Could not submit the agreement. Try again.'
+        e instanceof Error ? e.message : t('documentsAgreementSubmitFailed')
       setError(message)
     } finally {
       submitInFlightRef.current = false
       setSubmitting(false)
     }
-  }, [academicTermId, agreed, completed, onRefresh, studentId])
+  }, [academicTermId, agreed, completed, onRefresh, studentId, t])
 
-  const submittedLabel = completed ? 'Submitted: Yes' : 'Submitted: No'
+  const submittedLabel = completed
+    ? t('documentsAgreementSubmittedYes')
+    : t('documentsAgreementSubmittedNo')
 
   return (
     <div className="portal-documents-agreements">
       <div className="portal-doc-quiz-entry-card">
         <div className="portal-doc-quiz-entry-card__row">
           <div className="portal-doc-quiz-entry-card__text">
-            <p className="portal-doc-quiz-entry-card__title">Copyright Release Agreement</p>
-            <p className="portal-doc-quiz-entry-card__desc">
-              Review and submit the university copyright release for recordings and promotional use.
-            </p>
+            <p className="portal-doc-quiz-entry-card__title">{t('documentsCopyrightAgreementTitle')}</p>
+            <p className="portal-doc-quiz-entry-card__desc">{t('documentsCopyrightAgreementDesc')}</p>
             <p className="portal-inline-note portal-inline-note--flush">
               <strong>{submittedLabel}</strong>
             </p>
           </div>
           <div className="portal-doc-quiz-entry-card__aside">
             {completed ? (
-              <span className="portal-doc-quiz-entry-card__completed" aria-label="Completed">
-                Completed
+              <span
+                className="portal-doc-quiz-entry-card__completed"
+                aria-label={t('documentsAgreementCompletedAria')}
+              >
+                {t('documentsAgreementCompleted')}
               </span>
             ) : null}
             <button
@@ -112,7 +117,7 @@ export function AgreementsSection({
               className="portal-tab portal-doc-quiz-tab"
               onClick={() => setExpanded((e) => !e)}
             >
-              {expanded ? 'Hide agreement' : 'View agreement'}
+              {expanded ? t('documentsAgreementHide') : t('documentsAgreementView')}
             </button>
           </div>
         </div>
@@ -128,10 +133,12 @@ export function AgreementsSection({
                 <img
                   className="portal-documents-agreement-body__logo"
                   src="/AMULogo.png"
-                  alt="Alhambra Medical University"
+                  alt={t('alhambraMedicalUniversityAlt')}
                 />
-                <h4 className="portal-documents-agreement-body__title">Copyright Release Agreement</h4>
-                {COPYRIGHT_RELEASE_PARAGRAPHS.map((para, i) => (
+                <h4 className="portal-documents-agreement-body__title">
+                  {t('documentsAgreementBodyTitle')}
+                </h4>
+                {copyrightParagraphs.map((para, i) => (
                   <p key={i} className="portal-documents-agreement-body__para">
                     {para.split('\n').map((line, j, arr) => (
                       <span key={j}>
@@ -142,11 +149,11 @@ export function AgreementsSection({
                   </p>
                 ))}
                 <p className="portal-documents-agreement-body__para">{closing}</p>
-                <p className="portal-documents-agreement-body__para">{COPYRIGHT_RELEASE_SUBMIT_NOTE}</p>
+                <p className="portal-documents-agreement-body__para">{t('copyrightReleaseSubmitNote')}</p>
 
                 {completed ? (
                   <p className="portal-documents-agreement-body__success" role="status">
-                    Submitted: Yes. This agreement is on file for this term.
+                    {t('documentsAgreementSubmittedOnFile')}
                   </p>
                 ) : (
                   <div className="portal-documents-agreement-body__actions">
@@ -157,10 +164,7 @@ export function AgreementsSection({
                         disabled={submitting}
                         onChange={(e) => setAgreed(e.target.checked)}
                       />
-                      <span>
-                        I have read, understood, and agreed to the above statements, terms, and
-                        conditions.
-                      </span>
+                      <span>{t('documentsAgreementCheckboxLabel')}</span>
                     </label>
                     <button
                       type="button"
@@ -170,7 +174,7 @@ export function AgreementsSection({
                         void handleSubmit()
                       }}
                     >
-                      {submitting ? 'Submitting…' : 'Submit'}
+                      {submitting ? t('submittingEllipsis') : t('submitButton')}
                     </button>
                   </div>
                 )}

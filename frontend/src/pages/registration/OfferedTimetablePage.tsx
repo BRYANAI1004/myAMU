@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 import {
   fetchAdminCourseSections,
   fetchApiJson,
@@ -14,6 +16,7 @@ import {
 } from '../../lib/timetableBlockLayout'
 import {
   formatWeekdaysLongFromStored,
+  WEEKDAYS_FULL_ORDERED,
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
 import {
@@ -39,15 +42,19 @@ const OFFERED_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 
 type TimetableLangTab = 'en' | 'cn'
 
-const DAY_HEADERS: { full: WeekdayFull; label: string }[] = [
-  { full: 'Monday', label: 'Monday' },
-  { full: 'Tuesday', label: 'Tuesday' },
-  { full: 'Wednesday', label: 'Wednesday' },
-  { full: 'Thursday', label: 'Thursday' },
-  { full: 'Friday', label: 'Friday' },
-  { full: 'Saturday', label: 'Saturday' },
-  { full: 'Sunday', label: 'Sunday' },
-]
+const WEEKDAY_FULL_TO_LABEL: Record<WeekdayFull, StudentPortalKey> = {
+  Monday: 'weekdayMonday',
+  Tuesday: 'weekdayTuesday',
+  Wednesday: 'weekdayWednesday',
+  Thursday: 'weekdayThursday',
+  Friday: 'weekdayFriday',
+  Saturday: 'weekdaySaturday',
+  Sunday: 'weekdaySunday',
+}
+
+function weekdayColumnLabel(full: WeekdayFull, t: (key: StudentPortalKey) => string): string {
+  return t(WEEKDAY_FULL_TO_LABEL[full])
+}
 
 function cellText(value: string | number | null | undefined): string {
   if (value == null) return ''
@@ -68,6 +75,7 @@ type OfferedWeekGridProps = {
   catalogByCode: Map<string, CatalogCourseLite>
   binItems: CourseBinItem[]
   onSelectSection: (sec: AdminCourseSection) => void
+  t: (key: StudentPortalKey) => string
 }
 
 function OfferedTimetableWeekGrid({
@@ -77,6 +85,7 @@ function OfferedTimetableWeekGrid({
   catalogByCode,
   binItems,
   onSelectSection,
+  t,
 }: OfferedWeekGridProps) {
   return (
     <div className="admin-timetable-wrap">
@@ -90,9 +99,9 @@ function OfferedTimetableWeekGrid({
       >
         <div className="admin-timetable-v2__head">
           <div className="admin-timetable-v2__corner" aria-hidden />
-          {DAY_HEADERS.map((d) => (
-            <div key={d.full} className="admin-timetable-v2__day-head">
-              {d.label}
+          {WEEKDAYS_FULL_ORDERED.map((d) => (
+            <div key={d} className="admin-timetable-v2__day-head">
+              {weekdayColumnLabel(d, t)}
             </div>
           ))}
         </div>
@@ -107,8 +116,8 @@ function OfferedTimetableWeekGrid({
               </div>
             ))}
           </div>
-          {DAY_HEADERS.map((d, di) => (
-            <div key={d.full} className="admin-timetable-v2__day-col">
+          {WEEKDAYS_FULL_ORDERED.map((d, di) => (
+            <div key={d} className="admin-timetable-v2__day-col">
               <div
                 className="admin-timetable-v2__day-track"
                 style={{ height: bodyHeightPx }}
@@ -129,9 +138,11 @@ function OfferedTimetableWeekGrid({
                     b.section.schedule_track,
                   )
                   const labelCore = `${b.section.course_code} ${b.section.section_code}. ${preferredTitle}`
+                  const ariaInBin = t('offeredInCourseBinOpenDetails').replace('{label}', labelCore)
+                  const ariaDefault = t('offeredViewDetailsFor').replace('{label}', labelCore)
                   return (
                     <button
-                      key={`${b.section.id}-${d.full}-${b.startMin}-${b.colIndex}`}
+                      key={`${b.section.id}-${d}-${b.startMin}-${b.colIndex}`}
                       type="button"
                       className={[
                         'admin-timetable-v2__block',
@@ -147,16 +158,12 @@ function OfferedTimetableWeekGrid({
                         width: `calc(${colW}% - ${insetPx * 2}px)`,
                       }}
                       onClick={() => onSelectSection(b.section)}
-                      aria-label={
-                        inBin
-                          ? `${labelCore}, in CourseBin — open details`
-                          : `View details for ${labelCore}`
-                      }
+                      aria-label={inBin ? ariaInBin : ariaDefault}
                     >
                       <span className="admin-timetable-v2__block-title">
                         {b.section.course_code} {b.section.section_code}
                         {inBin ? (
-                          <span className="portal-offered-timetable__badge"> Added</span>
+                          <span className="portal-offered-timetable__badge">{t('offeredAddedBadge')}</span>
                         ) : null}
                       </span>
                       <span className="admin-timetable-v2__block-subtitle">
@@ -182,6 +189,7 @@ function OfferedTimetableWeekGrid({
 }
 
 export function OfferedTimetablePage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const { items: binItems, addToCourseBin, removeFromCourseBin } = useCourseBin()
   const [detailSection, setDetailSection] = useState<AdminCourseSection | null>(null)
@@ -214,7 +222,7 @@ export function OfferedTimetablePage() {
       try {
         const data: unknown = await fetchApiJson('/api/courses', { signal: ac.signal })
         if (!Array.isArray(data)) {
-          throw new Error('Unexpected course catalog response.')
+          throw new Error(t('unexpectedCatalogOffered'))
         }
         if (!ac.signal.aborted) {
           setCatalog(data as CatalogCourseLite[])
@@ -226,7 +234,7 @@ export function OfferedTimetablePage() {
       }
     })()
     return () => ac.abort()
-  }, [])
+  }, [t])
 
   const catalogByCode = useMemo(() => {
     const m = new Map<string, CatalogCourseLite>()
@@ -260,14 +268,14 @@ export function OfferedTimetablePage() {
         if (ac.signal.aborted) return
         setSections(null)
         setError(
-          e instanceof Error ? e.message : 'Could not load the offered timetable.',
+          e instanceof Error ? e.message : t('couldNotLoadOfferedTimetable'),
         )
       } finally {
         if (!ac.signal.aborted) setLoading(false)
       }
     })()
     return () => ac.abort()
-  }, [registrationTermId])
+  }, [registrationTermId, t])
 
   const hourRows = useMemo(() => {
     const sh = OFFERED_GRID.startHour ?? 8
@@ -306,9 +314,9 @@ export function OfferedTimetablePage() {
     if (isSectionInBin(binItems, detailSection)) return
     const cat = catalogByCode.get(cellText(detailSection.course_code).toUpperCase())
     addToCourseBin(adminSectionToCourseBinItem(detailSection, cat))
-    showToast('Added to CourseBin')
+    showToast(t('toastAddedToCourseBin'))
     setDetailSection(null)
-  }, [addToCourseBin, binItems, catalogByCode, detailSection, showToast])
+  }, [addToCourseBin, binItems, catalogByCode, detailSection, showToast, t])
 
   const handleConfirmRemoveFromModal = useCallback(() => {
     if (detailSection == null) return
@@ -317,9 +325,9 @@ export function OfferedTimetablePage() {
       detailSection.section_code,
       detailSection.schedule_track,
     )
-    showToast('Removed from CourseBin')
+    showToast(t('toastRemovedFromCourseBin'))
     setDetailSection(null)
-  }, [detailSection, removeFromCourseBin, showToast])
+  }, [detailSection, removeFromCourseBin, showToast, t])
 
   useEffect(() => {
     if (detailSection == null) return
@@ -371,13 +379,13 @@ export function OfferedTimetablePage() {
       <section className="portal-card portal-stack" aria-labelledby="offered-timetable-heading">
         <div className="portal-offered-timetable__title-row">
           <h2 id="offered-timetable-heading" className="portal-section-heading">
-            Offered Timetable
+            {t('offeredTimetableHeading')}
           </h2>
           {showTimetableTabs ? (
             <div
               className="portal-timetable-lang-tabs"
               role="tablist"
-              aria-label="Timetable language"
+              aria-label={t('offeredTimetableLanguageAria')}
             >
               <button
                 type="button"
@@ -388,7 +396,7 @@ export function OfferedTimetablePage() {
                 aria-controls="offered-tt-panel-en"
                 onClick={() => setLangTab('en')}
               >
-                English Timetable
+                {t('offeredTimetableTabEnglish')}
               </button>
               <button
                 type="button"
@@ -399,7 +407,7 @@ export function OfferedTimetablePage() {
                 aria-controls="offered-tt-panel-cn"
                 onClick={() => setLangTab('cn')}
               >
-                Chinese Timetable
+                {t('offeredTimetableTabChinese')}
               </button>
             </div>
           ) : null}
@@ -407,7 +415,7 @@ export function OfferedTimetablePage() {
 
         {termMissing && (
           <p className="portal-text-muted" role="status">
-            Select an academic term above to view offerings.
+            {t('offeredSelectTermForOfferings')}
           </p>
         )}
 
@@ -419,7 +427,7 @@ export function OfferedTimetablePage() {
 
         {!termMissing && loading && (
           <p className="portal-text-muted" role="status">
-            Loading timetable…
+            {t('offeredLoadingTimetable')}
           </p>
         )}
 
@@ -431,7 +439,7 @@ export function OfferedTimetablePage() {
           >
             {sections!.length === 0 || englishSections.length === 0 ? (
               <p className="portal-text-muted" role="status">
-                No English timetable sections scheduled for this term.
+                {t('offeredNoEnglishSections')}
               </p>
             ) : (
               <OfferedTimetableWeekGrid
@@ -441,6 +449,7 @@ export function OfferedTimetablePage() {
                 catalogByCode={catalogByCode}
                 binItems={binItems}
                 onSelectSection={setDetailSection}
+                t={t}
               />
             )}
           </div>
@@ -454,7 +463,7 @@ export function OfferedTimetablePage() {
           >
             {sections!.length === 0 || chineseSections.length === 0 ? (
               <p className="portal-text-muted" role="status">
-                No Chinese timetable sections scheduled for this term.
+                {t('offeredNoChineseSections')}
               </p>
             ) : (
               <OfferedTimetableWeekGrid
@@ -464,6 +473,7 @@ export function OfferedTimetablePage() {
                 catalogByCode={catalogByCode}
                 binItems={binItems}
                 onSelectSection={setDetailSection}
+                t={t}
               />
             )}
           </div>
@@ -489,53 +499,53 @@ export function OfferedTimetablePage() {
             </h2>
             <dl className="portal-offered-section-modal__dl">
               <div>
-                <dt>Course code</dt>
+                <dt>{t('offeredModalDtCourseCode')}</dt>
                 <dd>{detailSection.course_code}</dd>
               </div>
               {detailPrimaryTitle !== '' && detailPrimaryTitle !== '—' ? (
                 <div>
-                  <dt>Course title</dt>
+                  <dt>{t('offeredModalDtCourseTitle')}</dt>
                   <dd>{detailPrimaryTitle}</dd>
                 </div>
               ) : null}
               {detailAlternateTitle !== '' ? (
                 <div>
-                  <dt>Alternate title</dt>
+                  <dt>{t('offeredModalDtAlternateTitle')}</dt>
                   <dd>{detailAlternateTitle}</dd>
                 </div>
               ) : null}
               <div>
-                <dt>Timetable track</dt>
+                <dt>{t('offeredModalDtTimetableTrack')}</dt>
                 <dd>{scheduleTrackDetailLabel(detailSection.schedule_track)}</dd>
               </div>
               <div>
-                <dt>Section</dt>
+                <dt>{t('offeredModalDtSection')}</dt>
                 <dd>{detailSection.section_code}</dd>
               </div>
               <div>
-                <dt>Weekdays</dt>
+                <dt>{t('offeredModalDtWeekdays')}</dt>
                 <dd>{formatWeekdaysLongFromStored(detailSection.weekday)}</dd>
               </div>
               <div>
-                <dt>Time</dt>
+                <dt>{t('offeredModalDtTime')}</dt>
                 <dd>
                   {formatTimeRangeHmsForDisplay(detailSection.start_time, detailSection.end_time)}
                 </dd>
               </div>
               <div>
-                <dt>Delivery mode</dt>
+                <dt>{t('offeredModalDtDeliveryMode')}</dt>
                 <dd>{formatDeliveryModeForDisplay(detailSection.delivery_mode)}</dd>
               </div>
               <div>
-                <dt>Room</dt>
+                <dt>{t('offeredModalDtRoom')}</dt>
                 <dd>{detailSection.room?.trim() ? detailSection.room : '—'}</dd>
               </div>
               <div>
-                <dt>Instructor</dt>
+                <dt>{t('offeredModalDtInstructor')}</dt>
                 <dd>{detailSection.instructor?.trim() ? detailSection.instructor : '—'}</dd>
               </div>
               <div>
-                <dt>Notes</dt>
+                <dt>{t('offeredModalDtNotes')}</dt>
                 <dd>{detailSection.notes?.trim() ? detailSection.notes : '—'}</dd>
               </div>
             </dl>
@@ -546,7 +556,7 @@ export function OfferedTimetablePage() {
                   className="portal-btn portal-btn--secondary portal-btn--compact"
                   onClick={handleConfirmRemoveFromModal}
                 >
-                  Remove from CourseBin
+                  {t('removeFromCourseBin')}
                 </button>
               ) : (
                 <button
@@ -554,7 +564,7 @@ export function OfferedTimetablePage() {
                   className="portal-btn portal-btn--primary portal-btn--compact"
                   onClick={handleConfirmAddFromModal}
                 >
-                  Add to CourseBin
+                  {t('addToCourseBin')}
                 </button>
               )}
               <button
@@ -562,7 +572,7 @@ export function OfferedTimetablePage() {
                 className="portal-btn portal-btn--compact"
                 onClick={() => setDetailSection(null)}
               >
-                Close
+                {t('gcalModalClose')}
               </button>
             </div>
           </div>

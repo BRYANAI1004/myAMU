@@ -1,4 +1,6 @@
 import { useEffect, useId, useState, type FormEvent, type MouseEvent } from 'react'
+import { useLanguage, useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 import {
   fetchStudentCourseFeedback,
   postStudentCourseFeedback,
@@ -9,44 +11,47 @@ import { courseRowDisplayTitle } from '../../lib/academicsTranscriptDisplay'
 
 export type EnrollmentHistoryRow = StudentAcademicsResponse['enrollmentHistory'][number]
 
-/**
- * Ordered list for the evaluation form; DB columns `q1_rating`–`q5_rating` follow this order.
- * Admin CSV headers for these ratings: `backend/src/constants/courseFeedbackCsvColumns.ts` — keep aligned if questions change.
- */
-const COURSE_FEEDBACK_QUESTIONS = [
-  'Course content was clear and well organized.',
-  'The instructor explained concepts effectively.',
-  'The pace of the course was appropriate.',
-  'Assignments and learning activities supported my learning.',
-  'I would recommend this course to other students.',
-] as const
+const FEEDBACK_QUESTION_KEYS = [
+  'feedbackQ1',
+  'feedbackQ2',
+  'feedbackQ3',
+  'feedbackQ4',
+  'feedbackQ5',
+] as const satisfies readonly StudentPortalKey[]
 
-const RATING_WORDS: Record<number, string> = {
-  1: 'Poor',
-  2: 'Fair',
-  3: 'Good',
-  4: 'Very Good',
-  5: 'Excellent',
+const RATING_WORD_KEYS: Record<number, StudentPortalKey> = {
+  1: 'ratingPoor',
+  2: 'ratingFair',
+  3: 'ratingGood',
+  4: 'ratingVeryGood',
+  5: 'ratingExcellent',
 }
-
-const RATING_SCALE_LEGEND =
-  '1 = Poor · 2 = Fair · 3 = Good · 4 = Very Good · 5 = Excellent'
 
 function isRating(n: unknown): n is number {
   return typeof n === 'number' && n >= 1 && n <= 5 && Number.isInteger(n)
 }
 
-function formatRatingDisplay(n: number): string {
-  const word = RATING_WORDS[n]
-  return word ? `${n} — ${word}` : String(n)
+function formatRatingDisplay(
+  n: number,
+  t: (key: StudentPortalKey) => string,
+  dash: string,
+): string {
+  const wordKey = RATING_WORD_KEYS[n]
+  const word = wordKey ? t(wordKey) : ''
+  return word ? `${n} ${dash} ${word}` : String(n)
 }
 
-function formatSubmittedAt(iso: string | null | undefined): string {
-  if (iso == null || iso === '') return '—'
+function formatSubmittedAt(
+  iso: string | null | undefined,
+  locale: string,
+  dash: string,
+): string {
+  if (iso == null || iso === '') return dash
   try {
     const d = new Date(iso)
-    if (Number.isNaN(d.getTime())) return '—'
-    return d.toLocaleString('en-US', {
+    if (Number.isNaN(d.getTime())) return dash
+    const loc = locale === 'zh' ? 'zh-Hant' : 'en-US'
+    return d.toLocaleString(loc, {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -55,7 +60,7 @@ function formatSubmittedAt(iso: string | null | undefined): string {
       hour12: true,
     })
   } catch {
-    return '—'
+    return dash
   }
 }
 
@@ -117,6 +122,9 @@ export function CourseFeedbackModal({
   onClose: () => void
   onSubmitted: () => void
 }) {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
+  const dash = t('dashEm')
   const reactId = useId()
   const [q1, setQ1] = useState<number>(3)
   const [q2, setQ2] = useState<number>(3)
@@ -148,20 +156,20 @@ export function CourseFeedbackModal({
         if (ac.signal.aborted) return
         if (!item) {
           setViewItem(null)
-          setViewError('Could not find submitted feedback for this course.')
+          setViewError(t('feedbackNotFound'))
         } else {
           setViewItem(item)
           setViewError(null)
         }
       } catch (e) {
         if (ac.signal.aborted) return
-        setViewError(e instanceof Error ? e.message : 'Could not load feedback.')
+        setViewError(e instanceof Error ? e.message : t('couldNotLoadFeedbackFallback'))
       } finally {
         if (!ac.signal.aborted) setViewLoading(false)
       }
     })()
     return () => ac.abort()
-  }, [mode, studentId, row.courseCode, row.term, row.year])
+  }, [mode, studentId, row.courseCode, row.term, row.year, t])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -181,10 +189,10 @@ export function CourseFeedbackModal({
     setSubmitting(true)
     try {
       if (!row.courseCode?.trim() || !row.term?.trim() || row.year == null) {
-        throw new Error('Missing course metadata')
+        throw new Error(t('feedbackMissingCourseMetadata'))
       }
       if (!isRating(q1) || !isRating(q2) || !isRating(q3) || !isRating(q4) || !isRating(q5) || !isRating(overall)) {
-        throw new Error('Please rate all questions and overall (1–5).')
+        throw new Error(t('pleaseRateAll'))
       }
       const payload = {
         courseCode: row.courseCode,
@@ -202,7 +210,7 @@ export function CourseFeedbackModal({
       onClose()
       onSubmitted()
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not submit feedback.')
+      setFormError(err instanceof Error ? err.message : t('couldNotSubmitFeedback'))
     } finally {
       setSubmitting(false)
     }
@@ -210,7 +218,7 @@ export function CourseFeedbackModal({
 
   const titleId = 'course-feedback-modal-title'
   const courseTitle = courseRowDisplayTitle(row)
-  const courseLine = `${row.courseCode.trim()} — ${courseTitle}`
+  const courseLine = `${row.courseCode.trim()} ${dash} ${courseTitle}`
   const termLine = `${row.term} ${row.year}`
 
   const radioName = (suffix: string) => `cfb-${suffix}-${reactId.replace(/:/g, '')}`
@@ -232,11 +240,11 @@ export function CourseFeedbackModal({
         <header className="portal-course-feedback-modal__header">
           {mode === 'submit' ? (
             <h2 id={titleId} className="portal-course-feedback-modal__header-title">
-              Course evaluation
+              {t('courseEvaluation')}
             </h2>
           ) : (
             <h2 id={titleId} className="portal-course-feedback-modal__header-title">
-              Submitted evaluation
+              {t('submittedEvaluation')}
             </h2>
           )}
           <p className="portal-course-feedback-modal__header-course">{courseLine}</p>
@@ -250,66 +258,29 @@ export function CourseFeedbackModal({
           <form onSubmit={handleSubmit}>
             <div className="portal-course-feedback-modal__body-inner">
               <p className="portal-course-feedback-modal__rating-legend-once portal-text-muted">
-                {RATING_SCALE_LEGEND}
+                {t('ratingScaleLegend')}
               </p>
-              <div className="portal-course-feedback-modal__feedback-block">
-                <p className="portal-course-feedback-modal__question" id="cfb-q1-text">
-                  {COURSE_FEEDBACK_QUESTIONS[0]}
-                </p>
-                <RatingScaleRow
-                  name={radioName('q1')}
-                  value={q1}
-                  onChange={setQ1}
-                  labelledBy="cfb-q1-text"
-                />
-              </div>
-              <div className="portal-course-feedback-modal__feedback-block">
-                <p className="portal-course-feedback-modal__question" id="cfb-q2-text">
-                  {COURSE_FEEDBACK_QUESTIONS[1]}
-                </p>
-                <RatingScaleRow
-                  name={radioName('q2')}
-                  value={q2}
-                  onChange={setQ2}
-                  labelledBy="cfb-q2-text"
-                />
-              </div>
-              <div className="portal-course-feedback-modal__feedback-block">
-                <p className="portal-course-feedback-modal__question" id="cfb-q3-text">
-                  {COURSE_FEEDBACK_QUESTIONS[2]}
-                </p>
-                <RatingScaleRow
-                  name={radioName('q3')}
-                  value={q3}
-                  onChange={setQ3}
-                  labelledBy="cfb-q3-text"
-                />
-              </div>
-              <div className="portal-course-feedback-modal__feedback-block">
-                <p className="portal-course-feedback-modal__question" id="cfb-q4-text">
-                  {COURSE_FEEDBACK_QUESTIONS[3]}
-                </p>
-                <RatingScaleRow
-                  name={radioName('q4')}
-                  value={q4}
-                  onChange={setQ4}
-                  labelledBy="cfb-q4-text"
-                />
-              </div>
-              <div className="portal-course-feedback-modal__feedback-block">
-                <p className="portal-course-feedback-modal__question" id="cfb-q5-text">
-                  {COURSE_FEEDBACK_QUESTIONS[4]}
-                </p>
-                <RatingScaleRow
-                  name={radioName('q5')}
-                  value={q5}
-                  onChange={setQ5}
-                  labelledBy="cfb-q5-text"
-                />
-              </div>
+              {FEEDBACK_QUESTION_KEYS.map((qk, i) => {
+                const id = `cfb-q${i + 1}-text`
+                const setter = [setQ1, setQ2, setQ3, setQ4, setQ5][i]
+                const val = [q1, q2, q3, q4, q5][i]
+                return (
+                  <div key={qk} className="portal-course-feedback-modal__feedback-block">
+                    <p className="portal-course-feedback-modal__question" id={id}>
+                      {t(qk)}
+                    </p>
+                    <RatingScaleRow
+                      name={radioName(`q${i + 1}`)}
+                      value={val}
+                      onChange={setter}
+                      labelledBy={id}
+                    />
+                  </div>
+                )
+              })}
               <div className="portal-course-feedback-modal__feedback-block portal-course-feedback-modal__feedback-block--overall">
                 <p className="portal-course-feedback-modal__question" id="cfb-overall-text">
-                  Overall rating
+                  {t('overallRating')}
                 </p>
                 <RatingScaleRow
                   name={radioName('overall')}
@@ -320,7 +291,7 @@ export function CourseFeedbackModal({
               </div>
               <div className="portal-course-feedback-modal__comment-block">
                 <label className="portal-course-feedback-modal__comment-label" htmlFor="cfb-comment">
-                  Additional comments
+                  {t('additionalComments')}
                 </label>
                 <textarea
                   id="cfb-comment"
@@ -329,7 +300,7 @@ export function CourseFeedbackModal({
                   onChange={(e) => setComment(e.target.value)}
                   maxLength={8000}
                   rows={4}
-                  placeholder="Share any additional feedback about this course."
+                  placeholder={t('feedbackCommentPlaceholder')}
                 />
               </div>
               {formError ? (
@@ -344,14 +315,14 @@ export function CourseFeedbackModal({
                   onClick={onClose}
                   disabled={submitting}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"
                   className="portal-btn portal-btn--primary"
                   disabled={submitting}
                 >
-                  {submitting ? 'Submitting…' : 'Submit'}
+                  {submitting ? t('submitting') : t('submit')}
                 </button>
               </div>
             </div>
@@ -360,7 +331,7 @@ export function CourseFeedbackModal({
 
         {mode === 'view' ? (
           <>
-            {viewLoading ? <p className="portal-card-note">Loading…</p> : null}
+            {viewLoading ? <p className="portal-card-note">{t('loading')}</p> : null}
             {viewError && !viewLoading ? (
               <p className="portal-card-note portal-profile-state--error" role="alert">
                 {viewError}
@@ -369,64 +340,48 @@ export function CourseFeedbackModal({
             {view && !viewLoading ? (
               <div className="portal-course-feedback-modal__body-inner">
                 <dl className="portal-course-feedback-modal__readonly-dl">
-                  <div className="portal-course-feedback-modal__readonly-row">
-                    <dt className="portal-course-feedback-modal__readonly-label">{COURSE_FEEDBACK_QUESTIONS[0]}</dt>
-                    <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.q1Rating) ? formatRatingDisplay(view.q1Rating) : '—'}
-                    </dd>
-                  </div>
-                  <div className="portal-course-feedback-modal__readonly-row">
-                    <dt className="portal-course-feedback-modal__readonly-label">{COURSE_FEEDBACK_QUESTIONS[1]}</dt>
-                    <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.q2Rating) ? formatRatingDisplay(view.q2Rating) : '—'}
-                    </dd>
-                  </div>
-                  <div className="portal-course-feedback-modal__readonly-row">
-                    <dt className="portal-course-feedback-modal__readonly-label">{COURSE_FEEDBACK_QUESTIONS[2]}</dt>
-                    <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.q3Rating) ? formatRatingDisplay(view.q3Rating) : '—'}
-                    </dd>
-                  </div>
-                  <div className="portal-course-feedback-modal__readonly-row">
-                    <dt className="portal-course-feedback-modal__readonly-label">{COURSE_FEEDBACK_QUESTIONS[3]}</dt>
-                    <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.q4Rating) ? formatRatingDisplay(view.q4Rating) : '—'}
-                    </dd>
-                  </div>
-                  <div className="portal-course-feedback-modal__readonly-row">
-                    <dt className="portal-course-feedback-modal__readonly-label">{COURSE_FEEDBACK_QUESTIONS[4]}</dt>
-                    <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.q5Rating) ? formatRatingDisplay(view.q5Rating) : '—'}
-                    </dd>
-                  </div>
+                  {FEEDBACK_QUESTION_KEYS.map((qk, idx) => {
+                    const ratings = [view.q1Rating, view.q2Rating, view.q3Rating, view.q4Rating, view.q5Rating]
+                    const r = ratings[idx]
+                    return (
+                      <div key={qk} className="portal-course-feedback-modal__readonly-row">
+                        <dt className="portal-course-feedback-modal__readonly-label">{t(qk)}</dt>
+                        <dd className="portal-course-feedback-modal__readonly-value">
+                          {isRating(r) ? formatRatingDisplay(r, t, dash) : dash}
+                        </dd>
+                      </div>
+                    )
+                  })}
                   <div className="portal-course-feedback-modal__readonly-row portal-course-feedback-modal__readonly-row--summary-first">
-                    <dt className="portal-course-feedback-modal__readonly-label">Overall rating</dt>
+                    <dt className="portal-course-feedback-modal__readonly-label">{t('overallRating')}</dt>
                     <dd className="portal-course-feedback-modal__readonly-value">
-                      {isRating(view.overallRating) ? formatRatingDisplay(view.overallRating) : '—'}
+                      {isRating(view.overallRating)
+                        ? formatRatingDisplay(view.overallRating, t, dash)
+                        : dash}
                     </dd>
                   </div>
                   <div className="portal-course-feedback-modal__readonly-row portal-course-feedback-modal__readonly-row--multiline">
-                    <dt className="portal-course-feedback-modal__readonly-label">Additional comments</dt>
+                    <dt className="portal-course-feedback-modal__readonly-label">{t('additionalComments')}</dt>
                     <dd className="portal-course-feedback-modal__readonly-value">
-                      {view.comment != null && view.comment.trim() !== '' ? view.comment : '—'}
+                      {view.comment != null && view.comment.trim() !== '' ? view.comment : dash}
                     </dd>
                   </div>
                 </dl>
                 <div
                   className="portal-course-feedback-modal__submitted-row"
                   role="group"
-                  aria-label="Submitted at"
+                  aria-label={t('feedbackSubmittedAtAria')}
                 >
-                  <span className="portal-course-feedback-modal__submitted-label">Submitted:</span>
+                  <span className="portal-course-feedback-modal__submitted-label">{t('submittedLabel')}</span>
                   <span className="portal-course-feedback-modal__submitted-value">
-                    {formatSubmittedAt(view.submittedAt)}
+                    {formatSubmittedAt(view.submittedAt, locale, dash)}
                   </span>
                 </div>
               </div>
             ) : null}
             <div className="portal-course-feedback-modal__actions">
               <button type="button" className="portal-btn portal-btn--secondary" onClick={onClose}>
-                Close
+                {t('close')}
               </button>
             </div>
           </>

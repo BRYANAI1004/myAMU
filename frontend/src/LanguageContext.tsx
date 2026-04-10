@@ -66,8 +66,13 @@ export function useLanguage(): LanguageContextValue {
   return ctx
 }
 
+/** When outside `LanguageProvider` (e.g. admin login), defaults to English. */
+export function useOptionalPortalLocale(): PortalLocale {
+  return useContext(LanguageContext)?.locale ?? 'en'
+}
+
 /** Student portal UI strings; switches with {@link useLanguage}. */
 export function useStudentPortalT(): (key: StudentPortalKey) => string {
-  const { locale } = useLanguage()
+  const locale = useOptionalPortalLocale()
   return useCallback((key: StudentPortalKey) => studentPortalT(locale, key), [locale])
 }

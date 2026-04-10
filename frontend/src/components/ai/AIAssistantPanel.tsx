@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, Ref } from 'react'
+import { useStudentPortalT } from '../../LanguageContext'
 import type { AIAssistantAttachment, AIAssistantChatMessage } from '../../hooks/useAIAssistant'
 import { AIAssistantBrandTitle } from './AIAssistantBrandTitle'
 import { AIAssistantInput } from './AIAssistantInput'
@@ -49,6 +50,7 @@ export function AIAssistantPanel({
   catHidden = false,
   onShowCat,
 }: AIAssistantPanelProps) {
+  const t = useStudentPortalT()
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -79,13 +81,13 @@ export function AIAssistantPanel({
         </div>
         <div className="portal-ai-assistant-panel__header-actions">
           <button type="button" className="portal-ai-assistant-panel__header-text-btn" onClick={onClear}>
-            Clear chat
+            {t('clearChat')}
           </button>
           <button
             type="button"
             className="portal-ai-assistant-icon-btn"
             onClick={onMinimize}
-            aria-label="Minimize chat panel"
+            aria-label={t('minimizeChatPanel')}
           >
             <span aria-hidden="true">─</span>
           </button>
@@ -93,7 +95,7 @@ export function AIAssistantPanel({
             type="button"
             className="portal-ai-assistant-icon-btn"
             onClick={onClose}
-            aria-label="Close chat panel"
+            aria-label={t('closeChatPanel')}
           >
             <span aria-hidden="true">×</span>
           </button>
@@ -104,7 +106,7 @@ export function AIAssistantPanel({
         <div className="portal-ai-assistant-panel__toolbar">
           <div className="portal-ai-assistant-panel__toolbar-actions">
             <button type="button" className="portal-ai-assistant-link-btn" onClick={onShowCat}>
-              Show AMU AI Cat
+              {t('showAmuAiCat')}
             </button>
           </div>
         </div>
@@ -128,7 +130,9 @@ export function AIAssistantPanel({
                   : 'portal-ai-assistant-msg portal-ai-assistant-msg--assistant'
               }
             >
-              <span className="visually-hidden">{m.role === 'user' ? 'You' : 'Assistant'}: </span>
+              <span className="visually-hidden">
+                {m.role === 'user' ? t('messageRoleYou') : t('messageRoleAssistant')}:{' '}
+              </span>
               <div
                 className={
                   m.welcomeLines?.length
@@ -146,7 +150,7 @@ export function AIAssistantPanel({
           ))}
           {isAwaitingReply ? (
             <li className="portal-ai-assistant-msg portal-ai-assistant-msg--assistant">
-              <span className="visually-hidden">Assistant is typing</span>
+              <span className="visually-hidden">{t('assistantTyping')}</span>
               <div className="portal-ai-assistant-bubble portal-ai-assistant-bubble--typing" aria-busy="true">
                 <span className="portal-ai-assistant-typing">
                   <span />

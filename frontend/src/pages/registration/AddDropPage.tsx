@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import {
   fetchAcademicTerms,
@@ -23,30 +24,6 @@ function localTodayYyyyMmDd(): string {
   return `${y}-${m}-${day}`
 }
 
-/**
- * Date-only comparison in local time. Deadline day is inclusive: allowed when today <= deadline.
- */
-function withdrawDeadlineEligibility(deadlineYmd: string | null): {
-  withdrawAllowed: boolean
-  reasonWhenDisabled: string | null
-} {
-  if (deadlineYmd == null || deadlineYmd.trim() === '') {
-    return {
-      withdrawAllowed: false,
-      reasonWhenDisabled: 'Withdraw deadline is not configured for this term.',
-    }
-  }
-  const deadline = deadlineYmd.slice(0, 10)
-  const today = localTodayYyyyMmDd()
-  if (today > deadline) {
-    return {
-      withdrawAllowed: false,
-      reasonWhenDisabled: 'Withdraw deadline has passed.',
-    }
-  }
-  return { withdrawAllowed: true, reasonWhenDisabled: null }
-}
-
 function resolveTermForSelectedId(
   selectedId: string,
   current: AcademicTerm | null,
@@ -55,10 +32,11 @@ function resolveTermForSelectedId(
   const id = selectedId.trim()
   if (id === '') return null
   if (current != null && current.id === id) return current
-  return allTerms.find((t) => t.id === id) ?? null
+  return allTerms.find((termOpt) => termOpt.id === id) ?? null
 }
 
 export function AddDropPage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const { currentStudentId, isAuthenticated } = useAccount()
 
@@ -84,10 +62,24 @@ export function AddDropPage() {
     return m
   }, [coursesCatalog])
 
-  const withdrawEligibility = useMemo(
-    () => withdrawDeadlineEligibility(selectedTerm?.withdraw_deadline ?? null),
-    [selectedTerm?.withdraw_deadline],
-  )
+  const withdrawEligibility = useMemo(() => {
+    const deadlineYmd = selectedTerm?.withdraw_deadline ?? null
+    if (deadlineYmd == null || deadlineYmd.trim() === '') {
+      return {
+        withdrawAllowed: false,
+        reasonWhenDisabled: t('addDropWithdrawDeadlineNotConfigured'),
+      }
+    }
+    const deadline = deadlineYmd.slice(0, 10)
+    const today = localTodayYyyyMmDd()
+    if (today > deadline) {
+      return {
+        withdrawAllowed: false,
+        reasonWhenDisabled: t('addDropWithdrawDeadlinePassed'),
+      }
+    }
+    return { withdrawAllowed: true, reasonWhenDisabled: null }
+  }, [selectedTerm?.withdraw_deadline, t])
 
   const loadWorkspace = useCallback(async () => {
     if (termKey === '' || studentKey === '' || !isAuthenticated) {
@@ -122,9 +114,9 @@ export function AddDropPage() {
       setSelectedTerm(null)
       setCoursesCatalog(null)
       setLoadState('error')
-      setLoadError(e instanceof Error ? e.message : 'Could not load Add/Drop data.')
+      setLoadError(e instanceof Error ? e.message : t('couldNotLoadAddDropData'))
     }
-  }, [termKey, studentKey, isAuthenticated])
+  }, [termKey, studentKey, isAuthenticated, t])
 
   const refetchEnrolledSectionsOnly = useCallback(async () => {
     if (termKey === '' || studentKey === '' || !isAuthenticated) return
@@ -145,9 +137,7 @@ export function AddDropPage() {
     if (code === '' || termKey === '' || studentKey === '') return
     if (!withdrawEligibility.withdrawAllowed) return
 
-    const ok = window.confirm(
-      `Withdraw ${code}? This course will appear as W on your academic record.`,
-    )
+    const ok = window.confirm(t('addDropWithdrawConfirm').replace('{code}', code))
     if (!ok) return
 
     setRowErrorByCode((prev) => {
@@ -165,38 +155,37 @@ export function AddDropPage() {
       if (!res.success || res.removedCount < 1) {
         setRowErrorByCode((prev) => ({
           ...prev,
-          [code]: 'No active enrollment was withdrawn. Refresh and try again if this persists.',
+          [code]: t('addDropWithdrawNoEnrollment'),
         }))
         return
       }
-      setSuccessMessage('Course withdrawn.')
+      setSuccessMessage(t('addDropCourseWithdrawn'))
       window.setTimeout(() => setSuccessMessage(null), 4000)
       await refetchEnrolledSectionsOnly()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Withdrawal failed.'
+      const msg = e instanceof Error ? e.message : t('withdrawalFailedGeneric')
       setRowErrorByCode((prev) => ({ ...prev, [code]: msg }))
     } finally {
       setWithdrawingCode(null)
     }
   }
 
+  const tba = t('scheduleTba')
+
   return (
     <main
       className="portal-page portal-add-drop-page"
       data-registration-term={registrationTermId ?? undefined}
     >
-      <p className="portal-page-lede">
-        Add or drop courses according to your program rules and the academic calendar. Changes may
-        require advisor approval depending on your status and the dates in effect.
-      </p>
+      <p className="portal-page-lede">{t('addDropPageLede')}</p>
 
       {!isAuthenticated && (
         <section className="portal-card portal-stack" aria-labelledby="add-drop-auth-heading">
           <h2 id="add-drop-auth-heading" className="portal-section-heading">
-            Sign in required
+            {t('signInRequiredHeading')}
           </h2>
           <p className="portal-text-muted" role="status">
-            Sign in to view your registered courses and use withdraw for this term.
+            {t('addDropSignInBody')}
           </p>
         </section>
       )}
@@ -204,11 +193,10 @@ export function AddDropPage() {
       {isAuthenticated && termMissing && (
         <section className="portal-card portal-stack" aria-labelledby="add-drop-term-heading">
           <h2 id="add-drop-term-heading" className="portal-section-heading">
-            Select a term
+            {t('addDropSelectTermHeading')}
           </h2>
           <p className="portal-text-muted" role="status">
-            Select an academic term above to view your registered courses. Withdraw is only available
-            when a term is selected.
+            {t('addDropSelectTermBody')}
           </p>
         </section>
       )}
@@ -216,10 +204,10 @@ export function AddDropPage() {
       {isAuthenticated && !termMissing && loadState === 'loading' && (
         <section className="portal-card portal-stack" aria-labelledby="add-drop-loading-heading">
           <h2 id="add-drop-loading-heading" className="portal-section-heading">
-            Loading
+            {t('addDropLoadingHeading')}
           </h2>
           <p className="portal-text-muted" role="status">
-            Loading your courses for this term…
+            {t('addDropLoadingCourses')}
           </p>
         </section>
       )}
@@ -227,17 +215,17 @@ export function AddDropPage() {
       {isAuthenticated && !termMissing && loadState === 'error' && (
         <section className="portal-card portal-stack" aria-labelledby="add-drop-error-heading">
           <h2 id="add-drop-error-heading" className="portal-section-heading">
-            Could not load courses
+            {t('addDropErrorHeading')}
           </h2>
           <p className="portal-text-muted" role="status">
-            {loadError ?? 'Something went wrong.'}
+            {loadError ?? t('somethingWentWrong')}
           </p>
           <button
             type="button"
             className="portal-btn portal-btn--primary portal-btn--compact"
             onClick={() => void loadWorkspace()}
           >
-            Retry
+            {t('retry')}
           </button>
         </section>
       )}
@@ -245,7 +233,7 @@ export function AddDropPage() {
       {isAuthenticated && !termMissing && loadState === 'idle' && (
         <section className="portal-card portal-stack" aria-labelledby="add-drop-workspace-heading">
           <h2 id="add-drop-workspace-heading" className="portal-section-heading">
-            Your courses
+            {t('yourCoursesHeading')}
           </h2>
 
           {!withdrawEligibility.withdrawAllowed && (
@@ -262,26 +250,24 @@ export function AddDropPage() {
 
           {sections.length === 0 ? (
             <p className="portal-text-muted" role="status">
-              No registered courses for this term.
+              {t('noRegisteredCoursesThisTerm')}
             </p>
           ) : (
             <div className="portal-course-search-sections-table-wrap portal-course-search-sections-table-wrap--schedule">
               <div className="portal-course-search-sections-table-scroll">
                 <table className="portal-table portal-table--course-sections portal-table--course-section-schedule">
-                  <caption className="visually-hidden">
-                    Your registered course sections for the selected term
-                  </caption>
+                  <caption className="visually-hidden">{t('addDropRegisteredSectionsCaption')}</caption>
                   <thead>
                     <tr>
-                      <th scope="col">Course</th>
-                      <th scope="col">Section</th>
-                      <th scope="col">Days</th>
-                      <th scope="col">Time</th>
-                      <th scope="col">Instructor</th>
-                      <th scope="col">Location</th>
-                      <th scope="col">Status</th>
+                      <th scope="col">{t('courseColCourse')}</th>
+                      <th scope="col">{t('sectionColSection')}</th>
+                      <th scope="col">{t('sectionColDays')}</th>
+                      <th scope="col">{t('sectionColTime')}</th>
+                      <th scope="col">{t('sectionColInstructor')}</th>
+                      <th scope="col">{t('sectionColLocation')}</th>
+                      <th scope="col">{t('status')}</th>
                       <th scope="col" className="portal-course-section-schedule-col-action">
-                        Action
+                        {t('tableColAction')}
                       </th>
                     </tr>
                   </thead>
@@ -299,14 +285,14 @@ export function AddDropPage() {
                       )
                       const daysRaw = formatWeekdaysShortFromStored(row.weekday)
                       const timeRaw = formatTimeRangeHmsForDisplay(row.start_time, row.end_time)
-                      const days = daysRaw === '—' ? 'TBA' : daysRaw
-                      const time = timeRaw === '—' ? 'TBA' : timeRaw
+                      const days = daysRaw === '—' ? tba : daysRaw
+                      const time = timeRaw === '—' ? tba : timeRaw
                       const inst =
                         row.instructor?.trim() && row.instructor.trim() !== ''
                           ? row.instructor.trim()
-                          : 'TBA'
+                          : tba
                       const loc =
-                        row.room?.trim() && row.room.trim() !== '' ? row.room.trim() : 'TBA'
+                        row.room?.trim() && row.room.trim() !== '' ? row.room.trim() : tba
                       const rowErr = rowErrorByCode[code]
                       const submitting = withdrawingCode === code
                       return (
@@ -324,7 +310,7 @@ export function AddDropPage() {
                           <td>{time}</td>
                           <td>{inst}</td>
                           <td>{loc}</td>
-                          <td>Active</td>
+                          <td>{t('enrollmentStatusActive')}</td>
                           <td className="portal-course-section-schedule-col-action">
                             <div className="portal-stack" style={{ gap: '0.35rem' }}>
                               <button
@@ -335,7 +321,7 @@ export function AddDropPage() {
                                 }
                                 onClick={() => void handleWithdraw(row)}
                               >
-                                {submitting ? 'Withdrawing…' : 'Withdraw'}
+                                {submitting ? t('withdrawingEllipsis') : t('withdrawButton')}
                               </button>
                               {rowErr != null && rowErr !== '' ? (
                                 <span className="portal-text-muted" style={{ fontSize: '0.85rem' }}>

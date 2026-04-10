@@ -2,18 +2,17 @@
  * Shared footer for student and administrator login screens.
  * Uses AMU portal tokens from global styles (portal.css).
  */
+import { useStudentPortalT } from '@/LanguageContext'
+
 export function LoginFooter() {
+  const t = useStudentPortalT()
   return (
     <footer className="portal-login-footer" role="contentinfo">
       <div className="portal-login-footer__inner">
-        <p className="portal-login-footer__powered">Powered by WanPanel AI</p>
+        <p className="portal-login-footer__powered">{t('poweredByWanPanel')}</p>
         <div className="portal-login-footer__accent" aria-hidden="true" />
-        <p className="portal-login-footer__copyright">
-          © 2026 Alhambra Medical University. All rights reserved.
-        </p>
-        <p className="portal-login-footer__detail">
-          2215 W Mission Rd Suite 280, Alhambra, CA 91803
-        </p>
+        <p className="portal-login-footer__copyright">{t('copyrightAmu')}</p>
+        <p className="portal-login-footer__detail">{t('footerAddress')}</p>
         <p className="portal-login-footer__detail">
           <a className="portal-login-footer__tel" href="tel:+16264388980">
             <svg

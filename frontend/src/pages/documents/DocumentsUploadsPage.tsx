@@ -1,101 +1,121 @@
+import { useMemo } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
+
+type UploadStatusKind = 'approved' | 'underReview' | 'submitted' | 'missing'
+
 type UploadRow = {
   id: string
-  label: string
-  detail: string
-  status: 'Submitted' | 'Under Review' | 'Approved' | 'Missing'
+  labelKey: StudentPortalKey
+  detailKey: StudentPortalKey
+  statusKind: UploadStatusKind
 }
 
-const UPLOADS: readonly UploadRow[] = [
-  {
-    id: 'imm',
-    label: 'Immunization record',
-    detail: 'Uploaded Mar 8, 2026 · PDF · 240 KB',
-    status: 'Approved',
-  },
-  {
-    id: 'bls',
-    label: 'BLS certification',
-    detail: 'Uploaded Feb 2, 2026 · PDF · 180 KB',
-    status: 'Under Review',
-  },
-  {
-    id: 'bg',
-    label: 'Background check',
-    detail: 'Vendor report on file',
-    status: 'Approved',
-  },
-  {
-    id: 'copyright',
-    label: 'Signed Copyright Agreement',
-    detail: 'Electronic acknowledgment · Spring 2026',
-    status: 'Submitted',
-  },
-  {
-    id: 'reg',
-    label: 'Registration form',
-    detail: 'Expected for add/drop window',
-    status: 'Missing',
-  },
-]
-
-function statusClass(status: UploadRow['status']) {
-  switch (status) {
-    case 'Approved':
+function statusClass(kind: UploadStatusKind): string {
+  switch (kind) {
+    case 'approved':
       return 'portal-status portal-status--paid'
-    case 'Under Review':
+    case 'underReview':
       return 'portal-status portal-status--pending'
-    case 'Submitted':
+    case 'submitted':
       return 'portal-status portal-status--scheduled'
-    case 'Missing':
+    case 'missing':
     default:
       return 'portal-status portal-status--missing'
   }
 }
 
+function statusLabelKey(kind: UploadStatusKind): StudentPortalKey {
+  switch (kind) {
+    case 'approved':
+      return 'documentsUploadStatusApproved'
+    case 'underReview':
+      return 'documentsUploadStatusUnderReview'
+    case 'submitted':
+      return 'documentsUploadStatusSubmitted'
+    case 'missing':
+    default:
+      return 'documentsUploadStatusMissing'
+  }
+}
+
 export function DocumentsUploadsPage() {
+  const t = useStudentPortalT()
+
+  const uploads = useMemo(
+    (): readonly UploadRow[] => [
+      {
+        id: 'imm',
+        labelKey: 'documentsUploadImmLabel',
+        detailKey: 'documentsUploadImmDetail',
+        statusKind: 'approved',
+      },
+      {
+        id: 'bls',
+        labelKey: 'documentsUploadBlsLabel',
+        detailKey: 'documentsUploadBlsDetail',
+        statusKind: 'underReview',
+      },
+      {
+        id: 'bg',
+        labelKey: 'documentsUploadBgLabel',
+        detailKey: 'documentsUploadBgDetail',
+        statusKind: 'approved',
+      },
+      {
+        id: 'copyright',
+        labelKey: 'documentsUploadCopyrightLabel',
+        detailKey: 'documentsUploadCopyrightDetail',
+        statusKind: 'submitted',
+      },
+      {
+        id: 'reg',
+        labelKey: 'documentsUploadRegLabel',
+        detailKey: 'documentsUploadRegDetail',
+        statusKind: 'missing',
+      },
+    ],
+    [],
+  )
+
   return (
     <main className="portal-page portal-documents-page-stack">
-      <h2 className="portal-section-heading">Uploads & submissions</h2>
-      <p className="portal-page-lede">
-        Track files you have submitted for administrative, financial, or compliance purposes. This view
-        focuses on documents and records—not the same as clinical requirement status on the Clinical module.
-      </p>
+      <h2 className="portal-section-heading">{t('documentsUploadsHeading')}</h2>
+      <p className="portal-page-lede">{t('documentsUploadsLede')}</p>
       <section className="portal-module-panel" aria-labelledby="uploads-list-heading">
         <h3 id="uploads-list-heading" className="portal-module-panel-heading">
-          Your documents
+          {t('documentsUploadsYourDocuments')}
         </h3>
         <ul className="portal-registration-status-list">
-          {UPLOADS.map((row) => (
+          {uploads.map((row) => (
             <li key={row.id} className="portal-registration-status-item portal-documents-upload-row">
               <div>
-                <p className="portal-registration-status-label">{row.label}</p>
-                <p className="portal-registration-status-value portal-documents-upload-detail">{row.detail}</p>
+                <p className="portal-registration-status-label">{t(row.labelKey)}</p>
+                <p className="portal-registration-status-value portal-documents-upload-detail">
+                  {t(row.detailKey)}
+                </p>
               </div>
-              <span className={statusClass(row.status)}>{row.status}</span>
+              <span className={statusClass(row.statusKind)}>
+                {t(statusLabelKey(row.statusKind))}
+              </span>
             </li>
           ))}
         </ul>
       </section>
       <section className="portal-documents-upload-cta" aria-labelledby="upload-cta-heading">
         <h3 id="upload-cta-heading" className="portal-documents-upload-cta-title">
-          Submit a new file
+          {t('documentsUploadCtaTitle')}
         </h3>
-        <p className="portal-documents-upload-cta-desc">
-          Upload new documents when your program or an office requests them. Submission history will list
-          versions and review notes once the upload service is connected.
-        </p>
+        <p className="portal-documents-upload-cta-desc">{t('documentsUploadCtaDesc')}</p>
         <div className="portal-documents-upload-cta-actions">
           <button type="button" className="portal-btn portal-btn--primary" disabled>
-            Upload New Document
+            {t('documentsUploadNewDocument')}
           </button>
           <button type="button" className="portal-btn portal-btn--secondary" disabled>
-            View Submission History
+            {t('documentsUploadViewHistory')}
           </button>
         </div>
-        <p className="portal-documents-upload-cta-note">
-          These actions are disabled in this preview. They will open the document intake workflow in a future
-          release.
-        </p>
+        <p className="portal-documents-upload-cta-note">{t('documentsUploadCtaNote')}</p>
       </section>
     </main>
   )

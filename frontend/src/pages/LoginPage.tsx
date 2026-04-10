@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import { LoginFooter } from '../components/LoginFooter'
 import { PortalLoginPasswordInput } from '../components/PortalLoginPasswordInput'
 import { useAccount } from '../context/AccountContext'
@@ -7,6 +8,7 @@ import { loginStudent } from '../lib/api'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const t = useStudentPortalT()
   const { login } = useAccount()
   const [studentId, setStudentId] = useState('')
   const [password, setPassword] = useState('')
@@ -17,7 +19,7 @@ export function LoginPage() {
     const id = studentId.trim()
     const pw = password.trim()
     if (!id || !pw) {
-      setFormError('Student ID and Password are required')
+      setFormError(t('loginRequiredFields'))
       return
     }
     setFormError(null)
@@ -28,7 +30,7 @@ export function LoginPage() {
       navigate('/dashboard')
     } catch (e) {
       const message =
-        e instanceof Error ? e.message : 'Sign in failed. Please try again.'
+        e instanceof Error ? e.message : t('signInFailed')
       setFormError(message)
     } finally {
       setSubmitting(false)
@@ -42,14 +44,14 @@ export function LoginPage() {
           <img
             className="portal-login-logo"
             src="/AMULogo.png"
-            alt="Alhambra Medical University"
+            alt={t('alhambraLogoAlt')}
           />
           <article className="portal-login-card">
-            <h1 className="portal-login-card-title">STUDENT PORTAL</h1>
+            <h1 className="portal-login-card-title">{t('studentPortal')}</h1>
             <div className="portal-login-fields">
               <div className="portal-login-field">
                 <label className="portal-login-label" htmlFor="login-student-id">
-                  Student ID
+                  {t('studentId')}
                 </label>
                 <input
                   id="login-student-id"
@@ -63,7 +65,7 @@ export function LoginPage() {
               </div>
               <div className="portal-login-field">
                 <label className="portal-login-label" htmlFor="login-password">
-                  Password
+                  {t('password')}
                 </label>
                 <PortalLoginPasswordInput
                   id="login-password"
@@ -87,17 +89,17 @@ export function LoginPage() {
               onClick={() => void handleSignIn()}
               disabled={submitting}
             >
-              {submitting ? 'Signing in…' : 'Sign In'}
+              {submitting ? t('signingIn') : t('signIn')}
             </button>
-            <nav className="portal-login-help-links" aria-label="Account help">
+            <nav className="portal-login-help-links" aria-label={t('accountHelpAria')}>
               <a className="portal-login-help-link" href="#">
-                Forgot Student ID
+                {t('forgotStudentId')}
               </a>
               <span className="portal-login-help-sep" aria-hidden="true">
                 |
               </span>
               <a className="portal-login-help-link" href="#">
-                Forgot Password
+                {t('forgotPassword')}
               </a>
             </nav>
           </article>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalT } from '../../LanguageContext'
 import {
   fetchStudentAcademics,
   type StudentAcademicsResponse,
@@ -11,7 +12,9 @@ function termYearKey(term: string, year: number): string {
 }
 
 export function GradesPage() {
+  const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const dash = t('dashEm')
 
   const [academics, setAcademics] = useState<StudentAcademicsResponse | null>(
     null,
@@ -56,7 +59,7 @@ export function GradesPage() {
         if (ac.signal.aborted) return
         setAcademics(null)
         setError(
-          e instanceof Error ? e.message : 'Could not load your grades.',
+          e instanceof Error ? e.message : t('couldNotLoadGradesFallback'),
         )
       } finally {
         if (!ac.signal.aborted) {
@@ -66,7 +69,7 @@ export function GradesPage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, reloadKey])
+  }, [currentStudentId, reloadKey, t])
 
   const id = currentStudentId?.trim()
   const showEmpty = !id
@@ -89,9 +92,9 @@ export function GradesPage() {
 
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Grades</h2>
+      <h2 className="portal-section-heading">{t('gradesHeading')}</h2>
       <p className="portal-page-lede">
-        Course grades and numeric scores for the term you select. Data comes from your student record.
+        {t('gradesPageLede')}
       </p>
 
       {showEmpty ? (
@@ -99,9 +102,9 @@ export function GradesPage() {
           className="portal-card portal-profile-state"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Sign in to view grades</p>
+          <p className="portal-profile-state__title">{t('signInToViewGrades')}</p>
           <p className="portal-profile-state__detail">
-            Your graded coursework appears here after you log in with your student account.
+            {t('signInToViewGradesDetail')}
           </p>
         </section>
       ) : null}
@@ -112,9 +115,9 @@ export function GradesPage() {
           aria-busy="true"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Loading grades</p>
+          <p className="portal-profile-state__title">{t('loadingGrades')}</p>
           <p className="portal-profile-state__detail">
-            Please wait while we load your academic record.
+            {t('loadingGradesDetail')}
           </p>
         </section>
       ) : null}
@@ -125,7 +128,7 @@ export function GradesPage() {
           role="alert"
           aria-live="assertive"
         >
-          <p className="portal-profile-state__title">We could not load your grades</p>
+          <p className="portal-profile-state__title">{t('couldNotLoadGrades')}</p>
           <p className="portal-profile-state__detail">{error}</p>
           <div className="portal-actions portal-profile-state__actions">
             <button
@@ -133,7 +136,7 @@ export function GradesPage() {
               className="portal-btn portal-btn--secondary"
               onClick={() => setReloadKey((k) => k + 1)}
             >
-              Try again
+              {t('tryAgain')}
             </button>
           </div>
         </section>
@@ -146,7 +149,7 @@ export function GradesPage() {
               className="portal-account-ledger__quarter-label"
               htmlFor="grades-term-select"
             >
-              <span className="portal-card-note">Term</span>
+              <span className="portal-card-note">{t('term')}</span>
               <select
                 id="grades-term-select"
                 className="portal-account-ledger__select"
@@ -154,14 +157,14 @@ export function GradesPage() {
                 onChange={(e) => setSelectedKey(e.target.value || null)}
               >
               {academics.availableTerms.length === 0 ? (
-                <option value="">No terms on file</option>
+                <option value="">{t('noTermsOnFile')}</option>
               ) : null}
-              {academics.availableTerms.map((t) => (
+              {academics.availableTerms.map((termOpt) => (
                 <option
-                  key={termYearKey(t.term, t.year)}
-                  value={termYearKey(t.term, t.year)}
+                  key={termYearKey(termOpt.term, termOpt.year)}
+                  value={termYearKey(termOpt.term, termOpt.year)}
                 >
-                  {t.label}
+                  {termOpt.label}
                 </option>
               ))}
               </select>
@@ -171,18 +174,18 @@ export function GradesPage() {
             <table className="portal-table portal-table--grades">
               <thead>
                 <tr>
-                  <th scope="col">Course</th>
-                  <th scope="col">Title</th>
-                  <th scope="col">Term</th>
-                  <th scope="col">Grade</th>
-                  <th scope="col">Numeric Grade</th>
+                  <th scope="col">{t('course')}</th>
+                  <th scope="col">{t('title')}</th>
+                  <th scope="col">{t('term')}</th>
+                  <th scope="col">{t('grade')}</th>
+                  <th scope="col">{t('numericGrade')}</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="portal-card-note">
-                      No graded courses for this term.
+                      {t('noGradedCoursesThisTerm')}
                     </td>
                   </tr>
                 ) : (
@@ -197,14 +200,14 @@ export function GradesPage() {
                       </td>
                       <td>
                         <span className="portal-status">
-                          {row.grade?.trim() ? row.grade : '—'}
+                          {row.grade?.trim() ? row.grade : dash}
                         </span>
                       </td>
                       <td>
                         {row.numericGrade != null &&
                         Number.isFinite(row.numericGrade)
                           ? String(row.numericGrade)
-                          : '—'}
+                          : dash}
                       </td>
                     </tr>
                   ))

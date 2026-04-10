@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useLanguage, useStudentPortalT } from '../../LanguageContext'
+import type { PortalLocale, StudentPortalKey } from '../../lib/i18n'
 import {
   fetchAdminClinicalTimetable,
   fetchStudentClinicalRequests,
@@ -10,7 +12,7 @@ import {
   type StudentClinicalRequestItem,
 } from '../../lib/api'
 
-function formatScheduleDate(isoYmd: string): string {
+function formatScheduleDate(isoYmd: string, locale: PortalLocale): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoYmd.trim())
   if (!m) return isoYmd
   const y = Number(m[1])
@@ -24,7 +26,8 @@ function formatScheduleDate(isoYmd: string): string {
   ) {
     return isoYmd
   }
-  return dt.toLocaleDateString('en-US', {
+  const loc = locale === 'zh' ? 'zh-Hant' : 'en-US'
+  return dt.toLocaleDateString(loc, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -32,10 +35,10 @@ function formatScheduleDate(isoYmd: string): string {
   })
 }
 
-function dashText(value: string | null | undefined): string {
-  if (value == null) return '—'
-  const t = String(value).trim()
-  return t === '' ? '—' : t
+function dashText(value: string | null | undefined, dash: string): string {
+  if (value == null) return dash
+  const s = String(value).trim()
+  return s === '' ? dash : s
 }
 
 type TableRow = {
@@ -44,18 +47,22 @@ type TableRow = {
   session: string
   site: string
   faculty: string
-  status: string
+  statusRaw: string
 }
 
-function mapSessionToRow(s: ClinicalScheduleSession): TableRow {
-  return {
-    key: String(s.id),
-    date: formatScheduleDate(s.sessionDate),
-    session: dashText(s.sessionName),
-    site: dashText(s.site),
-    faculty: dashText(s.faculty),
-    status: s.status.trim() || 'Scheduled',
-  }
+function sessionStatusClass(raw: string): string {
+  const s = raw.trim()
+  if (s === 'Confirmed') return 'portal-status portal-status--paid'
+  if (s === 'Tentative') return 'portal-status portal-status--upcoming'
+  return 'portal-status portal-status--pending'
+}
+
+function sessionStatusLabel(raw: string, t: (k: StudentPortalKey) => string): string {
+  const s = raw.trim()
+  if (s === 'Confirmed') return t('clinicalStatusConfirmed')
+  if (s === 'Tentative') return t('clinicalStatusTentative')
+  if (s === 'Scheduled') return t('clinicalScheduledStatus')
+  return s.length > 0 ? s : t('clinicalScheduledStatus')
 }
 
 function isTimetableSlotInSchedule(
@@ -85,10 +92,10 @@ function compareTermsAcademic(a: string, b: string): number {
   const at = a.trim()
   const bt = b.trim()
   const ai = ACADEMIC_TERM_ORDER.findIndex(
-    (t) => t.toLowerCase() === at.toLowerCase(),
+    (termName) => termName.toLowerCase() === at.toLowerCase(),
   )
   const bi = ACADEMIC_TERM_ORDER.findIndex(
-    (t) => t.toLowerCase() === bt.toLowerCase(),
+    (termName) => termName.toLowerCase() === bt.toLowerCase(),
   )
   const aKnown = ai >= 0
   const bKnown = bi >= 0
@@ -99,8 +106,10 @@ function compareTermsAcademic(a: string, b: string): number {
 }
 
 export function ClinicalSchedulePage() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
+  const dash = t('dashEm')
   const { currentStudentId } = useAccount()
-  const [rows, setRows] = useState<TableRow[]>([])
   const [sessions, setSessions] = useState<ClinicalScheduleSession[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -119,6 +128,19 @@ export function ClinicalSchedulePage() {
   const [requestError, setRequestError] = useState<string | null>(null)
   const [dataReloadKey, setDataReloadKey] = useState(0)
 
+  const rows = useMemo<TableRow[]>(
+    () =>
+      sessions.map((s) => ({
+        key: String(s.id),
+        date: formatScheduleDate(s.sessionDate, locale),
+        session: dashText(s.sessionName, dash),
+        site: dashText(s.site, dash),
+        faculty: dashText(s.faculty, dash),
+        statusRaw: s.status.trim() || 'Scheduled',
+      })),
+    [sessions, locale, dash],
+  )
+
   useEffect(() => {
     const ac = new AbortController()
     setTimetableLoading(true)
@@ -134,7 +156,7 @@ export function ClinicalSchedulePage() {
         setTimetableError(
           e instanceof Error
             ? e.message
-            : 'Could not load clinic timetable slots.',
+            : t('couldNotLoadClinicTimetableSlots'),
         )
       } finally {
         if (!ac.signal.aborted) {
@@ -143,12 +165,11 @@ export function ClinicalSchedulePage() {
       }
     })()
     return () => ac.abort()
-  }, [])
+  }, [t])
 
   useEffect(() => {
     const id = currentStudentId?.trim()
     if (!id) {
-      setRows([])
       setSessions([])
       setRequests([])
       setLoading(false)
@@ -157,7 +178,6 @@ export function ClinicalSchedulePage() {
     }
 
     const ac = new AbortController()
-    setRows([])
     setSessions([])
     setLoading(true)
     setError(null)
@@ -170,16 +190,14 @@ export function ClinicalSchedulePage() {
         ])
         if (ac.signal.aborted) return
         setSessions(sess)
-        setRows(sess.map(mapSessionToRow))
         setRequests(reqList)
         setError(null)
       } catch (e) {
         if (ac.signal.aborted) return
-        setRows([])
         setSessions([])
         setRequests([])
         setError(
-          e instanceof Error ? e.message : 'Could not load clinic schedule.',
+          e instanceof Error ? e.message : t('couldNotLoadClinicSchedule'),
         )
       } finally {
         if (!ac.signal.aborted) {
@@ -189,13 +207,13 @@ export function ClinicalSchedulePage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, dataReloadKey])
+  }, [currentStudentId, dataReloadKey, t])
 
   const availableTerms = useMemo(() => {
     const seen = new Set<string>()
     for (const s of timetableSlots) {
-      const t = s.term.trim()
-      if (t !== '') seen.add(t)
+      const termStr = s.term.trim()
+      if (termStr !== '') seen.add(termStr)
     }
     return [...seen].sort(compareTermsAcademic)
   }, [timetableSlots])
@@ -242,11 +260,11 @@ export function ClinicalSchedulePage() {
     setRequestMessage(null)
     try {
       await postStudentClinicalRequest(id, { timetableId: selectedSlot.id })
-      setRequestMessage('Request submitted. You will see it here as pending until staff approves.')
+      setRequestMessage(t('clinicalRequestSubmittedMessage'))
       setDataReloadKey((k) => k + 1)
     } catch (e) {
       setRequestError(
-        e instanceof Error ? e.message : 'Could not submit clinical request.',
+        e instanceof Error ? e.message : t('couldNotSubmitClinicalRequest'),
       )
     } finally {
       setRequestSubmitting(false)
@@ -255,13 +273,13 @@ export function ClinicalSchedulePage() {
 
   const id = currentStudentId?.trim()
   const showEmptyAccount = !id
-  const sectionLoading = loading && rows.length === 0 && error === null
+  const sectionLoading = loading && sessions.length === 0 && error === null
 
   return (
     <main className="portal-page">
       {showEmptyAccount ? (
         <p className="portal-page-lede" role="status">
-          Sign in to view your clinic schedule.
+          {t('clinicalSignInSchedule')}
         </p>
       ) : null}
       {!showEmptyAccount && error ? (
@@ -271,19 +289,19 @@ export function ClinicalSchedulePage() {
       ) : null}
       {!showEmptyAccount && sectionLoading ? (
         <p className="portal-page-lede" aria-live="polite">
-          Loading schedule…
+          {t('clinicalLoadingScheduleShort')}
         </p>
       ) : null}
 
       {!showEmptyAccount ? (
         <section
           className="portal-module-panel"
-          aria-label="Request a clinical session slot"
+          aria-label={t('clinicalRequestSlotSectionAria')}
           style={{ marginBottom: '1rem' }}
         >
           {timetableLoading ? (
             <p className="portal-page-lede" aria-live="polite">
-              Loading timetable…
+              {t('clinicalLoadingTimetable')}
             </p>
           ) : null}
           {timetableError ? (
@@ -306,17 +324,17 @@ export function ClinicalSchedulePage() {
                   className="portal-card-note"
                   style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
                 >
-                  <span>Term</span>
+                  <span>{t('term')}</span>
                   <select
                     className="portal-account-ledger__select"
                     value={filterTerm}
                     onChange={(e) => setFilterTerm(e.target.value)}
-                    aria-label="Filter timetable by term"
+                    aria-label={t('clinicalFilterTimetableByTermAria')}
                   >
-                    <option value="">All terms</option>
-                    {availableTerms.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    <option value="">{t('clinicalAllTerms')}</option>
+                    {availableTerms.map((termName) => (
+                      <option key={termName} value={termName}>
+                        {termName}
                       </option>
                     ))}
                   </select>
@@ -325,14 +343,14 @@ export function ClinicalSchedulePage() {
                   className="portal-card-note"
                   style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
                 >
-                  <span>Year</span>
+                  <span>{t('clinicalColYear')}</span>
                   <select
                     className="portal-account-ledger__select"
                     value={filterYear}
                     onChange={(e) => setFilterYear(e.target.value)}
-                    aria-label="Filter timetable by year"
+                    aria-label={t('clinicalFilterTimetableByYearAria')}
                   >
-                    <option value="">All years</option>
+                    <option value="">{t('clinicalAllYears')}</option>
                     {availableYears.map((y) => (
                       <option key={y} value={String(y)}>
                         {y}
@@ -350,14 +368,14 @@ export function ClinicalSchedulePage() {
                     flex: '1 1 14rem',
                   }}
                 >
-                  <span>Weekly slot</span>
+                  <span>{t('clinicalWeeklySlot')}</span>
                   <select
                     className="portal-account-ledger__select"
                     value={selectedSlotId}
                     onChange={(e) => setSelectedSlotId(e.target.value)}
-                    aria-label="Select clinic timetable slot"
+                    aria-label={t('clinicalSelectSlotAria')}
                   >
-                    <option value="">Select a slot…</option>
+                    <option value="">{t('clinicalSelectSlotPlaceholder')}</option>
                     {filteredTimetableSlots.map((s) => (
                       <option key={s.id} value={String(s.id)}>
                         {s.slotLabel} ({s.term} {s.year})
@@ -376,26 +394,26 @@ export function ClinicalSchedulePage() {
                   }
                   onClick={() => void handleRequestSlot()}
                 >
-                  {requestSubmitting ? 'Submitting…' : 'Request slot'}
+                  {requestSubmitting ? t('submitting') : t('clinicalRequestSlot')}
                 </button>
               </div>
               <p className="portal-card-note" style={{ margin: '0 0 0.75rem', opacity: 0.85 }}>
-                Staff review requests; approved slots appear in the table below.
+                {t('clinicalRequestSlotStaffNote')}
               </p>
             </>
           ) : null}
           {selectedSlot && selectedPending ? (
             <p className="portal-page-lede" role="status">
-              <span className="portal-status portal-status--pending">Pending</span>
+              <span className="portal-status portal-status--pending">{t('clinicalPendingBadge')}</span>
               {' '}
-              Your request for this slot is awaiting approval.
+              {t('clinicalPendingSlotMessage')}
             </p>
           ) : null}
           {selectedSlot && selectedInSchedule && !selectedPending ? (
             <p className="portal-page-lede" role="status">
-              <span className="portal-status portal-status--paid">Approved</span>
+              <span className="portal-status portal-status--paid">{t('clinicalApprovedBadge')}</span>
               {' '}
-              This slot is already on your schedule below.
+              {t('clinicalApprovedSlotMessage')}
             </p>
           ) : null}
           {requestError ? (
@@ -413,17 +431,17 @@ export function ClinicalSchedulePage() {
 
       <section className="portal-module-panel" aria-labelledby="clinic-schedule-table-heading">
         <h3 id="clinic-schedule-table-heading" className="portal-module-panel-heading">
-          Upcoming assignments
+          {t('clinicalUpcomingAssignmentsHeading')}
         </h3>
         <div className="portal-table-wrap">
           <table className="portal-table portal-table--clinical-schedule">
             <thead>
               <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Session</th>
-                <th scope="col">Clinic / site</th>
-                <th scope="col">Supervising faculty</th>
-                <th scope="col">Status</th>
+                <th scope="col">{t('date')}</th>
+                <th scope="col">{t('clinicalColSession')}</th>
+                <th scope="col">{t('clinicalColClinicSite')}</th>
+                <th scope="col">{t('clinicalColSupervisingFaculty')}</th>
+                <th scope="col">{t('status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -434,16 +452,8 @@ export function ClinicalSchedulePage() {
                   <td>{row.site}</td>
                   <td>{row.faculty}</td>
                   <td>
-                    <span
-                      className={
-                        row.status === 'Confirmed'
-                          ? 'portal-status portal-status--paid'
-                          : row.status === 'Tentative'
-                            ? 'portal-status portal-status--upcoming'
-                            : 'portal-status portal-status--pending'
-                      }
-                    >
-                      {row.status}
+                    <span className={sessionStatusClass(row.statusRaw)}>
+                      {sessionStatusLabel(row.statusRaw, t)}
                     </span>
                   </td>
                 </tr>

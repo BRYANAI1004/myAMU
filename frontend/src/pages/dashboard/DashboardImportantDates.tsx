@@ -1,11 +1,14 @@
+import { useStudentPortalT } from '../../LanguageContext'
 import { DASHBOARD_IMPORTANT_DATES_MOCK } from './dashboardMockData'
 
 export function DashboardImportantDates() {
+  const t = useStudentPortalT()
+
   return (
     <section className="portal-dashboard-secondary-card" aria-labelledby="portal-dashboard-dates-heading">
       <header className="portal-dashboard-secondary-card-head">
         <h2 id="portal-dashboard-dates-heading" className="portal-dashboard-card-panel-title">
-          Important Dates
+          {t('importantDates')}
         </h2>
       </header>
       <ul className="portal-dashboard-dates-list">

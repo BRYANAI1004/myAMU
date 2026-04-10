@@ -1,4 +1,5 @@
 import { useEffect, type MouseEvent } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 
 export function DashboardGoogleCalendarModal({
   title,
@@ -9,6 +10,7 @@ export function DashboardGoogleCalendarModal({
   items: { href: string; label: string }[]
   onClose: () => void
 }) {
+  const t = useStudentPortalT()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -41,15 +43,12 @@ export function DashboardGoogleCalendarModal({
             type="button"
             className="portal-dashboard-gcal-modal__close"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('gcalModalClose')}
           >
             ×
           </button>
         </div>
-        <p className="portal-dashboard-gcal-modal__lede">
-          Each link opens Google Calendar with a prefilled recurring event. Confirm or edit in Google,
-          then save.
-        </p>
+        <p className="portal-dashboard-gcal-modal__lede">{t('gcalModalLede')}</p>
         <ul className="portal-dashboard-gcal-modal__list">
           {items.map((item) => (
             <li key={item.href} className="portal-dashboard-gcal-modal__row">
@@ -60,7 +59,7 @@ export function DashboardGoogleCalendarModal({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Add to Google Calendar
+                {t('addToGoogleCalendar')}
               </a>
             </li>
           ))}

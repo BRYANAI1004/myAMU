@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import { PageLayout } from '../components/PageLayout'
 import { useAccount } from '../context/AccountContext'
 import { installmentPlanDisplayLabel, portalTermLabel } from '../lib/accountDisplay'
 import { formatMoney } from '../lib/formatMoney'
 
 export function PaymentPlanPage() {
+  const t = useStudentPortalT()
   const { account } = useAccount()
   const { installmentPlan, installmentPolicy, program } = account
   const planLabel = installmentPlanDisplayLabel(installmentPlan)
@@ -14,21 +16,23 @@ export function PaymentPlanPage() {
     <PageLayout>
       <main className="portal-page">
         <p className="portal-page-lede">
-          {termLabel} installment schedule for {program.trim() ? program : 'your program'}. Your plan:{' '}
-          {planLabel}. Amounts and dates follow
-          catalog rules (up to three installments per quarter); confirm details on official bursar
-          communications.
+          {termLabel}
+          {t('paymentPlanPart1')}
+          {program.trim() ? program : t('yourProgram')}
+          {t('paymentPlanPart2')}
+          {planLabel}
+          {t('paymentPlanPart3')}
         </p>
 
         <div className="portal-table-wrap">
           <table className="portal-table portal-table--plan">
-            <caption className="visually-hidden">Installment payment schedule</caption>
+            <caption className="visually-hidden">{t('installmentPaymentScheduleCaption')}</caption>
             <thead>
               <tr>
-                <th scope="col">Installment</th>
-                <th scope="col">Due Date</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Status</th>
+                <th scope="col">{t('installment')}</th>
+                <th scope="col">{t('dueDate')}</th>
+                <th scope="col">{t('amount')}</th>
+                <th scope="col">{t('status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -46,7 +50,7 @@ export function PaymentPlanPage() {
 
         <section className="portal-plan-terms" aria-labelledby="plan-terms-heading">
           <h2 id="plan-terms-heading" className="portal-section-heading">
-            Plan terms
+            {t('planTerms')}
           </h2>
           <ul className="portal-plan-terms-list">
             {installmentPolicy.map((line) => (
@@ -55,9 +59,9 @@ export function PaymentPlanPage() {
           </ul>
         </section>
 
-        <nav className="portal-actions portal-actions--spaced" aria-label="Page actions">
+        <nav className="portal-actions portal-actions--spaced" aria-label={t('pageActionsAria')}>
           <Link className="portal-btn portal-btn--primary" to="/finances/overview">
-            Back to Finances
+            {t('backToFinances')}
           </Link>
         </nav>
       </main>

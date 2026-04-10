@@ -1,3 +1,5 @@
+import { useStudentPortalT } from '../../LanguageContext'
+
 const PENDING = [
   {
     id: 'ev-104',
@@ -18,41 +20,40 @@ const COMPLETED = [
     id: 'ev-098',
     rotation: 'Foundations pre-clinical immersion',
     submitted: 'Mar 4, 2026',
-    status: 'Released to student',
   },
   {
     id: 'ev-101',
     rotation: 'Primary care longitudinal clinic',
     submitted: 'Feb 19, 2026',
-    status: 'Released to student',
   },
 ] as const
 
 export function ClinicalEvaluationPage() {
+  const t = useStudentPortalT()
+
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Submit evaluation</h2>
+      <h2 className="portal-section-heading">{t('submitEvaluation')}</h2>
       <p className="portal-page-lede">
-        Complete end-of-rotation evaluations for your supervising faculty and clinical sites. Submissions are
-        routed to the clerkship office and may be required before grades or schedule releases are finalized.
+        {t('clinicalEvalLede')}
       </p>
       <section className="portal-module-panel portal-stack" aria-labelledby="pending-eval-heading">
         <h3 id="pending-eval-heading" className="portal-module-panel-heading">
-          Pending evaluations
+          {t('clinicalEvalPending')}
         </h3>
         <ul className="portal-registration-status-list">
           {PENDING.map((row) => (
             <li key={row.id} className="portal-registration-status-item">
               <div>
-                <p className="portal-registration-status-label">Rotation</p>
+                <p className="portal-registration-status-label">{t('rotation')}</p>
                 <p className="portal-registration-status-value">{row.rotation}</p>
                 <p className="portal-clinical-meta-line">
-                  {row.evaluator} · Due {row.due}
+                  {t('clinicalEvalEvaluatorDue').replace('{evaluator}', row.evaluator).replace('{due}', row.due)}
                 </p>
               </div>
               <div className="portal-actions portal-clinical-inline-actions">
                 <button type="button" className="portal-btn portal-btn--primary portal-btn--compact">
-                  Continue
+                  {t('continue')}
                 </button>
               </div>
             </li>
@@ -61,15 +62,15 @@ export function ClinicalEvaluationPage() {
       </section>
       <section className="portal-module-panel portal-stack" aria-labelledby="completed-eval-heading">
         <h3 id="completed-eval-heading" className="portal-module-panel-heading">
-          Completed evaluations
+          {t('clinicalEvalCompleted')}
         </h3>
         <div className="portal-table-wrap">
           <table className="portal-table">
             <thead>
               <tr>
-                <th scope="col">Rotation</th>
-                <th scope="col">Submitted</th>
-                <th scope="col">Status</th>
+                <th scope="col">{t('rotation')}</th>
+                <th scope="col">{t('clinicalEvalSubmittedCol')}</th>
+                <th scope="col">{t('status')}</th>
               </tr>
             </thead>
             <tbody>
@@ -78,7 +79,7 @@ export function ClinicalEvaluationPage() {
                   <td>{row.rotation}</td>
                   <td>{row.submitted}</td>
                   <td>
-                    <span className="portal-status portal-status--paid">{row.status}</span>
+                    <span className="portal-status portal-status--paid">{t('clinicalEvalReleasedToStudent')}</span>
                   </td>
                 </tr>
               ))}
@@ -87,12 +88,14 @@ export function ClinicalEvaluationPage() {
         </div>
       </section>
       <section className="portal-note" role="note">
-        <strong>New evaluation available?</strong> If a preceptor shared a link or access code, use{' '}
-        <em>Start new evaluation</em> below. Otherwise open a pending item from the list above.
+        <strong>{t('clinicalEvalNewNoteLead')}</strong>{' '}
+        {t('clinicalEvalNewNoteMid')}
+        <em>{t('clinicalEvalStartNewEm')}</em>
+        {t('clinicalEvalNewNoteAfterEm')}
       </section>
       <div className="portal-actions">
         <button type="button" className="portal-btn portal-btn--secondary">
-          Start new evaluation
+          {t('clinicalEvalStartNewButton')}
         </button>
       </div>
     </main>

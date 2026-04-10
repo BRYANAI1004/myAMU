@@ -1,31 +1,36 @@
-import { useAccount } from '../../context/AccountContext'
+import { useMemo } from 'react'
 import { INSTITUTION_NAME } from '../../branding'
+import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalT } from '../../LanguageContext'
 import { activityRowsFromRecent } from '../../lib/accountDisplay'
 import { formatMoney } from '../../lib/formatMoney'
 
 /** Recent activity table shared by Finances history and legacy `/activity`. */
 export function PaymentHistoryContent() {
+  const t = useStudentPortalT()
   const { account } = useAccount()
   const rows = activityRowsFromRecent(account.recentActivity)
+  const lede = useMemo(
+    () => t('paymentHistoryLede').replace('{institution}', INSTITUTION_NAME),
+    [t],
+  )
 
   return (
     <>
       <p className="portal-page-lede">
-        Recent posted activity for your student tuition account at {INSTITUTION_NAME}. Figures are
-        derived from the same MAHM demo ledger as your account overview; official statements are issued
-        by the bursar.
+        {lede}
       </p>
 
       <div className="portal-table-wrap">
         <table className="portal-table portal-table--activity">
-          <caption className="visually-hidden">Recent tuition account activity</caption>
+          <caption className="visually-hidden">{t('recentTuitionActivityCaption')}</caption>
           <thead>
             <tr>
-              <th scope="col">Date</th>
-              <th scope="col">Description</th>
-              <th scope="col">Charges</th>
-              <th scope="col">Credits</th>
-              <th scope="col">Balance</th>
+              <th scope="col">{t('date')}</th>
+              <th scope="col">{t('description')}</th>
+              <th scope="col">{t('tableCharges')}</th>
+              <th scope="col">{t('tableCredits')}</th>
+              <th scope="col">{t('balance')}</th>
             </tr>
           </thead>
           <tbody>
@@ -33,8 +38,8 @@ export function PaymentHistoryContent() {
               <tr key={`${i}-${row.date}-${row.description}`}>
                 <td>{row.date}</td>
                 <td>{row.description}</td>
-                <td>{row.charges ? formatMoney(row.charges) : '—'}</td>
-                <td>{row.credits ? formatMoney(row.credits) : '—'}</td>
+                <td>{row.charges ? formatMoney(row.charges) : t('dashEm')}</td>
+                <td>{row.credits ? formatMoney(row.credits) : t('dashEm')}</td>
                 <td>{formatMoney(row.balance)}</td>
               </tr>
             ))}

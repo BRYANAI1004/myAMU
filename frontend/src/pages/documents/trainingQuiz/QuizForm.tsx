@@ -1,14 +1,9 @@
 import { useMemo } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 import type { Quiz } from '../../../data/documentQuizzes'
 import { CertificationCheckbox } from './CertificationCheckbox'
 import { QuizQuestion } from './QuizQuestion'
 import { SubmitButton } from './SubmitButton'
-
-const CERT_CHECKBOX_LABEL =
-  'I certify that I have completed this training and understand the policy requirements.'
-
-const VALIDATION_HINT =
-  'Please answer all questions and confirm certification before submitting.'
 
 type QuizFormProps = {
   quiz: Quiz
@@ -33,6 +28,7 @@ export function QuizForm({
   onCertificationChange,
   onSubmit,
 }: QuizFormProps) {
+  const t = useStudentPortalT()
   const allAnswered = useMemo(
     () => quiz.questions.every((q) => Boolean(answers[q.id]?.trim())),
     [quiz.questions, answers],
@@ -62,7 +58,7 @@ export function QuizForm({
       >
         {showIncorrectHint ? (
           <p className="portal-inline-note portal-inline-note--flush" role="alert">
-            Please correct the highlighted answers.
+            {t('documentsQuizCorrectHighlighted')}
           </p>
         ) : null}
 
@@ -83,7 +79,7 @@ export function QuizForm({
 
         <CertificationCheckbox
           certificationText={quiz.certificationText}
-          checkboxLabel={CERT_CHECKBOX_LABEL}
+          checkboxLabel={t('documentsQuizCertifyTrainingCheckbox')}
           checked={certificationChecked}
           onChange={onCertificationChange}
           disabled={completed || submitting}
@@ -92,13 +88,17 @@ export function QuizForm({
 
         {!completed && (!allAnswered || !certificationChecked) ? (
           <p className="portal-doc-quiz-hint" role="status">
-            {VALIDATION_HINT}
+            {t('documentsQuizValidationHint')}
           </p>
         ) : null}
 
         <div className="portal-doc-quiz-actions">
           <SubmitButton disabled={completed || !canSubmit} loading={submitting}>
-            {completed ? 'Submitted' : submitting ? 'Submitting…' : 'Submit'}
+            {completed
+              ? t('documentsQuizSubmittedBadge')
+              : submitting
+                ? t('submittingEllipsis')
+                : t('submitButton')}
           </SubmitButton>
         </div>
       </form>

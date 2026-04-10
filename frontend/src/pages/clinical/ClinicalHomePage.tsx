@@ -1,21 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAccount } from '../../context/AccountContext'
+import { useLanguage, useStudentPortalT } from '../../LanguageContext'
+import type { PortalLocale, StudentPortalKey } from '../../lib/i18n'
 import {
   fetchStudentClinicalSchedule,
   type ClinicalScheduleSession,
 } from '../../lib/api'
 
-function readinessLabel(readiness: 'ready' | 'not_ready'): string {
-  return readiness === 'ready' ? 'Ready' : 'Not ready'
+function readinessLabel(
+  readiness: 'ready' | 'not_ready',
+  t: (k: StudentPortalKey) => string,
+): string {
+  return readiness === 'ready' ? t('clinicalReady') : t('clinicalNotReady')
 }
 
-function clinicalLevelLabel(level: number): string {
-  if (!Number.isFinite(level) || level <= 0) return 'Not started'
-  return `Level ${level}`
+function clinicalLevelLabel(level: number, t: (k: StudentPortalKey) => string): string {
+  if (!Number.isFinite(level) || level <= 0) return t('clinicalNotStarted')
+  return t('clinicalLevelN').replace('{n}', String(Math.trunc(level)))
 }
 
-function formatScheduleDate(isoYmd: string): string {
+function formatScheduleDate(isoYmd: string, locale: PortalLocale): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoYmd.trim())
   if (!m) return isoYmd
   const y = Number(m[1])
@@ -29,7 +34,8 @@ function formatScheduleDate(isoYmd: string): string {
   ) {
     return isoYmd
   }
-  return dt.toLocaleDateString('en-US', {
+  const loc = locale === 'zh' ? 'zh-Hant' : 'en-US'
+  return dt.toLocaleDateString(loc, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -62,6 +68,8 @@ function upcomingAssignedSessions(sessions: ClinicalScheduleSession[]): Clinical
 }
 
 export function ClinicalHomePage() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
   const { account, currentStudentId } = useAccount()
   const cp = account.clinicalProgress
 
@@ -89,14 +97,14 @@ export function ClinicalHomePage() {
         if (ac.signal.aborted) return
         setSessions([])
         setScheduleError(
-          e instanceof Error ? e.message : 'Could not load assigned clinical sessions.',
+          e instanceof Error ? e.message : t('couldNotLoadClinicalSessionsFallback'),
         )
       } finally {
         if (!ac.signal.aborted) setScheduleLoading(false)
       }
     })()
     return () => ac.abort()
-  }, [currentStudentId])
+  }, [currentStudentId, t])
 
   const upcomingPreview = useMemo(
     () => upcomingAssignedSessions(sessions).slice(0, UPCOMING_PREVIEW_LIMIT),
@@ -112,12 +120,15 @@ export function ClinicalHomePage() {
           ? 100
           : 0
 
+  const hoursCaption = t('clinicalHoursLoggedCaption')
+    .replace('{completed}', String(cp?.completedHours ?? 0))
+    .replace('{required}', String(cp?.requiredHours ?? 0))
+
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Clinical overview</h2>
+      <h2 className="portal-section-heading">{t('clinicalOverviewHeading')}</h2>
       <p className="portal-page-lede">
-        Your assigned clinic sessions and progress from clinical course records and program hour
-        requirements.
+        {t('clinicalOverviewLede')}
       </p>
 
       <section
@@ -125,25 +136,24 @@ export function ClinicalHomePage() {
         aria-labelledby="clinical-assigned-preview-heading"
       >
         <h3 id="clinical-assigned-preview-heading" className="portal-section-heading">
-          Upcoming assigned sessions
+          {t('clinicalUpcomingAssignedSessions')}
         </h3>
         {scheduleLoading ? (
-          <p className="portal-inline-note portal-inline-note--flush">Loading assigned sessions…</p>
+          <p className="portal-inline-note portal-inline-note--flush">{t('clinicalLoadingAssignedSessions')}</p>
         ) : scheduleError != null ? (
           <p className="portal-inline-note portal-inline-note--flush" role="alert">
             {scheduleError}
           </p>
         ) : upcomingPreview.length === 0 ? (
           <p className="portal-inline-note portal-inline-note--flush">
-            No upcoming assigned sessions on file. Use Clinic Schedule to request slots or review your
-            full assignment list.
+            {t('clinicalNoUpcomingSessions')}
           </p>
         ) : (
           <ul className="portal-module-list">
             {upcomingPreview.map((s) => (
               <li key={String(s.id)} className="portal-module-list-item">
                 <span className="portal-module-list-label">
-                  {formatScheduleDate(s.sessionDate)}
+                  {formatScheduleDate(s.sessionDate, locale)}
                   {s.sessionName != null && String(s.sessionName).trim() !== ''
                     ? ` · ${String(s.sessionName).trim()}`
                     : ''}
@@ -157,7 +167,7 @@ export function ClinicalHomePage() {
         )}
         <p className="portal-academics-progress-caption portal-inline-note portal-inline-note--flush">
           <Link to="/clinical/schedule" className="portal-text-link">
-            Open full clinic schedule
+            {t('clinicalOpenFullSchedule')}
           </Link>
         </p>
       </section>
@@ -171,12 +181,12 @@ export function ClinicalHomePage() {
             color: 'var(--portal-text-muted)',
           }}
         >
-          Clinical progress for your program appears here when available from your student record.
+          {t('clinicalProgressWhenAvailable')}
         </p>
       ) : (
         <>
           <h2 className="portal-section-heading" style={{ marginTop: '1.75rem' }}>
-            Clinical progress
+            {t('clinicalProgressSectionHeading')}
           </h2>
 
           <section
@@ -184,24 +194,24 @@ export function ClinicalHomePage() {
             aria-labelledby="clinical-progress-heading"
           >
             <h3 id="clinical-progress-heading" className="portal-section-heading">
-              Tracker
+              {t('clinicalTrackerHeading')}
             </h3>
             <div className="portal-grid-4">
               <div>
-                <p className="portal-card-label">Level</p>
-                <p className="portal-card-value">{clinicalLevelLabel(cp.level)}</p>
+                <p className="portal-card-label">{t('clinicalLevelLabel')}</p>
+                <p className="portal-card-value">{clinicalLevelLabel(cp.level, t)}</p>
               </div>
               <div>
-                <p className="portal-card-label">Completed hours</p>
+                <p className="portal-card-label">{t('clinicalCompletedHoursLabel')}</p>
                 <p className="portal-card-value">{cp.completedHours} hrs</p>
               </div>
               <div>
-                <p className="portal-card-label">Required hours</p>
+                <p className="portal-card-label">{t('clinicalRequiredHoursLabel')}</p>
                 <p className="portal-card-value">{cp.requiredHours} hrs</p>
               </div>
               <div>
-                <p className="portal-card-label">Readiness</p>
-                <p className="portal-card-value">{readinessLabel(cp.readiness)}</p>
+                <p className="portal-card-label">{t('clinicalReadinessLabel')}</p>
+                <p className="portal-card-value">{readinessLabel(cp.readiness, t)}</p>
               </div>
             </div>
             <div
@@ -210,22 +220,22 @@ export function ClinicalHomePage() {
               aria-valuenow={pct}
               aria-valuemin={0}
               aria-valuemax={100}
-              aria-label="Clinical hours progress"
+              aria-label={t('clinicalHoursProgressAria')}
             >
               <div className="portal-academics-progress-fill" style={{ width: `${pct}%` }} />
             </div>
             <p className="portal-academics-progress-caption portal-inline-note portal-inline-note--flush">
-              {cp.completedHours} of {cp.requiredHours} required hours logged in clinical records.
+              {hoursCaption}
             </p>
           </section>
 
           <section className="portal-module-panel" aria-labelledby="clinical-courses-heading">
             <h3 id="clinical-courses-heading" className="portal-module-panel-heading">
-              Completed courses
+              {t('clinicalCompletedCoursesHeading')}
             </h3>
             {cp.completedCourses.length === 0 ? (
               <p className="portal-inline-note portal-inline-note--flush">
-                No clinical course rows on file yet.
+                {t('clinicalNoCourseRowsOnFile')}
               </p>
             ) : (
               <ul className="portal-module-list">
@@ -240,10 +250,10 @@ export function ClinicalHomePage() {
 
           <section className="portal-module-panel" aria-labelledby="clinical-missing-heading">
             <h3 id="clinical-missing-heading" className="portal-module-panel-heading">
-              Missing or next steps
+              {t('clinicalMissingNextSteps')}
             </h3>
             {cp.missing.length === 0 ? (
-              <p className="portal-inline-note portal-inline-note--flush">No open items listed.</p>
+              <p className="portal-inline-note portal-inline-note--flush">{t('clinicalNoOpenItems')}</p>
             ) : (
               <ul className="portal-module-list">
                 {cp.missing.map((item) => (

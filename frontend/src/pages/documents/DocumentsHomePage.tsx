@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalT } from '../../LanguageContext'
 import { fetchStudentDocuments, type StudentDocumentRequirement } from '../../lib/api'
 import { AgreementsSection } from './components/AgreementsSection'
 import { DocumentsTabs, type DocumentsTabId } from './components/DocumentsTabs'
@@ -18,6 +19,7 @@ type DocsBootstrapState =
     }
 
 export function DocumentsHomePage() {
+  const t = useStudentPortalT()
   const { currentStudentId, isAuthenticated } = useAccount()
   const [tab, setTab] = useState<DocumentsTabId>('registration')
   const [docs, setDocs] = useState<DocsBootstrapState>(() =>
@@ -90,12 +92,12 @@ export function DocumentsHomePage() {
       } catch (e) {
         if (ac.signal.aborted) return
         const message =
-          e instanceof Error ? e.message : 'Could not load document requirements.'
+          e instanceof Error ? e.message : t('couldNotLoadDocumentRequirements')
         setDocs({ phase: 'error', message })
       }
     })()
     return () => ac.abort()
-  }, [currentStudentId])
+  }, [currentStudentId, t])
 
   const agreementRequirement = useMemo(() => {
     if (docs.phase !== 'ready') return undefined
@@ -128,10 +130,10 @@ export function DocumentsHomePage() {
   return (
     <main className="portal-page portal-documents-home">
       <p className="portal-inline-note portal-inline-note--flush" data-docs-build-marker>
-        Documents build marker: docs-debug-2026-04-07
+        {t('documentsBuildMarker')}
       </p>
       {!isAuthenticated ? (
-        <p className="portal-page-lede">Sign in to view documents and forms for your account.</p>
+        <p className="portal-page-lede">{t('signInToViewDocuments')}</p>
       ) : null}
 
       {isAuthenticated && docs.phase === 'error' ? (
@@ -145,7 +147,7 @@ export function DocumentsHomePage() {
 
       {isAuthenticated && docs.phase === 'ready' ? (
         <p className="portal-inline-note portal-inline-note--flush">
-          Requirements for <strong>{docs.termLabel}</strong> (academic term).
+          {t('documentsRequirementsForTerm').replace('{term}', docs.termLabel)}
         </p>
       ) : null}
 
@@ -153,15 +155,14 @@ export function DocumentsHomePage() {
       <div className="portal-documents-home__panel">
         {!isAuthenticated ? null : docs.phase === 'loading' ? (
           <p className="portal-page-lede" role="status">
-            Loading document requirements…
+            {t('loadingDocumentRequirements')}
           </p>
         ) : docs.phase === 'error' ? (
           <>
             {tab === 'registration' ? <RegistrationFormsSection /> : null}
             {tab !== 'registration' ? (
               <p className="portal-page-lede" role="status">
-                Quiz and agreement actions are unavailable until document requirements load
-                successfully.
+                {t('documentsQuizUnavailableUntilLoad')}
               </p>
             ) : null}
           </>

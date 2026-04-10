@@ -1,7 +1,6 @@
 import { forwardRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useLanguage } from '@/LanguageContext'
-import { portalStudentLabel } from '@/lib/portalLocaleStrings'
+import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../context/AccountContext'
 import { PORTAL_BRANDING_TITLE } from '../branding'
 import { PORTAL_MOBILE_NAV_DRAWER_ID } from './PortalSidebar'
@@ -24,14 +23,14 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
 ) {
   const navigate = useNavigate()
   const { locale, toggleLanguage } = useLanguage()
-  const langToggleTitle =
-    locale === 'en' ? 'Switch language to 中文 (Traditional Chinese)' : 'Switch language to English'
+  const t = useStudentPortalT()
+  const langToggleTitle = locale === 'en' ? t('switchLanguageToZh') : t('switchLanguageToEn')
   const { account, loading, isAuthenticated, logout } = useAccount()
   const displayName = !isAuthenticated
-    ? 'Student'
+    ? t('studentFallback')
     : loading
-      ? 'Loading…'
-      : (account.student.name?.trim() || 'Student')
+      ? t('loadingEllipsis')
+      : (account.student.name?.trim() || t('studentFallback'))
 
   const handleLogout = useCallback(() => {
     logout()
@@ -42,7 +41,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
 
   return (
     <header className="portal-app-header">
-      <div className="portal-branding-bar" aria-label="School branding">
+      <div className="portal-branding-bar" aria-label={t('schoolBrandingAria')}>
         <div className="portal-branding-bar-inner">
           <div className="portal-branding-bar-start">
             <button
@@ -50,7 +49,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
               type="button"
               id={PORTAL_MOBILE_MENU_BUTTON_ID}
               className="portal-branding-bar-menu-btn"
-              aria-label="Open navigation menu"
+              aria-label={t('openNavigationMenu')}
               aria-expanded={mobileMenuOpen ?? false}
               aria-controls={PORTAL_MOBILE_NAV_DRAWER_ID}
               onClick={onMobileMenuToggle}
@@ -60,7 +59,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
             <Link
               to="/dashboard"
               className="portal-branding-bar-logo-link"
-              aria-label={`${PORTAL_BRANDING_TITLE} — go to dashboard`}
+              aria-label={`${PORTAL_BRANDING_TITLE} — ${t('goToDashboard')}`}
             >
               <img
                 src="/AMULogo.png"
@@ -85,7 +84,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
                 <Link
                   to="/my-account"
                   className="portal-user-button"
-                  title="My account"
+                  title={t('myAccountLinkTitle')}
                 >
                   <span className="portal-user-icon" aria-hidden>
                     <IconUserCircle width={17} height={17} />
@@ -101,7 +100,7 @@ export const TopBar = forwardRef<HTMLButtonElement, TopBarProps>(function TopBar
                 <span className="portal-user-icon" aria-hidden>
                   <IconLogout width={17} height={17} />
                 </span>
-                <span>{portalStudentLabel(locale, 'logout')}</span>
+                <span>{t('logout')}</span>
               </button>
             </div>
             {assistantMobile && !showPortalBanner ? (

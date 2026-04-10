@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import {
   fetchCurrentAcademicTerm,
   fetchRecentAcademicTerms,
@@ -11,35 +12,40 @@ import {
   REGISTRATION_TERMS_LOAD_ERROR,
 } from './registrationTermSearch'
 
-const ACTIONS = [
-  {
-    to: 'add-drop',
-    title: 'Add / Drop Courses',
-    description: 'Adjust your course load during the published add/drop period.',
-  },
-  {
-    to: 'search',
-    title: 'Course Search',
-    description: 'Browse sections, seats, and meeting times before you register.',
-  },
-  {
-    to: 'schedule',
-    title: 'My Timetable',
-    description: 'View your weekly class and exam schedule for the term.',
-  },
-  {
-    to: 'form',
-    title: 'Registration Form',
-    description: 'Download or submit program registration paperwork when required.',
-  },
-  {
-    to: 'status',
-    title: 'Registration Status',
-    description: 'See holds, approvals, and credits registered for the current term.',
-  },
-] as const
-
 export function RegistrationHomePage() {
+  const t = useStudentPortalT()
+  const actions = useMemo(
+    () =>
+      [
+        {
+          to: 'add-drop' as const,
+          titleKey: 'regActionAddDropTitle' as const,
+          descKey: 'regActionAddDropDesc' as const,
+        },
+        {
+          to: 'search' as const,
+          titleKey: 'regActionCourseSearchTitle' as const,
+          descKey: 'regActionCourseSearchDesc' as const,
+        },
+        {
+          to: 'schedule' as const,
+          titleKey: 'regActionMyTimetableTitle' as const,
+          descKey: 'regActionMyTimetableDesc' as const,
+        },
+        {
+          to: 'form' as const,
+          titleKey: 'regActionRegistrationFormTitle' as const,
+          descKey: 'regActionRegistrationFormDesc' as const,
+        },
+        {
+          to: 'status' as const,
+          titleKey: 'regActionRegistrationStatusTitle' as const,
+          descKey: 'regActionRegistrationStatusDesc' as const,
+        },
+      ] as const,
+    [],
+  )
+
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
   const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
   const [selectedId, setSelectedId] = useState<string>('')
@@ -97,6 +103,11 @@ export function RegistrationHomePage() {
   const termQuery =
     selectedId.trim() !== '' ? `?term=${encodeURIComponent(selectedId.trim())}` : ''
 
+  const termsErrorDisplay =
+    loadError === REGISTRATION_TERMS_LOAD_ERROR
+      ? t('registrationTermsLoadError')
+      : (loadError ?? t('registrationCouldNotLoadTerms'))
+
   return (
     <main className="portal-page portal-stack">
       <section
@@ -104,28 +115,28 @@ export function RegistrationHomePage() {
         aria-labelledby="registration-term-heading"
       >
         <h2 id="registration-term-heading" className="portal-module-panel-heading">
-          Select Term
+          {t('registrationSelectTermHeading')}
         </h2>
         {loadState === 'loading' ? (
           <p className="portal-text-muted portal-registration-term-status" role="status">
-            Loading terms…
+            {t('registrationLoadingTermsShort')}
           </p>
         ) : null}
         {loadState === 'error' ? (
           <p className="portal-text-muted portal-registration-term-status" role="alert">
-            {loadError ?? 'Could not load terms.'}
+            {termsErrorDisplay}
           </p>
         ) : null}
         {loadState === 'ready' && options.length === 0 ? (
           <p className="portal-text-muted portal-registration-term-status" role="status">
-            No academic terms available.
+            {t('registrationNoTermsAvailable')}
           </p>
         ) : null}
         {loadState === 'ready' && options.length > 0 ? (
           <>
             <div className="portal-registration-term-field">
               <label htmlFor="registration-term-select" className="portal-registration-term-label">
-                Registration term
+                {t('registrationTermFieldLabel')}
               </label>
               <select
                 id="registration-term-select"
@@ -133,15 +144,15 @@ export function RegistrationHomePage() {
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
               >
-                {options.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.term_label}
+                {options.map((termOpt) => (
+                  <option key={termOpt.id} value={termOpt.id}>
+                    {termOpt.term_label}
                   </option>
                 ))}
               </select>
             </div>
             <p className="portal-text-muted portal-registration-term-hint">
-              Recent terms shown here are published by the registrar.
+              {t('registrationRecentTermsHint')}
             </p>
           </>
         ) : null}
@@ -149,10 +160,10 @@ export function RegistrationHomePage() {
 
       <section className="portal-module-panel" aria-labelledby="registration-actions-heading">
         <h2 id="registration-actions-heading" className="portal-module-panel-heading">
-          Registration services
+          {t('registrationServicesHeading')}
         </h2>
         <ul className="portal-registration-action-grid">
-          {ACTIONS.map((action) => (
+          {actions.map((action) => (
             <li key={action.to}>
               <NavLink
                 to={`${action.to}${termQuery}`}
@@ -161,8 +172,8 @@ export function RegistrationHomePage() {
                 <span className="portal-registration-action-arrow" aria-hidden="true">
                   →
                 </span>
-                <h3 className="portal-registration-action-title">{action.title}</h3>
-                <p className="portal-registration-action-desc">{action.description}</p>
+                <h3 className="portal-registration-action-title">{t(action.titleKey)}</h3>
+                <p className="portal-registration-action-desc">{t(action.descKey)}</p>
               </NavLink>
             </li>
           ))}

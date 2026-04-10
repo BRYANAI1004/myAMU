@@ -1,45 +1,48 @@
 import { useEffect, useState } from 'react'
 import { BackToDashboardLink } from '../components/BackToDashboardLink'
 import { useAccount } from '../context/AccountContext'
+import { useStudentPortalT } from '../LanguageContext'
 import {
   fetchStudentProfile,
   type StudentProfileResponse,
 } from '../lib/api'
 
-function dashText(value: string | null | undefined): string {
+function dashText(value: string | null | undefined, dash: string): string {
   const s = value?.trim() ?? ''
-  return s.length > 0 ? s : '—'
+  return s.length > 0 ? s : dash
 }
 
 /** Display ISO `YYYY-MM-DD` (or datetime) as MM/DD/YYYY. */
-function formatUsMdY(iso: string | null | undefined): string {
+function formatUsMdY(iso: string | null | undefined, dash: string): string {
   const s = iso?.trim() ?? ''
-  if (!s) return '—'
+  if (!s) return dash
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
   if (m) {
     const [, y, mo, d] = m
     return `${mo}/${d}/${y}`
   }
   const d = new Date(s.includes('T') ? s : `${s}T12:00:00`)
-  if (Number.isNaN(d.getTime())) return '—'
+  if (Number.isNaN(d.getTime())) return dash
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   const yy = d.getFullYear()
   return `${mm}/${dd}/${yy}`
 }
 
-function displayAge(age: number | null | undefined): string {
-  if (age == null || !Number.isFinite(age)) return '—'
+function displayAge(age: number | null | undefined, dash: string): string {
+  if (age == null || !Number.isFinite(age)) return dash
   return String(Math.trunc(age))
 }
 
-function displayCredits(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return '—'
+function displayCredits(n: number | null | undefined, dash: string): string {
+  if (n == null || !Number.isFinite(n)) return dash
   return String(n)
 }
 
 export function ProfilePage() {
+  const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const dash = t('dashEm')
 
   const [profile, setProfile] = useState<StudentProfileResponse | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
@@ -70,7 +73,7 @@ export function ProfilePage() {
         if (ac.signal.aborted) return
         setProfile(null)
         setProfileError(
-          e instanceof Error ? e.message : 'Could not load your student profile.',
+          e instanceof Error ? e.message : t('couldNotLoadProfileFallback'),
         )
       } finally {
         if (!ac.signal.aborted) {
@@ -80,7 +83,7 @@ export function ProfilePage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, profileReloadKey])
+  }, [currentStudentId, profileReloadKey, t])
 
   const profileSectionLoading =
     profileLoading && profile === null && profileError === null
@@ -89,7 +92,7 @@ export function ProfilePage() {
     <main className="portal-page portal-module-page portal-profile-page">
       <header className="portal-module-header">
         <BackToDashboardLink />
-        <h1 className="portal-page-title">My Account</h1>
+        <h1 className="portal-page-title">{t('myAccountPageTitle')}</h1>
       </header>
 
       {profileSectionLoading ? (
@@ -98,9 +101,9 @@ export function ProfilePage() {
           aria-busy="true"
           aria-live="polite"
         >
-          <p className="portal-profile-state__title">Loading your profile</p>
+          <p className="portal-profile-state__title">{t('loadingYourProfile')}</p>
           <p className="portal-profile-state__detail">
-            Please wait while we load your student information.
+            {t('profileLoadingDetail')}
           </p>
         </section>
       ) : null}
@@ -111,7 +114,7 @@ export function ProfilePage() {
           role="alert"
           aria-live="assertive"
         >
-          <p className="portal-profile-state__title">We could not load your profile</p>
+          <p className="portal-profile-state__title">{t('couldNotLoadProfile')}</p>
           <p className="portal-profile-state__detail">{profileError}</p>
           <div className="portal-actions portal-profile-state__actions">
             <button
@@ -119,7 +122,7 @@ export function ProfilePage() {
               className="portal-btn portal-btn--secondary"
               onClick={() => setProfileReloadKey((k) => k + 1)}
             >
-              Try again
+              {t('tryAgain')}
             </button>
           </div>
         </section>
@@ -131,68 +134,68 @@ export function ProfilePage() {
           aria-labelledby="profile-student-heading"
         >
           <h2 id="profile-student-heading" className="portal-section-heading">
-            Student profile
+            {t('studentProfile')}
           </h2>
           <dl>
             <div className="portal-row">
-              <dt>Full name</dt>
-              <dd>{dashText(profile.fullName)}</dd>
+              <dt>{t('fullName')}</dt>
+              <dd>{dashText(profile.fullName, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Student ID</dt>
-              <dd>{dashText(profile.studentId)}</dd>
+              <dt>{t('studentId')}</dt>
+              <dd>{dashText(profile.studentId, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Track</dt>
-              <dd>{dashText(profile.track ?? undefined)}</dd>
+              <dt>{t('track')}</dt>
+              <dd>{dashText(profile.track ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Gender</dt>
-              <dd>{dashText(profile.gender ?? undefined)}</dd>
+              <dt>{t('gender')}</dt>
+              <dd>{dashText(profile.gender ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Age</dt>
-              <dd>{displayAge(profile.age)}</dd>
+              <dt>{t('age')}</dt>
+              <dd>{displayAge(profile.age, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Enrollment date</dt>
-              <dd>{formatUsMdY(profile.enrollmentDate ?? undefined)}</dd>
+              <dt>{t('enrollmentDate')}</dt>
+              <dd>{formatUsMdY(profile.enrollmentDate ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Background</dt>
-              <dd>{dashText(profile.background ?? undefined)}</dd>
+              <dt>{t('background')}</dt>
+              <dd>{dashText(profile.background ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Credits</dt>
-              <dd>{displayCredits(profile.credits)}</dd>
+              <dt>{t('credits')}</dt>
+              <dd>{displayCredits(profile.credits, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Highest tertiary ed. degree</dt>
-              <dd>{dashText(profile.highestDegree ?? undefined)}</dd>
+              <dt>{t('highestDegree')}</dt>
+              <dd>{dashText(profile.highestDegree ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Race</dt>
-              <dd>{dashText(profile.race ?? undefined)}</dd>
+              <dt>{t('race')}</dt>
+              <dd>{dashText(profile.race ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Address</dt>
-              <dd>{dashText(profile.address ?? undefined)}</dd>
+              <dt>{t('address')}</dt>
+              <dd>{dashText(profile.address ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>City</dt>
-              <dd>{dashText(profile.city ?? undefined)}</dd>
+              <dt>{t('city')}</dt>
+              <dd>{dashText(profile.city ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>State</dt>
-              <dd>{dashText(profile.state ?? undefined)}</dd>
+              <dt>{t('state')}</dt>
+              <dd>{dashText(profile.state ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Zip</dt>
-              <dd>{dashText(profile.zip ?? undefined)}</dd>
+              <dt>{t('zip')}</dt>
+              <dd>{dashText(profile.zip ?? undefined, dash)}</dd>
             </div>
             <div className="portal-row">
-              <dt>Email</dt>
-              <dd>{dashText(profile.email ?? undefined)}</dd>
+              <dt>{t('email')}</dt>
+              <dd>{dashText(profile.email ?? undefined, dash)}</dd>
             </div>
           </dl>
         </section>

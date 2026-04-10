@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import { getPreferredCourseTitle } from '../../lib/courseDisplayName'
 import {
   courseBinSectionKey,
@@ -12,6 +13,7 @@ function binRowKey(item: CourseBinItem): string {
 }
 
 export function MyCourseBinPage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const navigate = useNavigate()
   const location = useLocation()
@@ -34,12 +36,9 @@ export function MyCourseBinPage() {
         <div className="portal-course-bin-card-header">
           <div className="portal-course-bin-card-header-text">
             <h2 id="course-bin-heading" className="portal-section-heading">
-              My CourseBin
+              {t('myCourseBin')}
             </h2>
-            <p className="portal-page-lede portal-course-bin-lede">
-              Sections you add from Course Search or the Offered Timetable appear here before
-              registration is finalized.
-            </p>
+            <p className="portal-page-lede portal-course-bin-lede">{t('myCourseBinLede')}</p>
           </div>
           <div className="portal-course-bin-card-header-actions">
             <button
@@ -48,7 +47,7 @@ export function MyCourseBinPage() {
               disabled={!hasItems}
               onClick={handleCheckout}
             >
-              Checkout
+              {t('checkoutButton')}
             </button>
           </div>
         </div>
@@ -56,23 +55,21 @@ export function MyCourseBinPage() {
         <div className="portal-course-search-sections-table-wrap portal-course-search-sections-table-wrap--schedule">
           <div className="portal-course-search-sections-table-scroll">
             <table className="portal-table portal-table--course-sections portal-table--course-section-schedule portal-table--course-bin">
-              <caption className="visually-hidden">
-                Courses and sections currently in your CourseBin
-              </caption>
+              <caption className="visually-hidden">{t('courseBinTableCaption')}</caption>
               <thead>
                 <tr>
-                  <th scope="col">Course</th>
-                  <th scope="col">Section</th>
-                  <th scope="col">Session</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Units</th>
-                  <th scope="col">Registered</th>
-                  <th scope="col">Time</th>
-                  <th scope="col">Days</th>
-                  <th scope="col">Instructor</th>
-                  <th scope="col">Location</th>
+                  <th scope="col">{t('courseColCourse')}</th>
+                  <th scope="col">{t('sectionColSection')}</th>
+                  <th scope="col">{t('sectionColSession')}</th>
+                  <th scope="col">{t('sectionColType')}</th>
+                  <th scope="col">{t('sectionColUnits')}</th>
+                  <th scope="col">{t('sectionColRegistered')}</th>
+                  <th scope="col">{t('sectionColTime')}</th>
+                  <th scope="col">{t('sectionColDays')}</th>
+                  <th scope="col">{t('sectionColInstructor')}</th>
+                  <th scope="col">{t('sectionColLocation')}</th>
                   <th scope="col" className="portal-course-section-schedule-col-action">
-                    Action
+                    {t('tableColAction')}
                   </th>
                 </tr>
               </thead>
@@ -115,7 +112,7 @@ export function MyCourseBinPage() {
                           )
                         }
                       >
-                        Remove
+                        {t('removedFromCourseBin')}
                       </button>
                     </td>
                   </tr>

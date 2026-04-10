@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import {
   deleteStudentClinicalEnrollment,
@@ -12,8 +13,8 @@ import {
 
 function dashText(value: string | null | undefined): string {
   if (value == null) return '—'
-  const t = String(value).trim()
-  return t === '' ? '—' : t
+  const s = String(value).trim()
+  return s === '' ? '—' : s
 }
 
 function capDisplay(slot: StudentOpenClinicalEnrollmentSlot): string {
@@ -31,6 +32,7 @@ function enrollDisabled(slot: StudentOpenClinicalEnrollmentSlot): boolean {
 }
 
 export function ClinicalAddDropPage() {
+  const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
   const sid = currentStudentId?.trim() ?? ''
 
@@ -79,7 +81,7 @@ export function ClinicalAddDropPage() {
         setOpenSlots([])
         setEnrollments([])
         setError(
-          e instanceof Error ? e.message : 'Could not load clinic enrollment data.',
+          e instanceof Error ? e.message : t('clinicalCouldNotLoadEnrollmentData'),
         )
       } finally {
         if (!cancelled) setLoading(false)
@@ -88,7 +90,7 @@ export function ClinicalAddDropPage() {
     return () => {
       cancelled = true
     }
-  }, [sid, filterTerm, filterYear])
+  }, [sid, filterTerm, filterYear, t])
 
   const activeEnrollments = useMemo(
     () =>
@@ -103,7 +105,7 @@ export function ClinicalAddDropPage() {
     setBusyTimetableId(timetableId)
     try {
       await postStudentClinicalEnrollment(sid, { timetableId })
-      setActionMessage('You are enrolled in that clinic slot. It will appear on your clinic schedule.')
+      setActionMessage(t('clinicalEnrollmentSuccessSlot'))
       const term = filterTerm.trim() !== '' ? filterTerm.trim() : undefined
       const yearRaw = filterYear.trim()
       const year =
@@ -118,7 +120,7 @@ export function ClinicalAddDropPage() {
       setEnrollments(mine)
     } catch (e) {
       setActionError(
-        e instanceof Error ? e.message : 'Could not complete enrollment.',
+        e instanceof Error ? e.message : t('clinicalCouldNotCompleteEnrollment'),
       )
     } finally {
       setBusyTimetableId(null)
@@ -132,7 +134,7 @@ export function ClinicalAddDropPage() {
     setBusyEnrollmentId(enrollmentId)
     try {
       await deleteStudentClinicalEnrollment(sid, enrollmentId)
-      setActionMessage('Clinic enrollment dropped.')
+      setActionMessage(t('clinicalDropSuccessMessage'))
       const term = filterTerm.trim() !== '' ? filterTerm.trim() : undefined
       const yearRaw = filterYear.trim()
       const year =
@@ -146,7 +148,7 @@ export function ClinicalAddDropPage() {
       setOpenSlots(open)
       setEnrollments(mine)
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Could not drop enrollment.')
+      setActionError(e instanceof Error ? e.message : t('clinicalCouldNotDropEnrollment'))
     } finally {
       setBusyEnrollmentId(null)
     }
@@ -157,17 +159,16 @@ export function ClinicalAddDropPage() {
 
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Add / drop clinic</h2>
+      <h2 className="portal-section-heading">{t('clinicalAddDropHeading')}</h2>
       <p className="portal-page-lede">
-        Enroll directly in open weekly clinic slots when seats are available. This is the usual path for
-        clinic placement. If you need a special exception, you can still{' '}
-        <Link to="/clinical/schedule">request a slot for approval</Link>
-        {' '}from your clinic schedule page; staff may also assign placements manually when needed.
+        {t('clinicalAddDropPageLedeBefore')}
+        <Link to="/clinical/schedule">{t('clinicalAddDropLedeLink')}</Link>
+        {t('clinicalAddDropPageLedeAfter')}
       </p>
 
       {showEmptyAccount ? (
         <p className="portal-page-lede" role="status">
-          Sign in to add or drop clinic enrollments.
+          {t('clinicalSignInAddDrop')}
         </p>
       ) : null}
 
@@ -181,10 +182,10 @@ export function ClinicalAddDropPage() {
             id="clinical-enroll-filters-heading"
             className="portal-module-panel-heading"
           >
-            Term filters
+            {t('clinicalTermFiltersHeading')}
           </h3>
           <p className="portal-inline-note portal-inline-note--flush">
-            Leave blank to load all published timetable slots. Narrow by term and year to shorten the list.
+            {t('clinicalTermFiltersHint')}
           </p>
           <div
             className="portal-actions"
@@ -198,28 +199,28 @@ export function ClinicalAddDropPage() {
               className="portal-card-note"
               style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
             >
-              <span>Term</span>
+              <span>{t('clinicalFilterTermLabel')}</span>
               <input
                 type="text"
                 className="portal-registration-search-input"
                 value={filterTerm}
                 onChange={(e) => setFilterTerm(e.target.value)}
-                placeholder="e.g. Spring"
-                aria-label="Filter clinic slots by term"
+                placeholder={t('clinicalPlaceholderSpring')}
+                aria-label={t('clinicalFilterSlotsByTermAria')}
               />
             </label>
             <label
               className="portal-card-note"
               style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}
             >
-              <span>Year</span>
+              <span>{t('clinicalFilterYearLabel')}</span>
               <input
                 type="text"
                 className="portal-registration-search-input"
                 value={filterYear}
                 onChange={(e) => setFilterYear(e.target.value)}
-                placeholder="e.g. 2026"
-                aria-label="Filter clinic slots by year"
+                placeholder={t('clinicalPlaceholderYear')}
+                aria-label={t('clinicalFilterSlotsByYearAria')}
               />
             </label>
           </div>
@@ -244,7 +245,7 @@ export function ClinicalAddDropPage() {
       ) : null}
       {!showEmptyAccount && loading ? (
         <p className="portal-page-lede" aria-live="polite">
-          Loading clinic slots…
+          {t('clinicalLoadingClinicSlots')}
         </p>
       ) : null}
 
@@ -258,20 +259,20 @@ export function ClinicalAddDropPage() {
             id="clinical-open-slots-heading"
             className="portal-module-panel-heading"
           >
-            Available clinic slots
+            {t('clinicalAvailableSlotsHeading')}
           </h3>
           <div className="portal-table-wrap">
             <table className="portal-table portal-table--clinical-schedule">
               <thead>
                 <tr>
-                  <th scope="col">Term / year</th>
-                  <th scope="col">Slot</th>
-                  <th scope="col">Faculty</th>
-                  <th scope="col">Site</th>
-                  <th scope="col">Capacity</th>
-                  <th scope="col">Enrolled</th>
-                  <th scope="col">Remaining</th>
-                  <th scope="col">Action</th>
+                  <th scope="col">{t('clinicalColTermYear')}</th>
+                  <th scope="col">{t('clinicalColSlot')}</th>
+                  <th scope="col">{t('clinicalColFaculty')}</th>
+                  <th scope="col">{t('clinicalColSite')}</th>
+                  <th scope="col">{t('clinicalColCapacity')}</th>
+                  <th scope="col">{t('clinicalColEnrolled')}</th>
+                  <th scope="col">{t('clinicalColRemaining')}</th>
+                  <th scope="col">{t('clinicalColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -279,7 +280,7 @@ export function ClinicalAddDropPage() {
                   <tr>
                     <td colSpan={8}>
                       <span className="portal-inline-note portal-inline-note--flush">
-                        No timetable slots match these filters.
+                        {t('clinicalNoSlotsMatchFilters')}
                       </span>
                     </td>
                   </tr>
@@ -303,10 +304,10 @@ export function ClinicalAddDropPage() {
                         onClick={() => void handleEnroll(slot.timetableId)}
                       >
                         {busyTimetableId === slot.timetableId
-                          ? 'Enrolling…'
+                          ? t('clinicalEnrollingEllipsis')
                           : slot.alreadyEnrolled
-                            ? 'Enrolled'
-                            : 'Enroll'}
+                            ? t('clinicalEnrolledState')
+                            : t('enroll')}
                       </button>
                     </td>
                   </tr>
@@ -326,18 +327,18 @@ export function ClinicalAddDropPage() {
             id="clinical-my-enrollments-heading"
             className="portal-module-panel-heading"
           >
-            My clinic enrollments
+            {t('clinicalMyEnrollmentsHeading')}
           </h3>
           <div className="portal-table-wrap">
             <table className="portal-table portal-table--clinical-schedule">
               <thead>
                 <tr>
-                  <th scope="col">Term / year</th>
-                  <th scope="col">Slot</th>
-                  <th scope="col">Faculty</th>
-                  <th scope="col">Site</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Action</th>
+                  <th scope="col">{t('clinicalColTermYear')}</th>
+                  <th scope="col">{t('clinicalColSlot')}</th>
+                  <th scope="col">{t('clinicalColFaculty')}</th>
+                  <th scope="col">{t('clinicalColSite')}</th>
+                  <th scope="col">{t('status')}</th>
+                  <th scope="col">{t('clinicalColAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -345,7 +346,7 @@ export function ClinicalAddDropPage() {
                   <tr>
                     <td colSpan={6}>
                       <span className="portal-inline-note portal-inline-note--flush">
-                        No active clinic enrollments for these filters.
+                        {t('clinicalNoActiveEnrollments')}
                       </span>
                     </td>
                   </tr>
@@ -360,7 +361,7 @@ export function ClinicalAddDropPage() {
                     <td>{dashText(row.site)}</td>
                     <td>
                       <span className="portal-status portal-status--paid">
-                        {row.status.trim() || 'enrolled'}
+                        {row.status.trim() || t('clinicalStatusEnrolledFallback')}
                       </span>
                     </td>
                     <td>
@@ -370,7 +371,7 @@ export function ClinicalAddDropPage() {
                         disabled={anyBusy}
                         onClick={() => void handleDrop(row.id)}
                       >
-                        {busyEnrollmentId === row.id ? 'Dropping…' : 'Drop'}
+                        {busyEnrollmentId === row.id ? t('clinicalDroppingEllipsis') : t('drop')}
                       </button>
                     </td>
                   </tr>
@@ -380,7 +381,7 @@ export function ClinicalAddDropPage() {
           </div>
           {enrollments.some((r) => r.status.trim().toLowerCase() === 'dropped') ? (
             <p className="portal-inline-note" style={{ marginTop: '0.75rem' }}>
-              Dropped enrollments stay on file for records but are hidden from this table.
+              {t('clinicalDroppedEnrollmentsNote')}
             </p>
           ) : null}
         </section>

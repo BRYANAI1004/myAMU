@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useSearchParams } from 'react-router-dom'
-import { useLanguage } from '@/LanguageContext'
-import { portalStudentLabel } from '@/lib/portalLocaleStrings'
+import { useStudentPortalT } from '@/LanguageContext'
 import { BackToDashboardLink } from '../../components/BackToDashboardLink'
 import {
   fetchCurrentAcademicTerm,
@@ -42,7 +41,7 @@ function academicTermStubForDeepLink(termId: string): AcademicTerm {
 }
 
 export function RegistrationLayout() {
-  const { locale } = useLanguage()
+  const t = useStudentPortalT()
   const [searchParams, setSearchParams] = useSearchParams()
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
   const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
@@ -154,9 +153,7 @@ export function RegistrationLayout() {
       <div className="portal-registration-module">
         <header className="portal-module-header">
           <BackToDashboardLink />
-          <h1 className="portal-page-title">
-            {portalStudentLabel(locale, 'registrationModule')}
-          </h1>
+          <h1 className="portal-page-title">{t('registrationModule')}</h1>
         </header>
 
         <div
@@ -165,21 +162,23 @@ export function RegistrationLayout() {
         >
           <div className="portal-registration-layout-term__row">
             <span id="registration-layout-term-label" className="portal-registration-layout-term__title">
-              Select Term
+              {t('selectTerm')}
             </span>
             {loadState === 'loading' ? (
               <p className="portal-text-muted portal-registration-layout-term__status" role="status">
-                Loading terms…
+                {t('loadingTerms')}
               </p>
             ) : null}
             {loadState === 'error' ? (
               <p className="portal-text-muted portal-registration-layout-term__status" role="alert">
-                {loadError ?? 'Could not load terms.'}
+                {loadError === REGISTRATION_TERMS_LOAD_ERROR
+                  ? t('registrationTermsLoadError')
+                  : (loadError ?? t('couldNotLoadTerms'))}
               </p>
             ) : null}
             {loadState === 'ready' && options.length === 0 ? (
               <p className="portal-text-muted portal-registration-layout-term__status" role="status">
-                No academic terms available.
+                {t('noAcademicTermsAvailable')}
               </p>
             ) : null}
             {loadState === 'ready' && options.length > 0 ? (
@@ -201,9 +200,9 @@ export function RegistrationLayout() {
                   )
                 }}
               >
-                {options.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.term_label}
+                {options.map((term) => (
+                  <option key={term.id} value={term.id}>
+                    {term.term_label}
                   </option>
                 ))}
               </select>
@@ -211,7 +210,7 @@ export function RegistrationLayout() {
           </div>
           {loadState === 'ready' && options.length > 0 ? (
             <p className="portal-text-muted portal-registration-layout-term__hint">
-              Recent terms shown here are published by the registrar.
+              {t('registrationRecentTermsHint')}
             </p>
           ) : null}
         </div>

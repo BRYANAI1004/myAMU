@@ -1,53 +1,25 @@
+import { useMemo } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
+
 type PolicyRow = {
   id: string
-  title: string
-  category: string
+  titleKey: StudentPortalKey
+  categoryKey: StudentPortalKey
   effectiveDate: string
-  actionLabel: 'View PDF' | 'Review'
+  actionLabelKey: StudentPortalKey
 }
-
-const PRIVACY_POLICIES: readonly PolicyRow[] = [
-  {
-    id: 'ferpa',
-    title: 'FERPA Policy',
-    category: 'Privacy & records',
-    effectiveDate: 'Aug 1, 2025',
-    actionLabel: 'View PDF',
-  },
-  {
-    id: 'privacy',
-    title: 'Student Privacy Notice',
-    category: 'Privacy & records',
-    effectiveDate: 'Jan 15, 2026',
-    actionLabel: 'View PDF',
-  },
-]
-
-const ACADEMIC_POLICIES: readonly PolicyRow[] = [
-  {
-    id: 'copyright',
-    title: 'Copyright Agreement',
-    category: 'Intellectual property',
-    effectiveDate: 'Jul 1, 2025',
-    actionLabel: 'Review',
-  },
-  {
-    id: 'integrity',
-    title: 'Academic Integrity Policy',
-    category: 'Academic conduct',
-    effectiveDate: 'Sep 1, 2025',
-    actionLabel: 'View PDF',
-  },
-]
 
 function PolicySection({
   headingId,
   title,
   policies,
+  t,
 }: {
   headingId: string
   title: string
   policies: readonly PolicyRow[]
+  t: (key: StudentPortalKey) => string
 }) {
   return (
     <section className="portal-module-panel portal-documents-panel-stack" aria-labelledby={headingId}>
@@ -58,17 +30,17 @@ function PolicySection({
         {policies.map((p) => (
           <li key={p.id} className="portal-documents-item">
             <div className="portal-documents-item-main">
-              <p className="portal-documents-item-title">{p.title}</p>
+              <p className="portal-documents-item-title">{t(p.titleKey)}</p>
               <p className="portal-documents-item-meta">
-                <span className="portal-documents-item-category">{p.category}</span>
+                <span className="portal-documents-item-category">{t(p.categoryKey)}</span>
                 <span className="portal-documents-item-sep" aria-hidden="true">
                   ·
                 </span>
-                <span>Effective {p.effectiveDate}</span>
+                <span>{t('documentsEffective').replace('{date}', p.effectiveDate)}</span>
               </p>
             </div>
             <button type="button" className="portal-btn portal-btn--secondary portal-btn--compact">
-              {p.actionLabel}
+              {t(p.actionLabelKey)}
             </button>
           </li>
         ))}
@@ -78,23 +50,65 @@ function PolicySection({
 }
 
 export function DocumentsPoliciesPage() {
+  const t = useStudentPortalT()
+
+  const privacyPolicies = useMemo(
+    (): readonly PolicyRow[] => [
+      {
+        id: 'ferpa',
+        titleKey: 'documentsPolicyFerpaTitle',
+        categoryKey: 'documentsPolicyFerpaCategory',
+        effectiveDate: 'Aug 1, 2025',
+        actionLabelKey: 'documentsPolicyViewPdf',
+      },
+      {
+        id: 'privacy',
+        titleKey: 'documentsPolicyPrivacyTitle',
+        categoryKey: 'documentsPolicyFerpaCategory',
+        effectiveDate: 'Jan 15, 2026',
+        actionLabelKey: 'documentsPolicyViewPdf',
+      },
+    ],
+    [],
+  )
+
+  const academicPolicies = useMemo(
+    (): readonly PolicyRow[] => [
+      {
+        id: 'copyright',
+        titleKey: 'documentsPolicyCopyrightTitle',
+        categoryKey: 'documentsPolicyCopyrightCategory',
+        effectiveDate: 'Jul 1, 2025',
+        actionLabelKey: 'documentsPolicyReview',
+      },
+      {
+        id: 'integrity',
+        titleKey: 'documentsPolicyIntegrityTitle',
+        categoryKey: 'documentsPolicyIntegrityCategory',
+        effectiveDate: 'Sep 1, 2025',
+        actionLabelKey: 'documentsPolicyViewPdf',
+      },
+    ],
+    [],
+  )
+
   return (
     <main className="portal-page portal-documents-page-stack">
-      <h2 className="portal-section-heading">Policies</h2>
-      <p className="portal-page-lede">
-        Official school policies govern privacy, conduct, and use of academic materials. Review the summary
-        below and open the full document when you need to attest or share with third parties.
-      </p>
-      <PolicySection headingId="policies-privacy-heading" title="Privacy & student records" policies={PRIVACY_POLICIES} />
+      <h2 className="portal-section-heading">{t('documentsPoliciesHeading')}</h2>
+      <p className="portal-page-lede">{t('documentsPoliciesLede')}</p>
+      <PolicySection
+        headingId="policies-privacy-heading"
+        title={t('documentsPoliciesPrivacySection')}
+        policies={privacyPolicies}
+        t={t}
+      />
       <PolicySection
         headingId="policies-academic-heading"
-        title="Academic & intellectual property"
-        policies={ACADEMIC_POLICIES}
+        title={t('documentsPoliciesAcademicSection')}
+        policies={academicPolicies}
+        t={t}
       />
-      <p className="portal-inline-note portal-inline-note--flush">
-        Policy PDFs and acknowledgment workflows will connect to the document management system in a future
-        release. Contact the Registrar if you need a notarized or certified copy.
-      </p>
+      <p className="portal-inline-note portal-inline-note--flush">{t('documentsPoliciesFooter')}</p>
     </main>
   )
 }

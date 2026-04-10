@@ -1,11 +1,12 @@
 import { useAccount } from '../context/AccountContext'
+import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { DashboardCoursesWidget } from './dashboard/DashboardCoursesWidget'
 import { DashboardServiceLauncher } from './dashboard/DashboardServiceLauncher'
 
 /** Prefer given name when legacy uses "Last, First"; otherwise first token of the display name. */
 function welcomeNameFromDisplay(name: string): string {
   const t = name.trim()
-  if (!t) return 'Student'
+  if (!t) return ''
   const comma = t.indexOf(',')
   if (comma !== -1) {
     const rest = t.slice(comma + 1).trim()
@@ -16,13 +17,17 @@ function welcomeNameFromDisplay(name: string): string {
 }
 
 export function DashboardPage() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
   const { account, loading, isAuthenticated } = useAccount()
   const displayName = account.student.name?.trim() ?? ''
   const welcome =
-    loading && isAuthenticated ? '…' : welcomeNameFromDisplay(displayName)
+    loading && isAuthenticated
+      ? t('welcomeLoading')
+      : welcomeNameFromDisplay(displayName) || t('studentFallback')
   const today = new Date()
   const dateIso = today.toISOString().slice(0, 10)
-  const dateLabel = today.toLocaleDateString('en-US', {
+  const dateLabel = today.toLocaleDateString(locale === 'zh' ? 'zh-TW' : 'en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
@@ -34,7 +39,7 @@ export function DashboardPage() {
       <header className="portal-dashboard-hero">
         <div className="portal-dashboard-hero__title-row">
           <h1 className="portal-dashboard-hero-title">
-            <span className="portal-dashboard-hero-welcome">WELCOME,</span>{' '}
+            <span className="portal-dashboard-hero-welcome">{t('welcomePrefix')}</span>{' '}
             <span className="portal-dashboard-hero-name">{welcome}</span>
           </h1>
         </div>

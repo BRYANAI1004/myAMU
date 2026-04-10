@@ -1,4 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 import { fetchApiJson } from '../../lib/api'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatWeekdaysShortFromStored } from '../../lib/weekdaySchedule'
@@ -8,21 +10,21 @@ import { useRegistrationTermSearchParam } from './registrationTermSearch'
 /** Courses with no leading alphabetic prefix share this grouping key so none are dropped. */
 const NO_PREFIX_KEY = '__NO_PREFIX__'
 
-const PREFIX_LABEL_MAP: Readonly<Record<string, string>> = {
-  AC: 'Acupuncture',
-  BS: 'Basic Science',
-  OM: 'Oriental Medicine / TCM',
-  HB: 'Herbology',
-  WM: 'Western Medicine',
-  CL: 'Clinic',
-  MG: 'Medical General / Ethics',
-  CR: 'Comprehensive Review',
-  PH: 'Public Health',
-  CM: 'Case Management',
-  EL: 'Elective',
-  IM: 'Integrative Medicine',
-  ICM: 'Integrative Case Management',
-  PRO: 'Professional / Portfolio',
+const PREFIX_TO_I18N: Readonly<Record<string, StudentPortalKey>> = {
+  AC: 'prefixLabelAcupuncture',
+  BS: 'prefixLabelBasicScience',
+  OM: 'prefixLabelOrientalMedicine',
+  HB: 'prefixLabelHerbology',
+  WM: 'prefixLabelWesternMedicine',
+  CL: 'prefixLabelClinicSubject',
+  MG: 'prefixLabelMedicalGeneral',
+  CR: 'prefixLabelComprehensiveReview',
+  PH: 'prefixLabelPublicHealth',
+  CM: 'prefixLabelCaseManagement',
+  EL: 'prefixLabelElective',
+  IM: 'prefixLabelIntegrativeMedicine',
+  ICM: 'prefixLabelIntegrativeCaseManagement',
+  PRO: 'prefixLabelProfessionalPortfolio',
 }
 
 type CourseCatalogItem = {
@@ -87,7 +89,6 @@ function sectionPanelPhase(
   return 'data'
 }
 
-const PLACEHOLDER_REGISTERED = '0 of 0'
 
 type SectionScheduleRowModel = {
   key: string | number
@@ -112,17 +113,23 @@ function sessionLabelFromSection(sec: CourseSectionDetail): string {
   return `${term} ${year}`
 }
 
-function typeLabelFromSection(sec: CourseSectionDetail | null): string {
-  if (!sec) return 'Lecture'
+function typeLabelFromSection(
+  sec: CourseSectionDetail | null,
+  t: (key: StudentPortalKey) => string,
+): string {
+  if (!sec) return t('sessionTypeLecture')
   const d = cellText(sec.delivery_mode)
-  return d === '' ? 'Lecture' : d
+  return d === '' ? t('sessionTypeLecture') : d
 }
 
 function sectionScheduleRows(
   phase: SectionPanelPhase,
   sectionRows: CourseSectionDetail[] | undefined,
   course: CourseCatalogItem,
+  t: (key: StudentPortalKey) => string,
 ): SectionScheduleRowModel[] {
+  const tba = t('scheduleTba')
+  const regPh = t('courseRegisteredPlaceholder')
   if (phase === 'data' && sectionRows && sectionRows.length > 0) {
     return sectionRows.map((sec) => {
       const timeRaw = formatTimeRangeHmsForDisplay(sec.start_time, sec.end_time)
@@ -134,13 +141,13 @@ function sectionScheduleRows(
         key: sec.id,
         section: secCode === '' ? '—' : secCode,
         session: sessionLabelFromSection(sec),
-        type: typeLabelFromSection(sec),
+        type: typeLabelFromSection(sec, t),
         units: unitsFromSectionOrCatalog(sec, course),
-        registered: PLACEHOLDER_REGISTERED,
-        time: timeRaw === '—' ? 'TBA' : timeRaw,
-        days: daysRaw === '—' ? 'TBA' : daysRaw,
-        instructor: instRaw === '' ? 'TBA' : instRaw,
-        location: locRaw === '' ? 'TBA' : locRaw,
+        registered: regPh,
+        time: timeRaw === '—' ? tba : timeRaw,
+        days: daysRaw === '—' ? tba : daysRaw,
+        instructor: instRaw === '' ? tba : instRaw,
+        location: locRaw === '' ? tba : locRaw,
       }
     })
   }
@@ -151,13 +158,13 @@ function sectionScheduleRows(
       key: 'placeholder',
       section: '—',
       session: '—',
-      type: 'Lecture',
+      type: t('sessionTypeLecture'),
       units: catalogUnits === '' ? '—' : catalogUnits,
-      registered: PLACEHOLDER_REGISTERED,
-      time: 'TBA',
-      days: 'TBA',
-      instructor: 'TBA',
-      location: 'TBA',
+      registered: regPh,
+      time: tba,
+      days: tba,
+      instructor: tba,
+      location: tba,
     },
   ]
 }
@@ -171,6 +178,7 @@ function CourseSectionScheduleTable({
   sectionLoad,
   sectionErr,
   addToCourseBin,
+  t,
 }: {
   courseCode: string
   panelId: string
@@ -180,19 +188,20 @@ function CourseSectionScheduleTable({
   sectionLoad: boolean
   sectionErr: string | undefined
   addToCourseBin: (item: CourseBinItem) => void
+  t: (key: StudentPortalKey) => string
 }) {
-  const rows = sectionScheduleRows(phase, sectionRows, course)
+  const rows = sectionScheduleRows(phase, sectionRows, course, t)
 
   return (
     <div
       id={panelId}
       className="portal-course-search-sections-panel"
       role="region"
-      aria-label={`Section schedule for ${courseCode}`}
+      aria-label={t('sectionScheduleForCourse').replace('{code}', courseCode)}
     >
       {sectionLoad && (
         <p className="portal-course-search-sections-status" role="status" aria-live="polite">
-          Loading section details…
+          {t('loadingSectionDetails')}
         </p>
       )}
       {sectionErr && (
@@ -208,17 +217,17 @@ function CourseSectionScheduleTable({
           <table className="portal-table portal-table--course-sections portal-table--course-section-schedule">
             <thead>
               <tr>
-                <th scope="col">Section</th>
-                <th scope="col">Session</th>
-                <th scope="col">Type</th>
-                <th scope="col">Units</th>
-                <th scope="col">Registered</th>
-                <th scope="col">Time</th>
-                <th scope="col">Days</th>
-                <th scope="col">Instructor</th>
-                <th scope="col">Location</th>
+                <th scope="col">{t('sectionColSection')}</th>
+                <th scope="col">{t('sectionColSession')}</th>
+                <th scope="col">{t('sectionColType')}</th>
+                <th scope="col">{t('sectionColUnits')}</th>
+                <th scope="col">{t('sectionColRegistered')}</th>
+                <th scope="col">{t('sectionColTime')}</th>
+                <th scope="col">{t('sectionColDays')}</th>
+                <th scope="col">{t('sectionColInstructor')}</th>
+                <th scope="col">{t('sectionColLocation')}</th>
                 <th scope="col" className="portal-course-section-schedule-col-action">
-                  Action
+                  {t('tableColAction')}
                 </th>
               </tr>
             </thead>
@@ -255,7 +264,7 @@ function CourseSectionScheduleTable({
                         })
                       }}
                     >
-                      Add to CourseBin
+                      {t('addToCourseBin')}
                     </button>
                   </td>
                 </tr>
@@ -284,9 +293,10 @@ function extractCoursePrefix(code: string): string {
   return m ? m[1] : NO_PREFIX_KEY
 }
 
-function prefixDisplayLabel(prefixKey: string): string {
-  if (prefixKey === NO_PREFIX_KEY) return 'Other / Unmapped'
-  return PREFIX_LABEL_MAP[prefixKey] ?? 'Other / Unmapped'
+function prefixDisplayLabel(prefixKey: string, t: (key: StudentPortalKey) => string): string {
+  if (prefixKey === NO_PREFIX_KEY) return t('otherUnmappedPrefix')
+  const k = PREFIX_TO_I18N[prefixKey]
+  return k ? t(k) : t('otherUnmappedPrefix')
 }
 
 function panelIdForPrefix(prefixKey: string): string {
@@ -295,6 +305,7 @@ function panelIdForPrefix(prefixKey: string): string {
 }
 
 export function CourseSearchPage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const { addToCourseBin } = useCourseBin()
   const [courses, setCourses] = useState<CourseCatalogItem[]>([])
@@ -328,14 +339,14 @@ export function CourseSearchPage() {
       try {
         const data: unknown = await fetchApiJson('/api/courses')
         if (!Array.isArray(data)) {
-          throw new Error('Unexpected response from the catalog.')
+          throw new Error(t('unexpectedCatalogResponse'))
         }
         if (!cancelled) {
           setCourses(data as CourseCatalogItem[])
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load courses.')
+          setError(e instanceof Error ? e.message : t('failedToLoadCourses'))
           setCourses([])
         }
       } finally {
@@ -349,7 +360,7 @@ export function CourseSearchPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [t])
 
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -396,13 +407,22 @@ export function CourseSearchPage() {
     return keys.map((prefixKey) => ({
       prefixKey,
       displayPrefix: prefixKey === NO_PREFIX_KEY ? '—' : prefixKey,
-      label: prefixDisplayLabel(prefixKey),
+      label: prefixDisplayLabel(prefixKey, t),
       courses: buckets.get(prefixKey)!,
     }))
-  }, [filteredCourses])
+  }, [filteredCourses, t])
 
   const searchActive = query.trim().length > 0
   const totalFiltered = filteredCourses.length
+
+  const courseCatalogAriaIntroText = useMemo(() => {
+    const coursesWord = totalFiltered === 1 ? t('courseSingular') : t('coursePlural')
+    const matchingSuffix = query.trim() ? t('courseCatalogMatchingFilter') : ''
+    return t('courseCatalogAriaIntro')
+      .replace('{n}', String(totalFiltered))
+      .replace('{coursesWord}', coursesWord)
+      .replace('{matchingSuffix}', matchingSuffix)
+  }, [query, t, totalFiltered])
 
   function toggleGroup(prefixKey: string) {
     if (searchActive) return
@@ -441,12 +461,12 @@ export function CourseSearchPage() {
         `/api/courses/${encoded}/sections${qs}`,
       )
       if (!Array.isArray(data)) {
-        throw new Error('Unexpected sections response.')
+        throw new Error(t('unexpectedSectionsResponse'))
       }
       const rows = data.filter(isCourseSectionDetailRow)
       setSectionsByCode((prev) => ({ ...prev, [code]: rows }))
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Failed to load sections.'
+      const msg = e instanceof Error ? e.message : t('failedToLoadSections')
       setSectionsError((prev) => ({ ...prev, [code]: msg }))
     } finally {
       sectionsInflightRef.current.delete(code)
@@ -456,7 +476,7 @@ export function CourseSearchPage() {
         return next
       })
     }
-  }, [registrationTermId])
+  }, [registrationTermId, t])
 
   function toggleCourseRow(courseCode: string) {
     const code = courseCode.trim()
@@ -482,24 +502,24 @@ export function CourseSearchPage() {
     >
       <section className="portal-card portal-stack" aria-labelledby="course-search-heading">
         <h2 id="course-search-heading" className="portal-section-heading">
-          Course Search
+          {t('courseSearchHeading')}
         </h2>
         <div className="portal-registration-search">
           <label htmlFor="registration-course-search" className="visually-hidden">
-            Search courses
+            {t('courseSearchLabel')}
           </label>
           <input
             id="registration-course-search"
             type="search"
             className="portal-registration-search-input"
-            placeholder="Course code or keyword"
+            placeholder={t('courseSearchPlaceholder')}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
             disabled={loading}
           />
           <button type="button" className="portal-btn portal-btn--primary" disabled>
-            Search
+            {t('courseSearchSearchButton')}
           </button>
         </div>
 
@@ -509,7 +529,7 @@ export function CourseSearchPage() {
             role="status"
             aria-live="polite"
           >
-            Loading course catalog…
+            {t('loadingCourseCatalog')}
           </div>
         )}
 
@@ -524,7 +544,7 @@ export function CourseSearchPage() {
             className="portal-registration-placeholder portal-registration-results-placeholder"
             role="status"
           >
-            No courses are available in the catalog right now.
+            {t('noCoursesInCatalog')}
           </div>
         )}
 
@@ -533,16 +553,17 @@ export function CourseSearchPage() {
             className="portal-registration-placeholder portal-registration-results-placeholder"
             role="status"
           >
-            No courses match &ldquo;{query.trim()}&rdquo;. Try another code or keyword.
+            {t('noCoursesMatchQuery').replace('{q}', query.trim())}
           </div>
         )}
 
         {!loading && !error && totalFiltered > 0 && (
-          <div className="portal-course-catalog" role="region" aria-label="Course catalog by subject">
-            <p className="visually-hidden">
-              Course catalog: {totalFiltered} {totalFiltered === 1 ? 'course' : 'courses'}
-              {query.trim() ? ' matching filter' : ''}, grouped by subject prefix.
-            </p>
+          <div
+            className="portal-course-catalog"
+            role="region"
+            aria-label={t('courseCatalogBySubjectAria')}
+          >
+            <p className="visually-hidden">{courseCatalogAriaIntroText}</p>
             <div className="portal-course-catalog-groups">
               {groupedCatalog.map((group) => {
                 const open = isGroupOpen(group.prefixKey)
@@ -570,7 +591,7 @@ export function CourseSearchPage() {
                         <span className="portal-course-catalog-group-label">{group.label}</span>
                       </span>
                       <span className="portal-course-catalog-group-count">
-                        {count} {count === 1 ? 'course' : 'courses'}
+                        {count} {count === 1 ? t('courseSingular') : t('coursePlural')}
                       </span>
                     </button>
                     {open && (
@@ -585,12 +606,12 @@ export function CourseSearchPage() {
                             <thead>
                               <tr>
                                 <th scope="col" className="portal-course-search-col-expand">
-                                  <span className="visually-hidden">Show sections</span>
+                                  <span className="visually-hidden">{t('showSectionsVisuallyHidden')}</span>
                                 </th>
-                                <th scope="col">Code</th>
-                                <th scope="col">English name</th>
-                                <th scope="col">Chinese name</th>
-                                <th scope="col">Units</th>
+                                <th scope="col">{t('courseColCode')}</th>
+                                <th scope="col">{t('courseColEnglishName')}</th>
+                                <th scope="col">{t('courseColChineseName')}</th>
+                                <th scope="col">{t('courseColUnits')}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -619,7 +640,10 @@ export function CourseSearchPage() {
                                             {courseOpen ? '▼' : '▶'}
                                           </span>
                                           <span className="visually-hidden">
-                                            {courseOpen ? 'Collapse' : 'Expand'} sections for {code || 'course'}
+                                            {(courseOpen
+                                              ? t('collapseSectionsFor')
+                                              : t('expandSectionsFor')
+                                            ).replace('{code}', code || t('courseWordFallback'))}
                                           </span>
                                         </button>
                                       </td>
@@ -640,6 +664,7 @@ export function CourseSearchPage() {
                                             sectionLoad={sectionLoad}
                                             sectionErr={sectionErr}
                                             addToCourseBin={addToCourseBin}
+                                            t={t}
                                           />
                                         </td>
                                       </tr>

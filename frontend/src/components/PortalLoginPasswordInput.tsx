@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
 
 type PortalLoginPasswordInputProps = {
   id: string
@@ -15,6 +16,7 @@ export function PortalLoginPasswordInput({
   value,
   onChange,
 }: PortalLoginPasswordInputProps) {
+  const t = useStudentPortalT()
   const [showPassword, setShowPassword] = useState(false)
 
   return (
@@ -31,7 +33,7 @@ export function PortalLoginPasswordInput({
       <button
         type="button"
         className="portal-login-password-toggle"
-        aria-label={showPassword ? 'Hide password' : 'Show password'}
+        aria-label={showPassword ? t('hidePassword') : t('showPassword')}
         aria-pressed={showPassword}
         onClick={() => setShowPassword((v) => !v)}
       >

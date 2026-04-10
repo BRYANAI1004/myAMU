@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import { postStudentEnroll } from '../../lib/api'
 import { useCourseBin } from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 export function CourseBinCheckoutPage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const { currentStudentId, isAuthenticated } = useAccount()
   const { items, clearCourseBin } = useCourseBin()
@@ -22,21 +24,20 @@ export function CourseBinCheckoutPage() {
     setSuccess(null)
     if (termMissing || !currentStudentId) {
       setError(
-        termMissing
-          ? 'Select an academic term before registering.'
-          : 'You must be signed in to register.',
+        termMissing ? t('checkoutErrorSelectTerm') : t('checkoutErrorSignIn'),
       )
       return
     }
-    const sections = items.map((i) => {
-      const schedule_track: 'EN' | 'CN' =
-        i.schedule_track === 'CN' ? 'CN' : 'EN'
-      return {
-        course_code: i.course_code.trim(),
-        section_code: i.section.trim(),
-        schedule_track,
-      }
-    })
+    const sections = items
+      .map((i) => {
+        const schedule_track: 'EN' | 'CN' =
+          i.schedule_track === 'CN' ? 'CN' : 'EN'
+        return {
+          course_code: i.course_code.trim(),
+          section_code: i.section.trim(),
+          schedule_track,
+        }
+      })
       .filter(
         (s) =>
           s.course_code !== '' &&
@@ -44,7 +45,7 @@ export function CourseBinCheckoutPage() {
           s.section_code !== '—',
       )
     if (sections.length === 0) {
-      setError('Add at least one section with a valid section code to your CourseBin.')
+      setError(t('checkoutErrorAddSections'))
       return
     }
     setBusy(true)
@@ -57,8 +58,8 @@ export function CourseBinCheckoutPage() {
       clearCourseBin()
       const msg =
         res.insertedCount === 0
-          ? 'You were already enrolled in the selected course(s) for this term. Your CourseBin has been cleared.'
-          : `Registration saved (${res.insertedCount} course(s) added). Your CourseBin has been cleared.`
+          ? t('checkoutSuccessAlreadyEnrolled')
+          : t('checkoutSuccessAddedCount').replace('{n}', String(res.insertedCount))
       setSuccess(msg)
       window.setTimeout(() => {
         navigate({
@@ -69,7 +70,7 @@ export function CourseBinCheckoutPage() {
         })
       }, 1800)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Registration failed.')
+      setError(e instanceof Error ? e.message : t('registrationFailedGeneric'))
     } finally {
       setBusy(false)
     }
@@ -80,6 +81,7 @@ export function CourseBinCheckoutPage() {
     navigate,
     registrationTermId,
     termMissing,
+    t,
   ])
 
   return (
@@ -89,22 +91,19 @@ export function CourseBinCheckoutPage() {
     >
       <section className="portal-card portal-stack" aria-labelledby="course-bin-checkout-heading">
         <h2 id="course-bin-checkout-heading" className="portal-section-heading">
-          Register
+          {t('courseBinCheckoutHeading')}
         </h2>
-        <p className="portal-page-lede">
-          Confirm sections from your CourseBin and save them to your schedule for this term. This
-          writes to your official enrollment record for billing and registration.
-        </p>
+        <p className="portal-page-lede">{t('courseBinCheckoutLede')}</p>
 
         {termMissing && (
           <p className="portal-text-muted" role="status">
-            Select an academic term in the registration bar above.
+            {t('selectAcademicTermInRegistrationBar')}
           </p>
         )}
 
         {!isAuthenticated && (
           <p className="portal-text-muted" role="status">
-            <Link to="/login">Sign in</Link> to register for classes.
+            <Link to="/login">{t('signIn')}</Link> {t('checkoutRegisterAfterSignIn')}
           </p>
         )}
 
@@ -120,7 +119,7 @@ export function CourseBinCheckoutPage() {
         )}
 
         <p className="portal-text-muted" style={{ marginTop: 0 }}>
-          Sections in CourseBin: <strong>{items.length}</strong>
+          {t('courseBinSectionsCount')} <strong>{items.length}</strong>
         </p>
 
         <div
@@ -139,7 +138,7 @@ export function CourseBinCheckoutPage() {
             }
             onClick={() => void onRegister()}
           >
-            {busy ? 'Registering…' : 'Register'}
+            {busy ? t('registeringEllipsis') : t('registerButton')}
           </button>
           <Link
             to={{
@@ -150,7 +149,7 @@ export function CourseBinCheckoutPage() {
             }}
             className="portal-btn portal-btn--secondary"
           >
-            Back to CourseBin
+            {t('backToCourseBin')}
           </Link>
         </div>
       </section>

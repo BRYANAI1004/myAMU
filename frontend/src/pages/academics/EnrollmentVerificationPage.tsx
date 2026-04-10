@@ -1,48 +1,50 @@
+import { useStudentPortalT } from '../../LanguageContext'
+
 export function EnrollmentVerificationPage() {
+  const t = useStudentPortalT()
+
   return (
     <main className="portal-page">
-      <h2 className="portal-section-heading">Enrollment verification</h2>
+      <h2 className="portal-section-heading">{t('enrollmentVerificationHeading')}</h2>
       <p className="portal-page-lede">
-        Enrollment verification confirms your status as a registered student for a given term. Common uses
-        include loan deferments, health insurance, housing, and employer verification.
+        {t('enrollmentVerificationLede')}
       </p>
 
       <div className="portal-actions portal-academics-enrollment-actions">
         <button type="button" className="portal-btn portal-btn--primary">
-          Request verification letter
+          {t('requestVerificationLetter')}
         </button>
         <button type="button" className="portal-btn portal-btn--secondary">
-          Download current enrollment confirmation
+          {t('downloadEnrollmentConfirmation')}
         </button>
       </div>
 
       <section className="portal-module-panel" aria-labelledby="status-heading">
         <h3 id="status-heading" className="portal-module-panel-heading">
-          Current status (sample)
+          {t('currentStatusSample')}
         </h3>
         <ul className="portal-module-list">
           <li className="portal-module-list-item">
-            <span className="portal-module-list-label">Term</span>
+            <span className="portal-module-list-label">{t('term')}</span>
             <span>Spring 2026</span>
           </li>
           <li className="portal-module-list-item">
-            <span className="portal-module-list-label">Enrollment</span>
-            <span className="portal-status portal-status--paid">Full-time</span>
+            <span className="portal-module-list-label">{t('enrollment')}</span>
+            <span className="portal-status portal-status--paid">{t('enrollmentFullTime')}</span>
           </li>
           <li className="portal-module-list-item">
-            <span className="portal-module-list-label">Program</span>
+            <span className="portal-module-list-label">{t('program')}</span>
             <span>Doctor of Medicine</span>
           </li>
           <li className="portal-module-list-item">
-            <span className="portal-module-list-label">Expected graduation</span>
+            <span className="portal-module-list-label">{t('expectedGraduation')}</span>
             <span>May 2028</span>
           </li>
         </ul>
       </section>
 
       <p className="portal-inline-note">
-        Third-party verifier services and batch requests can be integrated when backend workflows are ready.
-        For urgent or specialized letters, contact the Office of the Registrar.
+        {t('enrollmentVerificationFootnote')}
       </p>
     </main>
   )

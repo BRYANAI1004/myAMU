@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import type { EnrollmentHistoryRow } from './CourseFeedbackModal'
 
 export function CourseFeedbackCell({
@@ -9,10 +10,11 @@ export function CourseFeedbackCell({
   onOpenSubmit: (row: EnrollmentHistoryRow) => void
   onOpenView: (row: EnrollmentHistoryRow) => void
 }) {
+  const t = useStudentPortalT()
   const submitted = row.feedbackSubmitted === true
 
   if (!row.feedbackEligible) {
-    return <span className="portal-text-muted">—</span>
+    return <span className="portal-text-muted">{t('dashEm')}</span>
   }
 
   if (!submitted) {
@@ -22,7 +24,7 @@ export function CourseFeedbackCell({
         className="portal-btn portal-btn--secondary portal-btn--compact"
         onClick={() => onOpenSubmit(row)}
       >
-        Submit
+        {t('submit')}
       </button>
     )
   }
@@ -33,7 +35,7 @@ export function CourseFeedbackCell({
       className="portal-btn portal-btn--secondary portal-btn--compact"
       onClick={() => onOpenView(row)}
     >
-      View
+      {t('view')}
     </button>
   )
 }

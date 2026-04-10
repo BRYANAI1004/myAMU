@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import type { RegistrationDidacticRow } from '../../../lib/registrationFormAdapter'
 
 type Props = {
@@ -6,6 +7,7 @@ type Props = {
 }
 
 export function RegistrationDidacticTable({ rows, totalUnits }: Props) {
+  const t = useStudentPortalT()
   const displayRows = rows.length > 0 ? rows : []
   const padRows = 6
   const emptySlots = Math.max(0, padRows - displayRows.length)
@@ -15,13 +17,13 @@ export function RegistrationDidacticTable({ rows, totalUnits }: Props) {
       <table className="portal-registration-form-table">
         <thead>
           <tr>
-            <th scope="col">Course No.</th>
-            <th scope="col">Course Title</th>
-            <th scope="col">Units</th>
-            <th scope="col">Day</th>
-            <th scope="col">Time</th>
-            <th scope="col">Track Ch/En</th>
-            <th scope="col">Instructor</th>
+            <th scope="col">{t('documentsRegFormColCourseNo')}</th>
+            <th scope="col">{t('documentsRegFormColCourseTitle')}</th>
+            <th scope="col">{t('documentsRegFormColUnits')}</th>
+            <th scope="col">{t('documentsRegFormColDay')}</th>
+            <th scope="col">{t('documentsRegFormColTime')}</th>
+            <th scope="col">{t('documentsRegFormColTrackChEn')}</th>
+            <th scope="col">{t('documentsRegFormColInstructor')}</th>
           </tr>
         </thead>
         <tbody>
@@ -51,7 +53,7 @@ export function RegistrationDidacticTable({ rows, totalUnits }: Props) {
         <tfoot>
           <tr>
             <th scope="row" colSpan={2}>
-              Total Units
+              {t('documentsRegFormTotalUnits')}
             </th>
             <td colSpan={5}>{totalUnits}</td>
           </tr>

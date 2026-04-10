@@ -1,4 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useLanguage, useStudentPortalT } from '@/LanguageContext'
+import {
+  timetableWeekdayLong,
+  timetableWeekdayShort,
+  type StudentPortalKey,
+} from '@/lib/i18n'
 import { useAccount } from '../../context/AccountContext'
 import {
   fetchAcademicTerms,
@@ -25,8 +31,7 @@ import {
   formatHourLabel,
   hourTickMinutes,
   type WeekTimetableModel,
-  WEEKDAY_LONG_LABEL,
-  WEEKDAY_SHORT_LABEL,
+  type WeekdayKey,
 } from '../../lib/dashboardWeekTimetable'
 import type { ScheduleRow } from '../../types/billing'
 import { DashboardGoogleCalendarModal } from './DashboardGoogleCalendarModal'
@@ -71,21 +76,28 @@ function scheduleTermOptionValue(term: string, year: number): string {
 function DashboardWeekTimetableMobileList({
   model,
   gcalHrefByPattern,
+  t,
+  weekdayLong,
 }: {
   model: WeekTimetableModel
   gcalHrefByPattern?: Map<string, string>
+  t: (key: StudentPortalKey) => string
+  weekdayLong: (day: WeekdayKey) => string
 }) {
   const { visibleDays, blocksByDay } = model
 
   return (
-    <div className="portal-dashboard-courses-timetable-mobile" aria-label="Weekly timetable, list view">
+    <div
+      className="portal-dashboard-courses-timetable-mobile"
+      aria-label={t('weeklyTimetableListViewAria')}
+    >
       {visibleDays.map((day) => (
         <section key={day} className="portal-dashboard-courses-timetable-mobile-day">
           <h3 className="portal-dashboard-courses-timetable-mobile-day-title">
-            {WEEKDAY_LONG_LABEL[day]}
+            {weekdayLong(day)}
           </h3>
           {blocksByDay[day].length === 0 ? (
-            <p className="portal-dashboard-courses-timetable-mobile-empty">No classes</p>
+            <p className="portal-dashboard-courses-timetable-mobile-empty">{t('noClasses')}</p>
           ) : (
             <ul className="portal-dashboard-courses-timetable-mobile-slots">
               {blocksByDay[day].map((block, bi) => {
@@ -117,7 +129,7 @@ function DashboardWeekTimetableMobileList({
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        Add to Google Calendar
+                        {t('addToGoogleCalendar')}
                       </a>
                     ) : null}
                   </li>
@@ -134,9 +146,13 @@ function DashboardWeekTimetableMobileList({
 function DashboardWeekTimetableGrid({
   model,
   gcalHrefByPattern,
+  t,
+  weekdayShort,
 }: {
   model: WeekTimetableModel
   gcalHrefByPattern?: Map<string, string>
+  t: (key: StudentPortalKey) => string
+  weekdayShort: (day: WeekdayKey) => string
 }) {
   const { visibleDays, gridStartMinutes, gridEndMinutes, blocksByDay } = model
   const colCount = visibleDays.length
@@ -164,7 +180,7 @@ function DashboardWeekTimetableGrid({
           className="portal-dashboard-courses-timetable-dayhead"
           style={{ gridColumn: i + 2, gridRow: 1 }}
         >
-          {WEEKDAY_SHORT_LABEL[day]}
+          {weekdayShort(day)}
         </div>
       ))}
       <div
@@ -209,9 +225,9 @@ function DashboardWeekTimetableGrid({
                         href={gcalHref}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Add to Google Calendar"
+                        title={t('addToGoogleCalendar')}
                       >
-                        Add to Google Calendar
+                        {t('addToGoogleCalendar')}
                       </a>
                     ) : null}
                   </div>
@@ -226,6 +242,10 @@ function DashboardWeekTimetableGrid({
 }
 
 export function DashboardCoursesWidget() {
+  const { locale } = useLanguage()
+  const t = useStudentPortalT()
+  const weekdayLong = (day: WeekdayKey) => timetableWeekdayLong(locale, day)
+  const weekdayShort = (day: WeekdayKey) => timetableWeekdayShort(locale, day)
   const [gcalModalOpen, setGcalModalOpen] = useState(false)
   const [calendarWeekTerm, setCalendarWeekTerm] = useState<CalendarWeekTermKey | null>(null)
   const [weekTermRows, setWeekTermRows] = useState<ScheduleRow[] | null>(null)
@@ -684,20 +704,20 @@ export function DashboardCoursesWidget() {
     <section className="portal-dashboard-courses" aria-labelledby="portal-dashboard-courses-heading">
       <header className="portal-dashboard-courses-head portal-dashboard-card-panel-head">
         <h2 id="portal-dashboard-courses-heading" className="portal-dashboard-card-panel-title">
-          My Calendar
+          {t('myCalendar')}
         </h2>
         {!isLoadingAccount ? (
           <div className="portal-dashboard-courses-head-actions">
             {showWeekTermSelect ? (
               <div className="portal-dashboard-courses-head-term">
                 <label htmlFor="portal-dashboard-courses-week-term-select" className="visually-hidden">
-                  Term for week view
+                  {t('termForWeekView')}
                 </label>
                 <select
                   id="portal-dashboard-courses-week-term-select"
                   className="portal-account-ledger__select portal-dashboard-courses-head-term-select"
                   value={selectValue}
-                  aria-label="Academic term for week timetable"
+                  aria-label={t('academicTermForWeekTimetable')}
                   onChange={(e) => {
                     const raw = e.target.value
                     const pipe = raw.indexOf('|')
@@ -723,11 +743,11 @@ export function DashboardCoursesWidget() {
             <button
               type="button"
               className="portal-dashboard-gcal-add-all"
-              aria-label="Add all classes to Google Calendar"
+              aria-label={t('addAllClassesToGoogleCalendar')}
               disabled={gcalAddAllDisabled}
               onClick={() => setGcalModalOpen(true)}
             >
-              <span>Add to</span>
+              <span>{t('addTo')}</span>
               <img
                 src="/googlecalendar-button.png"
                 alt=""
@@ -742,7 +762,7 @@ export function DashboardCoursesWidget() {
 
       {isLoadingAccount ? (
         <div className="portal-dashboard-courses-loading" role="status">
-          Loading your courses…
+          {t('loadingYourCourses')}
         </div>
       ) : null}
 
@@ -752,25 +772,25 @@ export function DashboardCoursesWidget() {
           role="region"
           aria-label={
             weekTermDisplayLabel
-              ? `Weekly timetable for ${weekTermDisplayLabel}`
-              : 'Weekly timetable'
+              ? `${t('weeklyTimetableForPrefix')} ${weekTermDisplayLabel}`
+              : t('weeklyTimetableAria')
           }
         >
           {resolvedWeekTerm == null ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              No term available.
+              {t('noTermAvailable')}
             </p>
           ) : null}
 
           {resolvedWeekTerm != null && weekScheduleLoading ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Loading schedule…
+              {t('loadingSchedule')}
             </p>
           ) : null}
 
           {resolvedWeekTerm != null && weekFetchError && !weekScheduleLoading ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Could not load schedule.
+              {t('couldNotLoadSchedule')}
             </p>
           ) : null}
 
@@ -781,8 +801,7 @@ export function DashboardCoursesWidget() {
           portalEnrollmentHintCount != null &&
           portalEnrollmentHintCount > 0 ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              You are enrolled in courses for this term, but no scheduled section times are available
-              yet.
+              {t('enrolledNoTimesYet')}
             </p>
           ) : null}
 
@@ -792,7 +811,7 @@ export function DashboardCoursesWidget() {
           effectiveWeekRows.length === 0 &&
           !(portalEnrollmentHintCount != null && portalEnrollmentHintCount > 0) ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              No scheduled classes for this term.
+              {t('noScheduledClassesForTerm')}
             </p>
           ) : null}
 
@@ -802,8 +821,7 @@ export function DashboardCoursesWidget() {
           effectiveWeekRows.length > 0 &&
           !weekHasParsableMeetings ? (
             <p className="portal-text-muted portal-dashboard-courses-week-status" role="status">
-              Some courses do not include weekly times on this grid. Check Registration or Academics
-              for more details.
+              {t('someCoursesNoWeeklyTimes')}
             </p>
           ) : null}
 
@@ -811,10 +829,14 @@ export function DashboardCoursesWidget() {
             <DashboardWeekTimetableMobileList
               model={weekTimetableModel}
               gcalHrefByPattern={gcalExport.hrefByBlockPatternKey}
+              t={t}
+              weekdayLong={weekdayLong}
             />
             <DashboardWeekTimetableGrid
               model={weekTimetableModel}
               gcalHrefByPattern={gcalExport.hrefByBlockPatternKey}
+              t={t}
+              weekdayShort={weekdayShort}
             />
           </div>
         </div>
@@ -822,7 +844,7 @@ export function DashboardCoursesWidget() {
 
       {gcalModalOpen && gcalExport.batchItems.length > 0 ? (
         <DashboardGoogleCalendarModal
-          title={`Add to Google Calendar${weekTermDisplayLabel ? ` — ${weekTermDisplayLabel}` : ''}`}
+          title={`${t('gcalModalTitlePrefix')}${weekTermDisplayLabel ? ` — ${weekTermDisplayLabel}` : ''}`}
           items={gcalExport.batchItems}
           onClose={() => setGcalModalOpen(false)}
         />

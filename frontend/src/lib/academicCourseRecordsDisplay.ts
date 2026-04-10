@@ -3,6 +3,8 @@
  * Keeps current-term semantics and display consistent across Dashboard and Academics.
  */
 
+import { t, type PortalLocale } from './i18n'
+
 export type AcademicCourseStatus =
   | 'active'
   | 'completed'
@@ -10,7 +12,25 @@ export type AcademicCourseStatus =
   | 'dropped'
   | 'unknown'
 
-export function academicStatusLabel(status: string): string {
+export function academicStatusLabel(status: string, locale?: PortalLocale): string {
+  if (locale) {
+    switch (status) {
+      case 'active':
+        return t(locale, 'enrollmentStatusActive')
+      case 'completed':
+        return t(locale, 'enrollmentStatusCompleted')
+      case 'withdrawn':
+        return t(locale, 'enrollmentStatusWithdrawn')
+      case 'dropped':
+        return t(locale, 'enrollmentStatusDropped')
+      case 'unknown':
+        return t(locale, 'enrollmentStatusUnknown')
+      default: {
+        const s = status.trim()
+        return s.length > 0 ? s : t(locale, 'enrollmentStatusUnknown')
+      }
+    }
+  }
   switch (status) {
     case 'active':
       return 'Active'

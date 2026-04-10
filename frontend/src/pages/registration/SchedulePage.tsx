@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useStudentPortalT } from '@/LanguageContext'
+import type { StudentPortalKey } from '@/lib/i18n'
 import { useAccount } from '../../context/AccountContext'
 import { fetchStudentEnrolledSections } from '../../lib/api'
 import { getPreferredCourseTitle } from '../../lib/courseDisplayName'
@@ -18,11 +20,22 @@ import { adminSectionToCourseBinItem } from './sectionToCourseBinItem'
 
 const MY_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 
-const DAY_HEADERS: { full: WeekdayFull; label: string }[] = WEEKDAYS_FULL_ORDERED.map(
-  (full) => ({ full, label: full }),
-)
+const WEEKDAY_FULL_TO_LABEL: Record<WeekdayFull, StudentPortalKey> = {
+  Monday: 'weekdayMonday',
+  Tuesday: 'weekdayTuesday',
+  Wednesday: 'weekdayWednesday',
+  Thursday: 'weekdayThursday',
+  Friday: 'weekdayFriday',
+  Saturday: 'weekdaySaturday',
+  Sunday: 'weekdaySunday',
+}
+
+function weekdayColumnLabel(full: WeekdayFull, t: (key: StudentPortalKey) => string): string {
+  return t(WEEKDAY_FULL_TO_LABEL[full])
+}
 
 export function SchedulePage() {
+  const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
   const { currentStudentId, isAuthenticated } = useAccount()
   const { items } = useCourseBin()
@@ -51,12 +64,12 @@ export function SchedulePage() {
         if (ac.signal.aborted) return
         setEnrolledItems([])
         setEnrolledError(
-          e instanceof Error ? e.message : 'Could not load enrolled sections.',
+          e instanceof Error ? e.message : t('couldNotLoadEnrolledSections'),
         )
       }
     })()
     return () => ac.abort()
-  }, [termKey, studentKey, isAuthenticated])
+  }, [termKey, studentKey, isAuthenticated, t])
 
   const displayItems = useMemo(() => {
     const map = new Map<string, CourseBinItem>()
@@ -111,13 +124,15 @@ export function SchedulePage() {
   )
 
   const placedWeekdays = useMemo(
-    () => placedByDayFull.slice(0, DAY_HEADERS.length),
+    () => placedByDayFull.slice(0, WEEKDAYS_FULL_ORDERED.length),
     [placedByDayFull],
   )
 
   const bodyHeightPx = timetableBodyHeightPx(MY_GRID)
 
   const termMissing = registrationTermId == null || registrationTermId.trim() === ''
+
+  const tba = t('scheduleTba')
 
   return (
     <main
@@ -126,17 +141,15 @@ export function SchedulePage() {
     >
       <section className="portal-card portal-stack" aria-labelledby="timetable-heading">
         <h2 id="timetable-heading" className="portal-section-heading">
-          My Timetable
+          {t('registrationMyTimetableHeading')}
         </h2>
         <p className="portal-text-muted" style={{ marginTop: 0 }}>
-          Your registered courses for this term and anything still in your CourseBin (Monday–Sunday,
-          8:00 a.m.–9:00 p.m.). CourseBin entries override the server view when both refer to the same
-          section.
+          {t('registrationSchedulePageLede')}
         </p>
 
         {termMissing && (
           <p className="portal-text-muted" role="status">
-            Select an academic term above to view your timetable.
+            {t('registrationScheduleSelectTermAbove')}
           </p>
         )}
 
@@ -148,15 +161,13 @@ export function SchedulePage() {
 
         {!termMissing && displayItems.length === 0 && (
           <p className="portal-text-muted" role="status">
-            No registered sections for this term and your CourseBin is empty. Add sections from the
-            Offered Timetable or complete registration from Checkout.
+            {t('registrationScheduleEmpty')}
           </p>
         )}
 
         {!termMissing && displayItems.length > 0 && sections.length === 0 && (
           <p className="portal-text-muted" role="status">
-            None of your CourseBin sections have a placeable weekly schedule (e.g. time or days are
-            TBA). Check My CourseBin for details.
+            {t('registrationScheduleNoPlaceable')}
           </p>
         )}
 
@@ -172,9 +183,9 @@ export function SchedulePage() {
             >
               <div className="admin-timetable-v2__head">
                 <div className="admin-timetable-v2__corner" aria-hidden />
-                {DAY_HEADERS.map((d) => (
-                  <div key={d.full} className="admin-timetable-v2__day-head">
-                    {d.label}
+                {WEEKDAYS_FULL_ORDERED.map((d) => (
+                  <div key={d} className="admin-timetable-v2__day-head">
+                    {weekdayColumnLabel(d, t)}
                   </div>
                 ))}
               </div>
@@ -189,8 +200,8 @@ export function SchedulePage() {
                     </div>
                   ))}
                 </div>
-                {DAY_HEADERS.map((d, di) => (
-                  <div key={d.full} className="admin-timetable-v2__day-col">
+                {WEEKDAYS_FULL_ORDERED.map((d, di) => (
+                  <div key={d} className="admin-timetable-v2__day-col">
                     <div
                       className="admin-timetable-v2__day-track"
                       style={{ height: bodyHeightPx }}
@@ -206,9 +217,13 @@ export function SchedulePage() {
                         const courseTitle =
                           preferredCourseTitleByBinKey.get(binKey) ??
                           b.section.course_code
+                        const ariaLabel = t('registrationTimetableBlockAria')
+                          .replace('{code}', String(b.section.course_code))
+                          .replace('{section}', String(b.section.section_code))
+                          .replace('{title}', courseTitle)
                         return (
                           <div
-                            key={`${b.section.id}-${d.full}-${b.startMin}-${b.colIndex}`}
+                            key={`${b.section.id}-${d}-${b.startMin}-${b.colIndex}`}
                             className="admin-timetable-v2__block portal-my-timetable__block"
                             style={{
                               top: b.topPx,
@@ -217,7 +232,7 @@ export function SchedulePage() {
                               width: `calc(${colW}% - ${insetPx * 2}px)`,
                             }}
                             role="group"
-                            aria-label={`${b.section.course_code} section ${b.section.section_code}. ${courseTitle}`}
+                            aria-label={ariaLabel}
                           >
                             <span className="admin-timetable-v2__block-title">
                               {b.section.course_code} {b.section.section_code}
@@ -255,9 +270,9 @@ export function SchedulePage() {
 
         {!termMissing && unplaced.length > 0 && (
           <div className="portal-my-timetable-unplaced portal-stack">
-            <h3 className="portal-my-timetable-unplaced__title">Not shown on grid</h3>
+            <h3 className="portal-my-timetable-unplaced__title">{t('registrationScheduleUnplacedTitle')}</h3>
             <p className="portal-text-muted" style={{ marginTop: 0 }}>
-              These entries do not have enough schedule detail to place on the timetable.
+              {t('registrationScheduleUnplacedHelp')}
             </p>
             <ul className="portal-my-timetable-unplaced__list">
               {unplaced.map((u) => (
@@ -279,8 +294,8 @@ export function SchedulePage() {
                     },
                     u.schedule_track,
                   )}
-                  {u.time.trim() && u.time !== 'TBA' ? ` · ${u.time}` : ''}
-                  {u.days.trim() && u.days !== 'TBA' ? ` · ${u.days}` : ''}
+                  {u.time.trim() && u.time !== tba ? ` · ${u.time}` : ''}
+                  {u.days.trim() && u.days !== tba ? ` · ${u.days}` : ''}
                 </li>
               ))}
             </ul>

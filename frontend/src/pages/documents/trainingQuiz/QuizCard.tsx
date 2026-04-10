@@ -1,3 +1,4 @@
+import { useStudentPortalT } from '@/LanguageContext'
 import type { Quiz } from '../../../data/documentQuizzes'
 import { QuizForm } from './QuizForm'
 
@@ -30,9 +31,12 @@ export function QuizCard({
   onCertificationChange,
   onSubmit,
 }: QuizCardProps) {
-  const toggleLabel = expanded ? 'Close' : 'Start Quiz'
+  const t = useStudentPortalT()
+  const toggleLabel = expanded ? t('documentsQuizCloseQuiz') : t('documentsQuizStartQuiz')
 
-  const submittedLabel = completed ? 'Submitted: Yes' : 'Submitted: No'
+  const submittedLabel = completed
+    ? t('documentsAgreementSubmittedYes')
+    : t('documentsAgreementSubmittedNo')
 
   return (
     <article
@@ -49,8 +53,11 @@ export function QuizCard({
         </div>
         <div className="portal-doc-quiz-entry-card__aside">
           {completed ? (
-            <span className="portal-doc-quiz-entry-card__completed" aria-label="Completed">
-              Completed
+            <span
+              className="portal-doc-quiz-entry-card__completed"
+              aria-label={t('documentsAgreementCompletedAria')}
+            >
+              {t('documentsAgreementCompleted')}
             </span>
           ) : null}
           <button

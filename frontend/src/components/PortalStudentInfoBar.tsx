@@ -1,10 +1,11 @@
 import { useAccount } from '../context/AccountContext'
+import { useStudentPortalT } from '../LanguageContext'
 import { formatMoney } from '../lib/formatMoney'
 
-function initialsFromName(name: string): string {
+function initialsFromName(name: string, dash: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 0 || (parts.length === 1 && parts[0] === '')) {
-    return '—'
+    return dash
   }
   return parts
     .map((p) => p[0])
@@ -14,31 +15,33 @@ function initialsFromName(name: string): string {
 }
 
 export function PortalStudentInfoBar() {
+  const t = useStudentPortalT()
   const { fetchedAccount, loading, error } = useAccount()
+  const dash = t('dashEm')
 
   const showLiveData = !loading && !error && fetchedAccount !== null
   const displayName = showLiveData
     ? fetchedAccount.student.name
     : loading
-      ? 'Loading…'
+      ? t('loadingEllipsis')
       : error
-        ? 'Account unavailable'
-        : '—'
+        ? t('accountUnavailable')
+        : dash
 
   const balanceAmount = showLiveData
     ? formatMoney(fetchedAccount.summary.outstandingBalance)
-    : '—'
+    : dash
 
   const initials = showLiveData
-    ? initialsFromName(fetchedAccount.student.name)
+    ? initialsFromName(fetchedAccount.student.name, dash)
     : loading
-      ? '…'
-      : '—'
+      ? t('welcomeLoading')
+      : dash
 
   return (
     <section
       className="portal-student-info-bar"
-      aria-label="Signed-in student"
+      aria-label={t('signedInStudentAria')}
       aria-busy={loading}
     >
       <div className="portal-student-info-bar-inner">
@@ -64,7 +67,7 @@ export function PortalStudentInfoBar() {
         </div>
         <div className="portal-student-info-bar-balance">
           <span className="portal-student-info-bar-balance-label">
-            Balance
+            {t('studentInfoBarBalance')}
           </span>
           <span className="portal-student-info-bar-balance-amount">
             {balanceAmount}
