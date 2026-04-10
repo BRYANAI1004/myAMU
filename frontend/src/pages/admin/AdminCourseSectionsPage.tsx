@@ -520,8 +520,9 @@ export function AdminCourseSectionsPage() {
     if (resolvedCourseMeta.courseCode !== code) return ''
     return getPreferredInstructorDisplay(
       resolvedCourseMeta.instructorSuggestion,
+      form.schedule_track,
     )
-  }, [editingId, courseCode, resolvedCourseMeta])
+  }, [editingId, courseCode, resolvedCourseMeta, form.schedule_track])
 
   useEffect(() => {
     if (editingId != null) return
