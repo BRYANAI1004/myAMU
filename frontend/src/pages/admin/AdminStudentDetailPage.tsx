@@ -195,6 +195,7 @@ export function AdminStudentDetailPage() {
     useState<DocumentRequirementType | null>(null)
   const [resettingAllDocuments, setResettingAllDocuments] = useState(false)
   const [loaSelection, setLoaSelection] = useState<'no' | 'yes'>('no')
+  const [loaCreateFormOpen, setLoaCreateFormOpen] = useState(false)
   const [loaForm, setLoaForm] = useState(EMPTY_LOA_FORM)
   const [loaSaveError, setLoaSaveError] = useState<string | null>(null)
   const [loaSaving, setLoaSaving] = useState(false)
@@ -214,6 +215,7 @@ export function AdminStudentDetailPage() {
     setResettingRequirement(null)
     setResettingAllDocuments(false)
     setLoaSelection('no')
+    setLoaCreateFormOpen(false)
     setLoaForm(EMPTY_LOA_FORM)
     setLoaSaveError(null)
     setLoaSaving(false)
@@ -222,6 +224,7 @@ export function AdminStudentDetailPage() {
   useEffect(() => {
     const hasLoa = detail?.loaSummary.hasLoa === true
     setLoaSelection(hasLoa ? 'yes' : 'no')
+    setLoaCreateFormOpen(false)
     setLoaForm(EMPTY_LOA_FORM)
     setLoaSaveError(null)
   }, [detail?.loaSummary.hasLoa, studentId])
@@ -445,15 +448,33 @@ export function AdminStudentDetailPage() {
 
   const loaYearOptions = useMemo(() => buildLoaYearOptions(), [])
   const hasExistingLoa = detail?.loaSummary.hasLoa === true
-  const showLoaCreateForm = !hasExistingLoa && loaSelection === 'yes'
+  const showLoaCreateForm = loaSelection === 'yes' && loaCreateFormOpen
 
   const handleLoaSelectionChange = useCallback((nextValue: 'no' | 'yes') => {
     setLoaSelection(nextValue)
     setLoaSaveError(null)
     if (nextValue === 'no') {
+      setLoaCreateFormOpen(false)
       setLoaForm(EMPTY_LOA_FORM)
+      return
     }
+    setLoaCreateFormOpen(true)
   }, [])
+
+  const handleOpenLoaCreateForm = useCallback(() => {
+    setLoaSelection('yes')
+    setLoaCreateFormOpen(true)
+    setLoaSaveError(null)
+  }, [])
+
+  const handleLoaCreateCancel = useCallback(() => {
+    setLoaCreateFormOpen(false)
+    setLoaForm(EMPTY_LOA_FORM)
+    setLoaSaveError(null)
+    if (!hasExistingLoa) {
+      setLoaSelection('no')
+    }
+  }, [hasExistingLoa])
 
   const handleLoaSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -636,7 +657,7 @@ export function AdminStudentDetailPage() {
                           aria-label="LOA"
                           className="admin-input admin-detail-quarter-select"
                           value={loaSelection}
-                          disabled={loaSaving || hasExistingLoa}
+                          disabled={loaSaving}
                           onChange={(e) =>
                             handleLoaSelectionChange(
                               e.target.value === 'yes' ? 'yes' : 'no',
@@ -647,10 +668,25 @@ export function AdminStudentDetailPage() {
                           <option value="yes">Yes</option>
                         </select>
                         {hasExistingLoa ? (
-                          <p className="portal-card-note admin-loa-editor__helper">
-                            Existing LOA records display here, but update/remove
-                            actions are not part of this step yet.
-                          </p>
+                          <div className="portal-stack" style={{ gap: '0.5rem' }}>
+                            <p className="portal-card-note admin-loa-editor__helper">
+                              Existing LOA records stay visible here. Changing this
+                              control only shows or hides the create form and does not
+                              delete LOA history.
+                            </p>
+                            {!showLoaCreateForm ? (
+                              <div className="portal-actions">
+                                <button
+                                  type="button"
+                                  className="portal-btn portal-btn--secondary"
+                                  disabled={loaSaving}
+                                  onClick={handleOpenLoaCreateForm}
+                                >
+                                  Add LOA Record
+                                </button>
+                              </div>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     </dd>
@@ -814,7 +850,7 @@ export function AdminStudentDetailPage() {
                         type="button"
                         className="portal-btn portal-btn--secondary"
                         disabled={loaSaving}
-                        onClick={() => handleLoaSelectionChange('no')}
+                        onClick={handleLoaCreateCancel}
                       >
                         Cancel
                       </button>
