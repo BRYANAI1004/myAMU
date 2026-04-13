@@ -73,6 +73,7 @@ export function mapCourseSectionRow(row) {
     return {
         id: Number(row.id),
         course_code: String(row.course_code ?? ""),
+        prerequisite_course_id: nullableString(row.prerequisite_course_id),
         term: String(row.term ?? ""),
         year: Number(row.year),
         section_code: String(row.section_code ?? ""),
@@ -94,6 +95,7 @@ const SECTION_SELECT = `
   SELECT
     id,
     course_code,
+    prerequisite_course_id,
     term,
     year,
     section_code,
@@ -109,6 +111,7 @@ const SECTION_SELECT = `
 `;
 const UPDATABLE_COLUMNS = [
     "course_code",
+    "prerequisite_course_id",
     "term",
     "year",
     "section_code",
@@ -166,6 +169,7 @@ export async function listCourseSectionsWithEnrollmentAggregates(term, year, opt
     SELECT
       cs.id,
       cs.course_code,
+      cs.prerequisite_course_id,
       cs.term,
       cs.year,
       cs.section_code,
@@ -296,6 +300,7 @@ export async function createCourseSection(input) {
     const sql = `
     INSERT INTO course_sections (
       course_code,
+      prerequisite_course_id,
       term,
       year,
       section_code,
@@ -307,10 +312,11 @@ export async function createCourseSection(input) {
       room,
       instructor,
       notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
     const params = [
         input.course_code,
+        input.prerequisite_course_id ?? null,
         input.term,
         input.year,
         input.section_code,

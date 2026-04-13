@@ -53,6 +53,21 @@ function parseScheduleTrackInput(v) {
         return { ok: true, value: t };
     return { ok: false, error: "schedule_track must be EN or CN." };
 }
+function parsePrerequisiteCourseIdInput(v, options) {
+    if (v === undefined) {
+        return { ok: true, value: options?.missingAsNull ? null : undefined };
+    }
+    if (v === null)
+        return { ok: true, value: null };
+    if (typeof v !== "string") {
+        return {
+            ok: false,
+            error: "prerequisite_course_id must be a string or null.",
+        };
+    }
+    const t = v.trim();
+    return { ok: true, value: t === "" ? null : t };
+}
 function parseQueryString(req, key) {
     const raw = req.query[key];
     const v = Array.isArray(raw) ? raw[0] : raw;
@@ -218,20 +233,34 @@ export async function getAdminExportRegisteredStudentsCsv(req, res) {
     }
 }
 function parseCreateBody(body) {
-    if (!body || typeof body !== "object")
-        return null;
+    if (!body || typeof body !== "object") {
+        return {
+            ok: false,
+            error: "Invalid body: require academic_term_id, course_code, section_code, and weekday.",
+        };
+    }
     const o = body;
     const academic_term_id = parseAcademicTermId(o.academic_term_id);
     const course_code = typeof o.course_code === "string" ? o.course_code.trim() : "";
     const section_code = typeof o.section_code === "string" ? o.section_code.trim() : "";
     const weekday = typeof o.weekday === "string" ? o.weekday.trim() : "";
     if (!academic_term_id || !course_code || !section_code || !weekday) {
-        return null;
+        return {
+            ok: false,
+            error: "Invalid body: require academic_term_id, course_code, section_code, and weekday.",
+        };
     }
+    const prerequisite = parsePrerequisiteCourseIdInput(o.prerequisite_course_id, {
+        missingAsNull: true,
+    });
+    if (!prerequisite.ok)
+        return prerequisite;
     return {
+        ok: true,
         academic_term_id,
         input: {
             course_code,
+            prerequisite_course_id: prerequisite.value ?? null,
             section_code,
             weekday,
             start_time: optionalStrOrNull(o.start_time),
@@ -244,12 +273,20 @@ function parseCreateBody(body) {
     };
 }
 function parsePatchBody(body) {
-    if (!body || typeof body !== "object")
-        return null;
+    if (!body || typeof body !== "object") {
+        return {
+            ok: false,
+            error: "Invalid body: academic_term_id is required, and schedule_track must be EN or CN when provided.",
+        };
+    }
     const o = body;
     const academic_term_id = parseAcademicTermId(o.academic_term_id);
-    if (!academic_term_id)
-        return null;
+    if (!academic_term_id) {
+        return {
+            ok: false,
+            error: "Invalid body: academic_term_id is required, and schedule_track must be EN or CN when provided.",
+        };
+    }
     const patch = {};
     if (typeof o.course_code === "string")
         patch.course_code = o.course_code.trim();
@@ -269,23 +306,31 @@ function parsePatchBody(body) {
         patch.instructor = optionalStrOrNull(o.instructor);
     if (o.notes !== undefined)
         patch.notes = optionalStrOrNull(o.notes);
+    if (Object.prototype.hasOwnProperty.call(o, "prerequisite_course_id")) {
+        const prerequisite = parsePrerequisiteCourseIdInput(o.prerequisite_course_id);
+        if (!prerequisite.ok)
+            return prerequisite;
+        patch.prerequisite_course_id = prerequisite.value ?? null;
+    }
     if (Object.prototype.hasOwnProperty.call(o, "schedule_track")) {
         if (o.schedule_track !== null) {
             const tr = parseScheduleTrackInput(o.schedule_track);
             if (!tr.ok)
-                return null;
+                return { ok: false, error: tr.error };
             if (tr.value !== undefined)
                 patch.schedule_track = tr.value;
         }
     }
-    return { academic_term_id, patch };
+    return { ok: true, academic_term_id, patch };
 }
 export async function postAdminCourseSection(req, res) {
     try {
         const parsed = parseCreateBody(req.body);
-        if (!parsed) {
+        if (!parsed || !parsed.ok) {
             res.status(400).json({
-                error: "Invalid body: require academic_term_id, course_code, section_code, and weekday.",
+                error: parsed && "error" in parsed
+                    ? parsed.error
+                    : "Invalid body: require academic_term_id, course_code, section_code, and weekday.",
             });
             return;
         }
@@ -331,9 +376,11 @@ export async function patchAdminCourseSection(req, res) {
             return;
         }
         const parsed = parsePatchBody(req.body);
-        if (!parsed) {
+        if (!parsed || !parsed.ok) {
             res.status(400).json({
-                error: "Invalid body: academic_term_id is required, and schedule_track must be EN or CN when provided.",
+                error: parsed && "error" in parsed
+                    ? parsed.error
+                    : "Invalid body: academic_term_id is required, and schedule_track must be EN or CN when provided.",
             });
             return;
         }

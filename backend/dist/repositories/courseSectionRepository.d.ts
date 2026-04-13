@@ -3,6 +3,7 @@ import type { RowDataPacket } from "mysql2";
 export type CourseSectionDetail = {
     id: number;
     course_code: string;
+    prerequisite_course_id: string | null;
     term: string;
     year: number;
     section_code: string;
@@ -32,6 +33,7 @@ export declare function parseEnrolledStudentsJson(raw: unknown): CourseSectionDe
 export declare function mapCourseSectionRow(row: RowDataPacket): CourseSectionDetail;
 export type CourseSectionCreateInput = {
     course_code: string;
+    prerequisite_course_id?: string | null;
     term: string;
     year: number;
     section_code: string;
