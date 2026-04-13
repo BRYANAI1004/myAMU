@@ -323,18 +323,6 @@ const ADMIN_STUDENTS_CSV_HEADERS = [
   "Latest Registration Term",
 ] as const;
 
-const ADMIN_NEW_ENROLLMENT_CSV_HEADERS = [
-  "Student ID",
-  "Name",
-  "Track",
-  "Entry Year",
-  "Intake",
-  "Program",
-  "Email",
-  "Status",
-  "Enroll Start Date",
-] as const;
-
 export type BuildAdminStudentsCsvInput =
   | {
       mode: "selected";
@@ -376,37 +364,21 @@ export async function buildAdminStudentsCsv(
     mapRowToListItem(row as Record<string, unknown>),
   );
   const lines = [
-    (input.view === "new-enrollment"
-      ? ADMIN_NEW_ENROLLMENT_CSV_HEADERS
-      : ADMIN_STUDENTS_CSV_HEADERS
-    )
+    ADMIN_STUDENTS_CSV_HEADERS
       .map((header) => csvEscapeCell(header))
       .join(","),
   ];
 
   for (const item of items) {
-    const values =
-      input.view === "new-enrollment"
-        ? [
-            item.studentId,
-            item.name,
-            csvCell(item.trackLabel),
-            item.entryYear == null ? "" : String(item.entryYear),
-            csvCell(item.intakeLabel),
-            item.program,
-            csvCell(item.email),
-            csvCell(item.status),
-            formatCsvDate(item.enrollStartDate),
-          ]
-        : [
-            item.studentId,
-            item.name,
-            item.division,
-            csvCell(item.email),
-            item.program,
-            formatCsvDate(item.signedDate),
-            csvCell(item.latestRegistrationTerm),
-          ];
+    const values = [
+      item.studentId,
+      item.name,
+      item.division,
+      csvCell(item.email),
+      item.program,
+      formatCsvDate(item.signedDate),
+      csvCell(item.latestRegistrationTerm),
+    ];
     lines.push(values.map(csvEscapeCell).join(","));
   }
 

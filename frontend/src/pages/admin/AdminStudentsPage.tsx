@@ -33,10 +33,6 @@ function displayCell(value: string | null): string {
   return value
 }
 
-function formatOptionalNumber(value: number | null): string {
-  return value == null ? '—' : String(value)
-}
-
 /** Display ISO `YYYY-MM-DD` as MM/DD/YYYY for table cells. */
 function formatTableDate(iso: string | null): string {
   if (iso == null || iso.trim() === '') return '—'
@@ -46,6 +42,37 @@ function formatTableDate(iso: string | null): string {
     return `${mo}/${d}/${y}`
   }
   return displayCell(iso)
+}
+
+const SHARED_STUDENT_TABLE_HEADERS = [
+  'Student ID',
+  'Name',
+  'Division',
+  'Email',
+  'Program',
+  'Signed Date',
+  'Latest Registration Term',
+] as const
+
+function renderSharedStudentTableCells(row: AdminStudentListItem) {
+  return (
+    <>
+      <td>{row.studentId}</td>
+      <td>
+        <Link
+          to={`/admin/students/${encodeURIComponent(row.studentId)}`}
+          className="admin-student-name-link"
+        >
+          {row.name}
+        </Link>
+      </td>
+      <td>{row.division}</td>
+      <td>{displayCell(row.email)}</td>
+      <td>{row.program}</td>
+      <td>{formatTableDate(row.signedDate)}</td>
+      <td>{displayCell(row.latestRegistrationTerm)}</td>
+    </>
+  )
 }
 
 export function AdminStudentsPage() {
@@ -609,33 +636,23 @@ export function AdminStudentsPage() {
                       />
                     </th>
                   ) : null}
-                  <th scope="col">Student ID</th>
-                  <th scope="col">Name</th>
-                  {isEnrollmentView ? (
-                    <>
-                      <th scope="col">Track</th>
-                      <th scope="col">Entry Year</th>
-                      <th scope="col">Intake</th>
-                      <th scope="col">Program</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Enroll Start Date</th>
-                    </>
-                  ) : (
-                    <>
-                      <th scope="col">Division</th>
-                      <th scope="col">Email</th>
-                      <th scope="col">Program</th>
-                      <th scope="col">Signed Date</th>
-                      <th scope="col">Latest Registration Term</th>
-                    </>
-                  )}
+                  {SHARED_STUDENT_TABLE_HEADERS.map((label) => (
+                    <th key={label} scope="col">
+                      {label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={isEnrollmentView ? 9 : 8} className="portal-card-note">
+                    <td
+                      colSpan={
+                        SHARED_STUDENT_TABLE_HEADERS.length +
+                        (!isEnrollmentView ? 1 : 0)
+                      }
+                      className="portal-card-note"
+                    >
                       {emptyMessage}
                     </td>
                   </tr>
@@ -655,34 +672,7 @@ export function AdminStudentsPage() {
                           />
                         </td>
                       ) : null}
-                      <td>{r.studentId}</td>
-                      <td>
-                        <Link
-                          to={`/admin/students/${encodeURIComponent(r.studentId)}`}
-                          className="admin-student-name-link"
-                        >
-                          {r.name}
-                        </Link>
-                      </td>
-                      {isEnrollmentView ? (
-                        <>
-                          <td>{displayCell(r.trackLabel)}</td>
-                          <td>{formatOptionalNumber(r.entryYear)}</td>
-                          <td>{displayCell(r.intakeLabel)}</td>
-                          <td>{r.program}</td>
-                          <td>{displayCell(r.email)}</td>
-                          <td>{displayCell(r.status)}</td>
-                          <td>{formatTableDate(r.enrollStartDate)}</td>
-                        </>
-                      ) : (
-                        <>
-                          <td>{r.division}</td>
-                          <td>{displayCell(r.email)}</td>
-                          <td>{r.program}</td>
-                          <td>{formatTableDate(r.signedDate)}</td>
-                          <td>{displayCell(r.latestRegistrationTerm)}</td>
-                        </>
-                      )}
+                      {renderSharedStudentTableCells(r)}
                     </tr>
                   ))
                 )}
