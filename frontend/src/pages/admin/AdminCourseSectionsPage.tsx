@@ -447,7 +447,9 @@ export function AdminCourseSectionsPage() {
   const courseCatalogById = useMemo(() => {
     const m = new Map<string, CourseCatalogItem>()
     for (const row of sortedCourses) {
-      m.set(row.course_id, row)
+      const courseId = row.course_id?.trim()
+      if (!courseId) continue
+      m.set(courseId, row)
     }
     return m
   }, [sortedCourses])
@@ -1111,11 +1113,20 @@ export function AdminCourseSectionsPage() {
               aria-label="Prerequisite course"
             >
               <option value="">None</option>
-              {fullCatalogPrerequisiteOptions.map((c) => (
-                <option key={c.course_id} value={c.course_id}>
-                  {formatCourseCatalogSelectLabel(c)}
-                </option>
-              ))}
+              {fullCatalogPrerequisiteOptions.map((c) => {
+                const courseId = c.course_id?.trim() ?? ''
+                const unmapped = courseId === ''
+                return (
+                  <option
+                    key={unmapped ? `unmapped:${c.code}` : courseId}
+                    value={unmapped ? `unmapped:${c.code}` : courseId}
+                    disabled={unmapped}
+                  >
+                    {formatCourseCatalogSelectLabel(c)}
+                    {unmapped ? ' (no portal course_id)' : ''}
+                  </option>
+                )
+              })}
               {form.prerequisite_course_id.trim() !== '' &&
                 !courseCatalogById.has(form.prerequisite_course_id) && (
                   <option value={form.prerequisite_course_id}>

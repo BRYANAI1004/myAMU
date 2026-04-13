@@ -2732,7 +2732,7 @@ export async function updateAcademicTerm(
 
 /** GET /api/courses — catalog rows for admin scheduling pickers. */
 export type CourseCatalogItem = {
-  course_id: string
+  course_id: string | null
   code: string
   eng_name: string | null
   chi_name: string | null
@@ -2749,20 +2749,21 @@ function parseCourseCatalogList(data: unknown): CourseCatalogItem[] {
   for (const row of data) {
     if (row == null || typeof row !== 'object') continue
     const o = row as Record<string, unknown>
-    const courseId = o.course_id ?? o.courseId
-    if (
-      typeof courseId !== 'string' ||
-      courseId.trim() === '' ||
-      typeof o.code !== 'string' ||
-      o.code.trim() === ''
-    ) {
+    const rawCourseId = o.course_id ?? o.courseId
+    const courseId =
+      rawCourseId == null
+        ? null
+        : String(rawCourseId).trim() === ''
+          ? null
+          : String(rawCourseId).trim()
+    if (typeof o.code !== 'string' || o.code.trim() === '') {
       continue
     }
     const eng = o.eng_name
     const chi = o.chi_name
     const cat = o.category
     const item: CourseCatalogItem = {
-      course_id: courseId.trim(),
+      course_id: courseId,
       code: o.code.trim(),
       eng_name: typeof eng === 'string' ? eng : null,
       chi_name: typeof chi === 'string' ? chi : null,
