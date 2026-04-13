@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParams'
 import {
   fetchAcademicTerms,
   fetchAdminCoursesOpenForRegistration,
@@ -148,6 +150,15 @@ export function AdminCoursesPage() {
     tab === 'open' &&
     (termsLoading || (terms !== null && terms.length > 0 && openTermId === ''))
 
+  const addCourseSearch = useMemo(
+    () =>
+      adminSchedulingQueryString({
+        term: terms?.[0]?.id ?? '',
+        course: catalog?.[0]?.code ?? '',
+      }),
+    [terms, catalog],
+  )
+
   return (
     <main className="admin-page">
       <div className="admin-page__toolbar">
@@ -175,9 +186,15 @@ export function AdminCoursesPage() {
                 onChange={(e) => setAllSearch(e.target.value)}
                 aria-label="Search courses"
               />
-              <button type="button" className="portal-btn portal-btn--primary">
+              <Link
+                to={{
+                  pathname: '/admin/course-sections',
+                  search: addCourseSearch ? `?${addCourseSearch}` : '',
+                }}
+                className="portal-btn portal-btn--primary"
+              >
                 Add Course
-              </button>
+              </Link>
             </div>
           </div>
           <AllCoursesTable
