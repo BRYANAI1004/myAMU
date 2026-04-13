@@ -12,6 +12,7 @@ import {
 import { scheduleTrackDetailLabel } from '../../lib/scheduleTrack'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
+import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import { formatWeekdaysLongFromStored } from '../../lib/weekdaySchedule'
 
 type Props = {
@@ -75,6 +76,10 @@ export function AdminCourseSectionDetailModal({
     termCatalogLabel?.trim() ||
     [section.term, section.year].filter(Boolean).join(' ') ||
     '—'
+  const prerequisiteDisplay = formatPrerequisiteCourseDisplay({
+    courseCode: section.prerequisite_course_code,
+    courseTitle: section.prerequisite_course_title,
+  })
 
   return (
     <div
@@ -104,6 +109,7 @@ export function AdminCourseSectionDetailModal({
           {courseTitleAlternate !== ''
             ? row('Alternate title', courseTitleAlternate)
             : null}
+          {row('Prerequisite', prerequisiteDisplay ?? '—')}
           {row('Timetable track', scheduleTrackDetailLabel(section.schedule_track))}
           {row('Section code', section.section_code)}
           {row('Academic term', termLine)}

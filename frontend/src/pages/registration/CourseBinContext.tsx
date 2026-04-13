@@ -14,6 +14,11 @@ export type CourseBinItem = {
   course_code: string
   eng_name: string
   chi_name: string
+  /**
+   * Legacy cached Course Bin rows may predate prerequisite support and omit these fields.
+   * We keep them optional at the type level for backward compatibility, then normalize
+   * loaded items to explicit `null` values inside the provider.
+   */
   prerequisite_course_id?: string | null
   prerequisite_course_code?: string | null
   prerequisite_course_title?: string | null
@@ -96,6 +101,19 @@ function isCourseBinItemRecord(v: unknown): v is CourseBinItem {
   )
 }
 
+function normalizeCourseBinItem(item: CourseBinItem): CourseBinItem {
+  return {
+    ...item,
+    prerequisite_course_id: item.prerequisite_course_id ?? null,
+    prerequisite_course_code: item.prerequisite_course_code ?? null,
+    prerequisite_course_title: item.prerequisite_course_title ?? null,
+    schedule_track: normalizeBinTrack(item.schedule_track),
+    schedule_weekday: item.schedule_weekday ?? null,
+    schedule_start_time: item.schedule_start_time ?? null,
+    schedule_end_time: item.schedule_end_time ?? null,
+  }
+}
+
 function loadItemsFromStorage(registrationTermId: string): CourseBinItem[] {
   const key = storageKeyForTerm(registrationTermId)
   if (key == null) return []
@@ -104,7 +122,9 @@ function loadItemsFromStorage(registrationTermId: string): CourseBinItem[] {
     if (raw == null || raw.trim() === '') return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(isCourseBinItemRecord)
+    // Lightweight in-place migration: older cached items may be missing
+    // prerequisite metadata entirely, so normalize them to explicit nulls.
+    return parsed.filter(isCourseBinItemRecord).map(normalizeCourseBinItem)
   } catch {
     return []
   }
@@ -140,14 +160,15 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
   }, [term, items])
 
   const addToCourseBin = useCallback((item: CourseBinItem) => {
-    const code = item.course_code.trim()
+    const normalizedItem = normalizeCourseBinItem(item)
+    const code = normalizedItem.course_code.trim()
     if (code === '') return
 
     setItems((prev) => {
       const key = courseBinSectionKey(
-        item.course_code,
-        item.section,
-        item.schedule_track,
+        normalizedItem.course_code,
+        normalizedItem.section,
+        normalizedItem.schedule_track,
       )
       if (
         prev.some(
@@ -158,7 +179,7 @@ export function CourseBinProvider({ children, registrationTermId }: CourseBinPro
       ) {
         return prev
       }
-      return [...prev, item]
+      return [...prev, normalizedItem]
     })
   }, [])
 

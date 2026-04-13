@@ -4,6 +4,8 @@ export type CourseSectionDetail = {
     id: number;
     course_code: string;
     prerequisite_course_id: string | null;
+    prerequisite_course_code: string | null;
+    prerequisite_course_title: string | null;
     term: string;
     year: number;
     section_code: string;

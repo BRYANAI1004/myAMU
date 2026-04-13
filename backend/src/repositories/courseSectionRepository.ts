@@ -6,6 +6,8 @@ export type CourseSectionDetail = {
   id: number;
   course_code: string;
   prerequisite_course_id: string | null;
+  prerequisite_course_code: string | null;
+  prerequisite_course_title: string | null;
   term: string;
   year: number;
   section_code: string;
@@ -36,6 +38,13 @@ function nullableString(v: unknown): string | null {
   if (typeof v === "bigint") return String(v);
   if (v instanceof Date) return v.toISOString();
   return String(v);
+}
+
+function trimNullableString(v: unknown): string | null {
+  const s = nullableString(v);
+  if (s == null) return null;
+  const t = s.trim();
+  return t === "" ? null : t;
 }
 
 function nullableUnits(v: unknown): number | null {
@@ -102,7 +111,9 @@ export function mapCourseSectionRow(row: RowDataPacket): CourseSectionDetail {
   return {
     id: Number(row.id),
     course_code: String(row.course_code ?? ""),
-    prerequisite_course_id: nullableString(row.prerequisite_course_id),
+    prerequisite_course_id: trimNullableString(row.prerequisite_course_id),
+    prerequisite_course_code: trimNullableString(row.prerequisite_course_code),
+    prerequisite_course_title: trimNullableString(row.prerequisite_course_title),
     term: String(row.term ?? ""),
     year: Number(row.year),
     section_code: String(row.section_code ?? ""),
@@ -123,21 +134,26 @@ export function mapCourseSectionRow(row: RowDataPacket): CourseSectionDetail {
 
 const SECTION_SELECT = `
   SELECT
-    id,
-    course_code,
-    prerequisite_course_id,
-    term,
-    year,
-    section_code,
-    schedule_track,
-    weekday,
-    start_time,
-    end_time,
-    delivery_mode,
-    room,
-    instructor,
-    notes
-  FROM course_sections
+    cs.id,
+    cs.course_code,
+    cs.prerequisite_course_id,
+    prereq_pc.course_code AS prerequisite_course_code,
+    prereq_pc.title AS prerequisite_course_title,
+    cs.term,
+    cs.year,
+    cs.section_code,
+    cs.schedule_track,
+    cs.weekday,
+    cs.start_time,
+    cs.end_time,
+    cs.delivery_mode,
+    cs.room,
+    cs.instructor,
+    cs.notes
+  FROM course_sections cs
+  LEFT JOIN portal_courses prereq_pc
+    ON CONVERT(TRIM(prereq_pc.course_id) USING utf8mb4) COLLATE utf8mb4_unicode_ci =
+       CONVERT(TRIM(cs.prerequisite_course_id) USING utf8mb4) COLLATE utf8mb4_unicode_ci
 `;
 
 const UPDATABLE_COLUMNS = [
@@ -178,7 +194,7 @@ export type CourseSectionUpdateInput = Partial<CourseSectionCreateInput>;
 export async function getCourseSectionById(
   id: number,
 ): Promise<CourseSectionDetail | null> {
-  const sql = `${SECTION_SELECT} WHERE id = ? LIMIT 1`;
+  const sql = `${SECTION_SELECT} WHERE cs.id = ? LIMIT 1`;
   const [rows] = await pool.query<RowDataPacket[]>(sql, [id]);
   const row = rows[0];
   return row ? mapCourseSectionRow(row) : null;
@@ -199,7 +215,7 @@ export async function listCourseSectionsByCourseCode(
 ): Promise<CourseSectionDetail[]> {
   const code = courseCode.trim();
   if (termFilter) {
-    const sql = `${SECTION_SELECT} WHERE course_code = ? AND term = ? AND year = ? ORDER BY CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, weekday ASC, start_time ASC, section_code ASC`;
+    const sql = `${SECTION_SELECT} WHERE cs.course_code = ? AND cs.term = ? AND cs.year = ? ORDER BY CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC`;
     const [rows] = await pool.query<RowDataPacket[]>(sql, [
       code,
       termFilter.term.trim(),
@@ -207,7 +223,7 @@ export async function listCourseSectionsByCourseCode(
     ]);
     return rows.map((r) => mapCourseSectionRow(withZeroEnrollment(r)));
   }
-  const sql = `${SECTION_SELECT} WHERE course_code = ? ORDER BY year ASC, term ASC, CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, weekday ASC, start_time ASC, section_code ASC`;
+  const sql = `${SECTION_SELECT} WHERE cs.course_code = ? ORDER BY cs.year ASC, cs.term ASC, CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC`;
   const [rows] = await pool.query<RowDataPacket[]>(sql, [code]);
   return rows.map((r) => mapCourseSectionRow(withZeroEnrollment(r)));
 }
@@ -242,6 +258,8 @@ export async function listCourseSectionsWithEnrollmentAggregates(
       cs.id,
       cs.course_code,
       cs.prerequisite_course_id,
+      prereq_pc.course_code AS prerequisite_course_code,
+      prereq_pc.title AS prerequisite_course_title,
       cs.term,
       cs.year,
       cs.section_code,
@@ -257,6 +275,9 @@ export async function listCourseSectionsWithEnrollmentAggregates(
       COALESCE(agg.enrolled_count, 0) AS enrolled_count,
       agg.enrolled_students_json
     FROM course_sections cs
+    LEFT JOIN portal_courses prereq_pc
+      ON CONVERT(TRIM(prereq_pc.course_id) USING utf8mb4) COLLATE utf8mb4_unicode_ci =
+         CONVERT(TRIM(cs.prerequisite_course_id) USING utf8mb4) COLLATE utf8mb4_unicode_ci
     LEFT JOIN courses crs
       ON CONVERT(TRIM(crs.code) USING utf8mb4) COLLATE utf8mb4_unicode_ci =
          CONVERT(TRIM(cs.course_code) USING utf8mb4) COLLATE utf8mb4_unicode_ci
@@ -398,13 +419,6 @@ export async function countCourseSectionsByCourseForTermYear(
     course_code: String(r.course_code ?? ""),
     section_count: Number(r.section_count ?? 0),
   }));
-}
-
-function trimNullableString(v: unknown): string | null {
-  const s = nullableString(v);
-  if (s == null) return null;
-  const t = s.trim();
-  return t === "" ? null : t;
 }
 
 /**

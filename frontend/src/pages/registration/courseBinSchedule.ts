@@ -38,6 +38,8 @@ function courseBinItemToSyntheticSection(
     id: -1000 - index,
     course_code: code,
     prerequisite_course_id: null,
+    prerequisite_course_code: null,
+    prerequisite_course_title: null,
     course_title: withTitle.course_title?.trim() || code,
     term: '',
     year: 0,

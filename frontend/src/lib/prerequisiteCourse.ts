@@ -10,8 +10,9 @@ export function formatPrerequisiteCourseDisplay(params: {
 }): string | null {
   const code = normalizeOptionalText(params.courseCode)
   const title = normalizeOptionalText(params.courseTitle)
+  // Only render when we have a resolved course code. Title-only text can come from
+  // incomplete or legacy data and should not imply a stable saved prerequisite.
   if (code && title) return `${code} — ${title}`
   if (code) return code
-  if (title) return title
   return null
 }

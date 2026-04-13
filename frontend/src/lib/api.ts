@@ -2944,6 +2944,8 @@ export type AdminCourseSection = {
   id: number
   course_code: string
   prerequisite_course_id: string | null
+  prerequisite_course_code: string | null
+  prerequisite_course_title: string | null
   /** `portal_courses.title` when returned by enrolled-sections; otherwise null. */
   course_title: string | null
   term: string
@@ -3040,6 +3042,18 @@ function parseAdminCourseSectionRow(
     prerequisiteRaw == null || String(prerequisiteRaw).trim() === ''
       ? null
       : String(prerequisiteRaw).trim()
+  const prerequisiteCodeRaw =
+    row.prerequisite_course_code ?? row.prerequisiteCourseCode
+  const prerequisite_course_code =
+    prerequisiteCodeRaw == null || String(prerequisiteCodeRaw).trim() === ''
+      ? null
+      : String(prerequisiteCodeRaw).trim()
+  const prerequisiteTitleRaw =
+    row.prerequisite_course_title ?? row.prerequisiteCourseTitle
+  const prerequisite_course_title =
+    prerequisiteTitleRaw == null || String(prerequisiteTitleRaw).trim() === ''
+      ? null
+      : String(prerequisiteTitleRaw).trim()
   const unitsRaw = row.units
   let units: number | null = null
   if (typeof unitsRaw === 'number' && Number.isFinite(unitsRaw)) {
@@ -3052,6 +3066,8 @@ function parseAdminCourseSectionRow(
     id,
     course_code: course_code.trim(),
     prerequisite_course_id,
+    prerequisite_course_code,
+    prerequisite_course_title,
     course_title,
     units,
     term: term.trim(),

@@ -1,12 +1,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
-import { fetchAdminCoursesOpenForRegistration, fetchApiJson, type OpenRegistrationCourseRow } from '../../lib/api'
+import { fetchApiJson } from '../../lib/api'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import { formatWeekdaysShortFromStored } from '../../lib/weekdaySchedule'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
+import { courseSearchSectionToCourseBinItem } from './sectionToCourseBinItem'
 
 /** Courses with no leading alphabetic prefix share this grouping key so none are dropped. */
 const NO_PREFIX_KEY = '__NO_PREFIX__'
@@ -40,9 +41,13 @@ type CourseCatalogItem = {
 type CourseSectionDetail = {
   id: number
   course_code: string
+  prerequisite_course_id?: string | null
+  prerequisite_course_code?: string | null
+  prerequisite_course_title?: string | null
   term: string
   year: number
   section_code: string
+  schedule_track?: 'EN' | 'CN'
   weekday: string
   start_time: string | null
   end_time: string | null
@@ -102,6 +107,7 @@ type SectionScheduleRowModel = {
   days: string
   instructor: string
   location: string
+  sourceSection: CourseSectionDetail | null
 }
 
 function sessionLabelFromSection(sec: CourseSectionDetail): string {
@@ -149,6 +155,7 @@ function sectionScheduleRows(
         days: daysRaw === '—' ? tba : daysRaw,
         instructor: instRaw === '' ? tba : instRaw,
         location: locRaw === '' ? tba : locRaw,
+        sourceSection: sec,
       }
     })
   }
@@ -166,8 +173,32 @@ function sectionScheduleRows(
       days: tba,
       instructor: tba,
       location: tba,
+      sourceSection: null,
     },
   ]
+}
+
+function sharedSavedPrerequisiteDisplay(
+  sectionRows: CourseSectionDetail[] | undefined,
+): string | null {
+  if (!sectionRows || sectionRows.length === 0) return null
+  let shared: string | null | undefined
+  for (const sec of sectionRows) {
+    const hasSavedPrerequisite =
+      cellText(sec.prerequisite_course_id) !== ''
+    const display = hasSavedPrerequisite
+      ? formatPrerequisiteCourseDisplay({
+          courseCode: sec.prerequisite_course_code,
+          courseTitle: sec.prerequisite_course_title,
+        })
+      : null
+    if (shared === undefined) {
+      shared = display
+      continue
+    }
+    if (shared !== display) return null
+  }
+  return shared ?? null
 }
 
 function CourseSectionScheduleTable({
@@ -176,9 +207,6 @@ function CourseSectionScheduleTable({
   phase,
   sectionRows,
   course,
-  prerequisiteCourseId,
-  prerequisiteCourseCode,
-  prerequisiteCourseTitle,
   sectionLoad,
   sectionErr,
   addToCourseBin,
@@ -189,19 +217,13 @@ function CourseSectionScheduleTable({
   phase: SectionPanelPhase
   sectionRows: CourseSectionDetail[] | undefined
   course: CourseCatalogItem
-  prerequisiteCourseId?: string | null
-  prerequisiteCourseCode?: string | null
-  prerequisiteCourseTitle?: string | null
   sectionLoad: boolean
   sectionErr: string | undefined
   addToCourseBin: (item: CourseBinItem) => void
   t: (key: StudentPortalKey) => string
 }) {
   const rows = sectionScheduleRows(phase, sectionRows, course, t)
-  const prerequisiteDisplay = formatPrerequisiteCourseDisplay({
-    courseCode: prerequisiteCourseCode,
-    courseTitle: prerequisiteCourseTitle,
-  })
+  const prerequisiteDisplay = sharedSavedPrerequisiteDisplay(sectionRows)
 
   return (
     <div
@@ -263,24 +285,12 @@ function CourseSectionScheduleTable({
                     <button
                       type="button"
                       className="portal-btn portal-btn--course-search-bin"
+                      disabled={row.sourceSection == null}
                       onClick={() => {
-                        addToCourseBin({
-                          course_code: cellText(courseCode),
-                          eng_name: cellText(course.eng_name),
-                          chi_name: cellText(course.chi_name),
-                          prerequisite_course_id: prerequisiteCourseId ?? null,
-                          prerequisite_course_code: prerequisiteCourseCode ?? null,
-                          prerequisite_course_title: prerequisiteCourseTitle ?? null,
-                          units: row.units,
-                          section: row.section,
-                          session: row.session,
-                          type: row.type,
-                          registered: row.registered,
-                          time: row.time,
-                          days: row.days,
-                          instructor: row.instructor,
-                          location: row.location,
-                        })
+                        if (row.sourceSection == null) return
+                        addToCourseBin(
+                          courseSearchSectionToCourseBinItem(row.sourceSection, course),
+                        )
                       }}
                     >
                       {t('addToCourseBin')}
@@ -299,7 +309,23 @@ function CourseSectionScheduleTable({
 function isCourseSectionDetailRow(v: unknown): v is CourseSectionDetail {
   if (v === null || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
-  return typeof o.id === 'number' && typeof o.section_code === 'string'
+  const scheduleTrack = o.schedule_track ?? o.scheduleTrack
+  if (
+    scheduleTrack !== undefined &&
+    scheduleTrack !== 'EN' &&
+    scheduleTrack !== 'CN'
+  ) {
+    return false
+  }
+  const isOptionalNullableString = (value: unknown): boolean =>
+    value === undefined || value === null || typeof value === 'string'
+  return (
+    typeof o.id === 'number' &&
+    typeof o.section_code === 'string' &&
+    isOptionalNullableString(o.prerequisite_course_id ?? o.prerequisiteCourseId) &&
+    isOptionalNullableString(o.prerequisite_course_code ?? o.prerequisiteCourseCode) &&
+    isOptionalNullableString(o.prerequisite_course_title ?? o.prerequisiteCourseTitle)
+  )
 }
 
 /**
@@ -328,7 +354,6 @@ export function CourseSearchPage() {
   const registrationTermId = useRegistrationTermSearchParam()
   const { addToCourseBin } = useCourseBin()
   const [courses, setCourses] = useState<CourseCatalogItem[]>([])
-  const [openRegistrationCourses, setOpenRegistrationCourses] = useState<OpenRegistrationCourseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -381,45 +406,6 @@ export function CourseSearchPage() {
       cancelled = true
     }
   }, [t])
-
-  useEffect(() => {
-    const termId = registrationTermId?.trim() ?? ''
-    if (termId === '') {
-      setOpenRegistrationCourses([])
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      try {
-        const rows = await fetchAdminCoursesOpenForRegistration({ termId })
-        if (!cancelled) {
-          setOpenRegistrationCourses(rows)
-        }
-      } catch (e) {
-        if (cancelled) return
-        console.error('[course-search] open-registration course load failed', e)
-        setOpenRegistrationCourses([])
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [registrationTermId])
-
-  const prerequisiteByCode = useMemo(() => {
-    const map = new Map<
-      string,
-      Pick<
-        OpenRegistrationCourseRow,
-        'prerequisiteCourseId' | 'prerequisiteCourseCode' | 'prerequisiteCourseTitle'
-      >
-    >()
-    for (const row of openRegistrationCourses) {
-      const code = cellText(row.courseCode)
-      if (code !== '') map.set(code.toUpperCase(), row)
-    }
-    return map
-  }, [openRegistrationCourses])
 
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -679,7 +665,6 @@ export function CourseSearchPage() {
                                 const rowKey = `${group.prefixKey}-${code || 'row'}-${i}`
                                 const panelId = `course-sections-${rowKey}`
                                 const courseOpen = expandedCourseCodes.has(code)
-                                const prerequisite = prerequisiteByCode.get(code.toUpperCase())
                                 const sectionRows = sectionsByCode[code]
                                 const sectionLoad = sectionsLoading[code] === true
                                 const sectionErr = sectionsError[code]
@@ -721,9 +706,6 @@ export function CourseSearchPage() {
                                             phase={phase}
                                             sectionRows={sectionRows}
                                             course={c}
-                                            prerequisiteCourseId={prerequisite?.prerequisiteCourseId ?? null}
-                                            prerequisiteCourseCode={prerequisite?.prerequisiteCourseCode ?? null}
-                                            prerequisiteCourseTitle={prerequisite?.prerequisiteCourseTitle ?? null}
                                             sectionLoad={sectionLoad}
                                             sectionErr={sectionErr}
                                             addToCourseBin={addToCourseBin}
