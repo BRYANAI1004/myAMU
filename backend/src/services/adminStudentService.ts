@@ -22,6 +22,7 @@ import type {
   AdminStudentCreateBody,
   AdminStudentDetail,
   AdminStudentListItem,
+  AdminStudentRosterProgramFilter,
   AdminStudentUpdateBody,
 } from "../types/adminStudent.js";
 import type { ClinicalProgress } from "../types/studentAccount.js";
@@ -152,16 +153,19 @@ export async function listAdminStudentsPage(options: {
   page: number;
   pageSize: number;
   search: string;
+  program: AdminStudentRosterProgramFilter;
   includeClinicalSummary?: boolean;
 }): Promise<AdminStudentListPageResult> {
   const page = Math.max(1, Math.trunc(options.page));
   const pageSize = Math.max(1, Math.trunc(options.pageSize));
   const search = options.search.trim();
+  const program = options.program;
   const offset = (page - 1) * pageSize;
 
-  const total = await countLegacyAdminStudentListRows(pool, { search });
+  const total = await countLegacyAdminStudentListRows(pool, { search, program });
   const rows = await listLegacyAdminStudentListRowsPage(pool, {
     search,
+    program,
     limit: pageSize,
     offset,
   });

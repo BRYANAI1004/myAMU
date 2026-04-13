@@ -545,6 +545,8 @@ export async function fetchAdminStudents(options?: {
   pageSize?: number
   /** Server-side filter (student id, name, email, program). */
   search?: string
+  /** Temporary admin roster program filter. */
+  program?: 'all' | 'DAHM' | 'MAHM'
   /** When true, each row may include `clinicalProgressSummary` (same source as admin detail). */
   clinicalSummary?: boolean
 }): Promise<AdminStudentListPageResponse> {
@@ -556,6 +558,12 @@ export async function fetchAdminStudents(options?: {
   const search = (options?.search ?? '').trim()
   if (search !== '') {
     params.set('search', search.slice(0, 200))
+  }
+  const program = options?.program ?? 'all'
+  if (program === 'DAHM') {
+    params.set('program', 'dahm')
+  } else if (program === 'MAHM') {
+    params.set('program', 'mahm')
   }
   if (options?.clinicalSummary) {
     params.set('clinicalSummary', '1')

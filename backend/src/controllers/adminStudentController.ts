@@ -9,6 +9,7 @@ import {
 } from "../services/adminStudentService.js";
 import type {
   AdminStudentCreateBody,
+  AdminStudentRosterProgramFilter,
   AdminStudentUpdateBody,
 } from "../types/adminStudent.js";
 
@@ -125,6 +126,21 @@ function parsePositiveIntParam(
   return truncated;
 }
 
+function parseAdminStudentProgramParam(
+  raw: unknown,
+): AdminStudentRosterProgramFilter {
+  if (typeof raw !== "string") return "all";
+  switch (raw.trim().toLowerCase()) {
+    case "dahm":
+      return "dahm";
+    case "mahm":
+      return "mahm";
+    case "all":
+    default:
+      return "all";
+  }
+}
+
 export async function getAdminStudents(
   req: Request,
   res: Response,
@@ -147,11 +163,13 @@ export async function getAdminStudents(
       typeof searchRaw === "string"
         ? searchRaw.trim().slice(0, 200)
         : "";
+    const program = parseAdminStudentProgramParam(req.query.program);
 
     const result = await listAdminStudentsPage({
       page,
       pageSize,
       search,
+      program,
       includeClinicalSummary,
     });
     res.json({

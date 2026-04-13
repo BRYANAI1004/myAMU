@@ -416,28 +416,62 @@ function escapeMysqlLikePattern(fragment: string): string {
     .replace(/_/g, "\\_");
 }
 
-function buildAdminStudentListSearch(
-  searchTrimmed: string,
-): { clause: string; params: string[] } {
-  if (searchTrimmed === "") {
-    return { clause: "", params: [] };
-  }
-  const like = `%${escapeMysqlLikePattern(searchTrimmed.toLowerCase())}%`;
-  return {
-    clause: ` WHERE (
-       LOWER(TRIM(s.id)) LIKE ? ESCAPE '\\\\'
-       OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '\\\\'
-       OR LOWER(COALESCE(s.email, '')) LIKE ? ESCAPE '\\\\'
-       OR LOWER(TRIM(CAST(IFNULL(s.requirements_id, '') AS CHAR))) LIKE ? ESCAPE '\\\\'
-     )`,
-    params: [like, like, like, like],
-  };
-}
-
 export type LegacyAdminStudentListQuery = {
   /** Trimmed search string; matches student id, name, email, and program (`requirements_id`) case-insensitively. */
   search: string;
+  /** Temporary admin roster program filter: DAHM = exists in legacy `daim_students_info`; MAHM = not in that set. */
+  program: "all" | "dahm" | "mahm";
 };
+
+function buildAdminStudentProgramClause(
+  program: LegacyAdminStudentListQuery["program"],
+): string {
+  switch (program) {
+    case "dahm":
+      return `EXISTS (
+        SELECT 1
+        FROM daim_students_info dsi
+        WHERE TRIM(dsi.student_id) = TRIM(s.id)
+      )`;
+    case "mahm":
+      return `NOT EXISTS (
+        SELECT 1
+        FROM daim_students_info dsi
+        WHERE TRIM(dsi.student_id) = TRIM(s.id)
+      )`;
+    default:
+      return "";
+  }
+}
+
+function buildAdminStudentListFilters(
+  query: LegacyAdminStudentListQuery,
+): { clause: string; params: string[] } {
+  const clauses: string[] = [];
+  const params: string[] = [];
+  const searchTrimmed = query.search.trim();
+  if (searchTrimmed !== "") {
+    const like = `%${escapeMysqlLikePattern(searchTrimmed.toLowerCase())}%`;
+    clauses.push(`(
+      LOWER(TRIM(s.id)) LIKE ? ESCAPE '\\\\'
+      OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '\\\\'
+      OR LOWER(COALESCE(s.email, '')) LIKE ? ESCAPE '\\\\'
+      OR LOWER(TRIM(CAST(IFNULL(s.requirements_id, '') AS CHAR))) LIKE ? ESCAPE '\\\\'
+    )`);
+    params.push(like, like, like, like);
+  }
+  const programClause = buildAdminStudentProgramClause(query.program);
+  if (programClause !== "") {
+    clauses.push(programClause);
+  }
+  if (clauses.length === 0) {
+    return { clause: "", params };
+  }
+  return {
+    clause: ` WHERE ${clauses.join("\n AND ")}`,
+    params,
+  };
+}
 
 /**
  * Count of students matching the admin roster search (before pagination).
@@ -446,7 +480,7 @@ export async function countLegacyAdminStudentListRows(
   pool: Pool,
   query: LegacyAdminStudentListQuery,
 ): Promise<number> {
-  const { clause, params } = buildAdminStudentListSearch(query.search.trim());
+  const { clause, params } = buildAdminStudentListFilters(query);
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT COUNT(*) AS cnt
      FROM students s
@@ -473,7 +507,7 @@ export async function listLegacyAdminStudentListRowsPage(
   pool: Pool,
   query: LegacyAdminStudentListPageQuery,
 ): Promise<LegacyAdminStudentListRow[]> {
-  const { clause, params } = buildAdminStudentListSearch(query.search.trim());
+  const { clause, params } = buildAdminStudentListFilters(query);
   const limit = Math.max(0, Math.trunc(query.limit));
   const offset = Math.max(0, Math.trunc(query.offset));
   const [rows] = await pool.query<LegacyAdminStudentListRow[]>(

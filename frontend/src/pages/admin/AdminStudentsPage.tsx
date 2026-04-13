@@ -8,6 +8,7 @@ import {
 
 const PAGE_SIZE = 25
 const SEARCH_DEBOUNCE_MS = 300
+type AdminStudentsProgramFilter = 'all' | 'DAHM' | 'MAHM'
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -36,6 +37,7 @@ function formatTableDate(iso: string | null): string {
 
 export function AdminStudentsPage() {
   const [q, setQ] = useState('')
+  const [program, setProgram] = useState<AdminStudentsProgramFilter>('all')
   const debouncedSearch = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS)
   const [page, setPage] = useState(1)
   const [rows, setRows] = useState<AdminStudentListItem[] | null>(null)
@@ -70,6 +72,7 @@ export function AdminStudentsPage() {
           page,
           pageSize: PAGE_SIZE,
           search: debouncedSearch,
+          program,
         })
         if (ac.signal.aborted) return
         setRows(res.items)
@@ -89,7 +92,7 @@ export function AdminStudentsPage() {
       }
     })()
     return () => ac.abort()
-  }, [page, debouncedSearch, reloadKey])
+  }, [page, debouncedSearch, program, reloadKey])
 
   const items = rows ?? []
 
@@ -206,6 +209,20 @@ export function AdminStudentsPage() {
             aria-label="Search students"
             disabled={sectionLoading || Boolean(error)}
           />
+          <select
+            className="admin-input"
+            value={program}
+            onChange={(e) => {
+              setProgram(e.target.value as AdminStudentsProgramFilter)
+              setPage(1)
+            }}
+            aria-label="Filter students by program"
+            disabled={sectionLoading || Boolean(error)}
+          >
+            <option value="all">All</option>
+            <option value="DAHM">DAHM</option>
+            <option value="MAHM">MAHM</option>
+          </select>
           <button
             type="button"
             className="portal-btn portal-btn--secondary"
@@ -313,9 +330,9 @@ export function AdminStudentsPage() {
                 {items.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="portal-card-note">
-                      {total === 0 && debouncedSearch === ''
+                      {total === 0 && debouncedSearch === '' && program === 'all'
                         ? 'No students on file.'
-                        : 'No students match your search.'}
+                        : 'No students match your filters.'}
                     </td>
                   </tr>
                 ) : (
