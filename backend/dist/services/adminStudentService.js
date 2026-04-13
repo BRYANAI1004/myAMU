@@ -1,5 +1,5 @@
 import { pool } from "../lib/db.js";
-import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, countLegacyAdminStudentListRows, listLegacyAdminStudentEnrollmentFacetRows, listLegacyAdminStudentListRows, listLegacyAdminStudentListRowsPage, listLegacyAdminStudentListRowsByStudentIds, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
+import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyStudentLoaRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, countLegacyAdminStudentListRows, listLegacyAdminStudentEnrollmentFacetRows, listLegacyAdminStudentListRows, listLegacyAdminStudentListRowsPage, listLegacyAdminStudentListRowsByStudentIds, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
 import { combineAddressLine, legacyDbDateToIso, resolveEnrollmentDate, } from "./studentProfileService.js";
 import { batchBuildClinicalProgressForStudentIds, buildClinicalProgress, } from "./clinicalProgressService.js";
 import { getAdminStudentIntakeLabel, parseAdminStudentEnrollmentInfo, } from "./adminStudentEnrollmentMetadata.js";
@@ -52,6 +52,52 @@ function entryYearFromResolved(iso) {
         return null;
     const y = Number.parseInt(iso.slice(0, 4), 10);
     return Number.isFinite(y) ? y : null;
+}
+function normalizedQuarter(raw) {
+    const quarter = str(raw);
+    if (quarter === "")
+        return null;
+    const lowered = quarter.toLowerCase();
+    switch (lowered) {
+        case "winter":
+            return "Winter";
+        case "spring":
+            return "Spring";
+        case "summer":
+            return "Summer";
+        case "fall":
+            return "Fall";
+        default:
+            return null;
+    }
+}
+function normalizedYear(raw) {
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+function formatLoaTerm(quarterRaw, yearRaw) {
+    const quarter = normalizedQuarter(quarterRaw);
+    const year = normalizedYear(yearRaw);
+    if (quarter == null || year == null)
+        return null;
+    return `${quarter} ${year}`;
+}
+async function buildAdminStudentLoaSummary(studentId) {
+    const latestLoa = await findLatestLegacyStudentLoaRow(pool, studentId);
+    if (!latestLoa) {
+        return {
+            hasLoa: false,
+            loaTerm: null,
+            plannedReturnTerm: null,
+            reason: null,
+        };
+    }
+    return {
+        hasLoa: true,
+        loaTerm: formatLoaTerm(latestLoa.absentQuarter, latestLoa.absentYear),
+        plannedReturnTerm: formatLoaTerm(latestLoa.returnQuarter, latestLoa.returnYear),
+        reason: latestLoa.reason,
+    };
 }
 function clinicalProgressToListSummary(cp) {
     const missing = cp.missing;
@@ -220,17 +266,6 @@ const ADMIN_STUDENTS_CSV_HEADERS = [
     "Signed Date",
     "Latest Registration Term",
 ];
-const ADMIN_NEW_ENROLLMENT_CSV_HEADERS = [
-    "Student ID",
-    "Name",
-    "Track",
-    "Entry Year",
-    "Intake",
-    "Program",
-    "Email",
-    "Status",
-    "Enroll Start Date",
-];
 export async function buildAdminStudentsCsv(input) {
     const rows = input.mode === "selected"
         ? await listLegacyAdminStudentListRowsByStudentIds(pool, input.studentIds)
@@ -243,34 +278,20 @@ export async function buildAdminStudentsCsv(input) {
         });
     const items = rows.map((row) => mapRowToListItem(row));
     const lines = [
-        (input.view === "new-enrollment"
-            ? ADMIN_NEW_ENROLLMENT_CSV_HEADERS
-            : ADMIN_STUDENTS_CSV_HEADERS)
+        ADMIN_STUDENTS_CSV_HEADERS
             .map((header) => csvEscapeCell(header))
             .join(","),
     ];
     for (const item of items) {
-        const values = input.view === "new-enrollment"
-            ? [
-                item.studentId,
-                item.name,
-                csvCell(item.trackLabel),
-                item.entryYear == null ? "" : String(item.entryYear),
-                csvCell(item.intakeLabel),
-                item.program,
-                csvCell(item.email),
-                csvCell(item.status),
-                formatCsvDate(item.enrollStartDate),
-            ]
-            : [
-                item.studentId,
-                item.name,
-                item.division,
-                csvCell(item.email),
-                item.program,
-                formatCsvDate(item.signedDate),
-                csvCell(item.latestRegistrationTerm),
-            ];
+        const values = [
+            item.studentId,
+            item.name,
+            item.division,
+            csvCell(item.email),
+            item.program,
+            formatCsvDate(item.signedDate),
+            csvCell(item.latestRegistrationTerm),
+        ];
         lines.push(values.map(csvEscapeCell).join(","));
     }
     const timestamp = buildAdminStudentsExportTimestamp();
@@ -288,7 +309,7 @@ export async function buildAdminStudentsCsv(input) {
         rowCount: items.length,
     };
 }
-function mapProfileRowToAdminDetail(row, latestRegistrationTerm) {
+function mapProfileRowToAdminDetail(row, latestRegistrationTerm, loaSummary) {
     const studentId = str(row.id);
     const nameRaw = str(row.name);
     const name = nameRaw.length > 0 ? nameRaw : studentId;
@@ -330,6 +351,7 @@ function mapProfileRowToAdminDetail(row, latestRegistrationTerm) {
         state,
         zip: zipStr,
         latestRegistrationTerm,
+        loaSummary,
     };
 }
 export async function getAdminStudentDetail(studentIdRaw) {
@@ -339,11 +361,14 @@ export async function getAdminStudentDetail(studentIdRaw) {
     const row = await loadLegacyStudentProfileRow(pool, studentId);
     if (!row)
         return null;
-    const latest = await findLatestLegacyTermYear(pool, studentId);
+    const [latest, loaSummary] = await Promise.all([
+        findLatestLegacyTermYear(pool, studentId),
+        buildAdminStudentLoaSummary(studentId),
+    ]);
     const latestRegistrationTerm = latest
         ? formatLatestRegistrationTerm(latest.term, latest.year)
         : null;
-    const base = mapProfileRowToAdminDetail(row, latestRegistrationTerm);
+    const base = mapProfileRowToAdminDetail(row, latestRegistrationTerm, loaSummary);
     try {
         const clinicalProgress = await buildClinicalProgress(pool, studentId);
         return { ...base, clinicalProgress };

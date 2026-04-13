@@ -259,6 +259,13 @@ export type AdminStudentClinicalProgressSummary = {
   missingSummary: string | null
 }
 
+export type AdminStudentLoaSummary = {
+  hasLoa: boolean
+  loaTerm: string | null
+  plannedReturnTerm: string | null
+  reason: string | null
+}
+
 /** GET/PUT /api/admin/students/:studentId — admin student detail. */
 export type AdminStudentDetail = {
   studentId: string
@@ -279,6 +286,7 @@ export type AdminStudentDetail = {
   state: string | null
   zip: string | null
   latestRegistrationTerm: string | null
+  loaSummary: AdminStudentLoaSummary
   clinicalProgress?: ClinicalProgress
   /** When present, drives quarter-based registration history on the admin detail page. */
   registrationHistory?: AdminStudentRegistrationHistoryTerm[]
@@ -474,6 +482,26 @@ function parseOptionalClinicalProgress(
   }
 }
 
+function parseAdminStudentLoaSummary(v: unknown): AdminStudentLoaSummary {
+  if (v == null || typeof v !== 'object') {
+    return {
+      hasLoa: false,
+      loaTerm: null,
+      plannedReturnTerm: null,
+      reason: null,
+    }
+  }
+  const raw = v as Record<string, unknown>
+  return {
+    hasLoa: raw.hasLoa === true,
+    loaTerm: parseNullableString(raw.loaTerm ?? raw.loa_term),
+    plannedReturnTerm: parseNullableString(
+      raw.plannedReturnTerm ?? raw.planned_return_term,
+    ),
+    reason: parseNullableString(raw.reason),
+  }
+}
+
 function parseOptionalRegistrationHistory(
   v: unknown,
 ): AdminStudentRegistrationHistoryTerm[] | undefined {
@@ -547,6 +575,9 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
   const clinicalProgress = parseOptionalClinicalProgress(
     o.clinicalProgress ?? o.clinical_progress,
   )
+  const loaSummary = parseAdminStudentLoaSummary(
+    o.loaSummary ?? o.loa_summary,
+  )
   return {
     studentId: o.studentId,
     division: parseAdminDivision(o.division),
@@ -566,6 +597,7 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
     state: parseNullableString(o.state),
     zip: parseNullableString(o.zip),
     latestRegistrationTerm: parseNullableString(o.latestRegistrationTerm),
+    loaSummary,
     ...(clinicalProgress != null ? { clinicalProgress } : {}),
     ...(registrationHistory != null ? { registrationHistory } : {}),
   }

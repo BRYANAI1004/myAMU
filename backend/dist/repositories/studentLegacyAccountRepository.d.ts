@@ -78,6 +78,22 @@ export type LegacyStudentProfileRow = RowDataPacket;
  * Load one legacy `students` row by primary key `id` (e.g. C17310).
  */
 export declare function loadLegacyStudentProfileRow(pool: Pool, studentId: string): Promise<LegacyStudentProfileRow | null>;
+export type LegacyStudentLoaRow = {
+    studentId: string;
+    absentQuarter: string | null;
+    absentYear: number | null;
+    returnQuarter: string | null;
+    returnYear: number | null;
+    reason: string | null;
+    hasStuReturned: string | null;
+    actualReturn: string | null;
+    seqNumber: number | null;
+};
+/**
+ * Latest LOA row for one student from legacy `loa`, matched by trimmed `student_id`.
+ * Ordering: absent_year DESC, quarter DESC (Fall > Summer > Spring > Winter), seqNumber DESC.
+ */
+export declare function findLatestLegacyStudentLoaRow(pool: Pool, studentId: string): Promise<LegacyStudentLoaRow | null>;
 /** Columns aligned with admin student profile (`getAdminStudentDetail` / `students` table). */
 export type LegacyStudentProfileExportRow = {
     id: string;

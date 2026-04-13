@@ -47,6 +47,12 @@ export type AdminStudentEnrollmentFilterOptions = {
         label: string;
     }>;
 };
+export type AdminStudentLoaSummary = {
+    hasLoa: boolean;
+    loaTerm: string | null;
+    plannedReturnTerm: string | null;
+    reason: string | null;
+};
 /**
  * GET /api/admin/students — paginated roster payload (`items` is one page only).
  * Query: `page`, `pageSize`, `search`, optional `clinicalSummary`.
@@ -78,6 +84,7 @@ export type AdminStudentDetail = {
     state: string | null;
     zip: string | null;
     latestRegistrationTerm: string | null;
+    loaSummary: AdminStudentLoaSummary;
     /** Same shape as student account `clinicalProgress` (legacy clinic + requirements). */
     clinicalProgress?: ClinicalProgress;
 };

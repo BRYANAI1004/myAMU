@@ -541,6 +541,24 @@ export function AdminStudentDetailPage() {
                     <dd>{dashText(detail.latestRegistrationTerm)}</dd>
                   </div>
                   <div className="portal-row">
+                    <dt>LOA Status</dt>
+                    <dd>{detail.loaSummary.hasLoa ? 'Yes' : 'No'}</dd>
+                  </div>
+                  <div className="portal-row">
+                    <dt>LOA Term</dt>
+                    <dd>{dashText(detail.loaSummary.loaTerm)}</dd>
+                  </div>
+                  <div className="portal-row">
+                    <dt>Planned Return Term</dt>
+                    <dd>{dashText(detail.loaSummary.plannedReturnTerm)}</dd>
+                  </div>
+                  {detail.loaSummary.reason ? (
+                    <div className="portal-row">
+                      <dt>LOA Reason</dt>
+                      <dd>{dashText(detail.loaSummary.reason)}</dd>
+                    </div>
+                  ) : null}
+                  <div className="portal-row">
                     <dt>Signed date</dt>
                     <dd>{formatUsMdY(detail.signedDate)}</dd>
                   </div>

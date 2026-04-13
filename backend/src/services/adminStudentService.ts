@@ -4,6 +4,7 @@ import {
   createLegacyStudentPasswordRow,
   deleteLegacyStudentMasterRow,
   deleteLegacyStudentPasswordRow,
+  findLatestLegacyStudentLoaRow,
   findLatestLegacyTermYear,
   getNextLegacyStudentId,
   hasLegacyStudentAccounting,
@@ -26,6 +27,7 @@ import type {
   AdminStudentDetail,
   AdminStudentEnrollmentFilterOptions,
   AdminStudentListItem,
+  AdminStudentLoaSummary,
   AdminStudentRosterProgramFilter,
   AdminStudentRosterTrackFilter,
   AdminStudentUpdateBody,
@@ -102,6 +104,59 @@ function entryYearFromResolved(iso: string | null): number | null {
   if (iso == null || iso.length < 4) return null;
   const y = Number.parseInt(iso.slice(0, 4), 10);
   return Number.isFinite(y) ? y : null;
+}
+
+function normalizedQuarter(raw: unknown): string | null {
+  const quarter = str(raw);
+  if (quarter === "") return null;
+  const lowered = quarter.toLowerCase();
+  switch (lowered) {
+    case "winter":
+      return "Winter";
+    case "spring":
+      return "Spring";
+    case "summer":
+      return "Summer";
+    case "fall":
+      return "Fall";
+    default:
+      return null;
+  }
+}
+
+function normalizedYear(raw: unknown): number | null {
+  const n = Number(raw);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function formatLoaTerm(quarterRaw: unknown, yearRaw: unknown): string | null {
+  const quarter = normalizedQuarter(quarterRaw);
+  const year = normalizedYear(yearRaw);
+  if (quarter == null || year == null) return null;
+  return `${quarter} ${year}`;
+}
+
+async function buildAdminStudentLoaSummary(
+  studentId: string,
+): Promise<AdminStudentLoaSummary> {
+  const latestLoa = await findLatestLegacyStudentLoaRow(pool, studentId);
+  if (!latestLoa) {
+    return {
+      hasLoa: false,
+      loaTerm: null,
+      plannedReturnTerm: null,
+      reason: null,
+    };
+  }
+  return {
+    hasLoa: true,
+    loaTerm: formatLoaTerm(latestLoa.absentQuarter, latestLoa.absentYear),
+    plannedReturnTerm: formatLoaTerm(
+      latestLoa.returnQuarter,
+      latestLoa.returnYear,
+    ),
+    reason: latestLoa.reason,
+  };
 }
 
 function clinicalProgressToListSummary(
@@ -403,6 +458,7 @@ export async function buildAdminStudentsCsv(
 function mapProfileRowToAdminDetail(
   row: Record<string, unknown>,
   latestRegistrationTerm: string | null,
+  loaSummary: AdminStudentLoaSummary,
 ): AdminStudentDetail {
   const studentId = str(row.id);
   const nameRaw = str(row.name);
@@ -449,6 +505,7 @@ function mapProfileRowToAdminDetail(
     state,
     zip: zipStr,
     latestRegistrationTerm,
+    loaSummary,
   };
 }
 
@@ -459,13 +516,17 @@ export async function getAdminStudentDetail(
   if (studentId === "") return null;
   const row = await loadLegacyStudentProfileRow(pool, studentId);
   if (!row) return null;
-  const latest = await findLatestLegacyTermYear(pool, studentId);
+  const [latest, loaSummary] = await Promise.all([
+    findLatestLegacyTermYear(pool, studentId),
+    buildAdminStudentLoaSummary(studentId),
+  ]);
   const latestRegistrationTerm = latest
     ? formatLatestRegistrationTerm(latest.term, latest.year)
     : null;
   const base = mapProfileRowToAdminDetail(
     row as Record<string, unknown>,
     latestRegistrationTerm,
+    loaSummary,
   );
   try {
     const clinicalProgress = await buildClinicalProgress(pool, studentId);

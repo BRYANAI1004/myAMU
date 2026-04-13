@@ -50,6 +50,16 @@ function normalizeTerm(raw: unknown): string {
   return String(raw ?? "").trim();
 }
 
+function legacyQuarterOrderSql(termSql: string): string {
+  return `CASE UPPER(TRIM(${termSql}))
+    WHEN 'FALL' THEN 4
+    WHEN 'SUMMER' THEN 3
+    WHEN 'SPRING' THEN 2
+    WHEN 'WINTER' THEN 1
+    ELSE 0
+  END`;
+}
+
 /**
  * Latest term/year from legacy registration for this student.
  * Order: highest year first, then Fall > Summer > Spring > Winter within the year.
@@ -63,13 +73,7 @@ export async function findLatestLegacyTermYear(
      FROM registration
      WHERE id = ?
      ORDER BY year DESC,
-       CASE UPPER(TRIM(term))
-         WHEN 'FALL' THEN 4
-         WHEN 'SUMMER' THEN 3
-         WHEN 'SPRING' THEN 2
-         WHEN 'WINTER' THEN 1
-         ELSE 0
-       END DESC
+      ${legacyQuarterOrderSql("term")} DESC
      LIMIT 1`,
     [studentId],
   );
@@ -95,13 +99,7 @@ export async function listLegacyRegistrationTermsForStudent(
      FROM registration
      WHERE id = ?
      ORDER BY year DESC,
-       CASE UPPER(TRIM(term))
-         WHEN 'FALL' THEN 4
-         WHEN 'SUMMER' THEN 3
-         WHEN 'SPRING' THEN 2
-         WHEN 'WINTER' THEN 1
-         ELSE 0
-       END DESC`,
+      ${legacyQuarterOrderSql("term")} DESC`,
     [studentId],
   );
   return rows.map((r) => ({
@@ -248,6 +246,71 @@ export async function loadLegacyStudentProfileRow(
     return null;
   }
   return rows[0]!;
+}
+
+export type LegacyStudentLoaRow = {
+  studentId: string;
+  absentQuarter: string | null;
+  absentYear: number | null;
+  returnQuarter: string | null;
+  returnYear: number | null;
+  reason: string | null;
+  hasStuReturned: string | null;
+  actualReturn: string | null;
+  seqNumber: number | null;
+};
+
+function parseLegacyNullableInt(v: unknown): number | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (s === "") return null;
+  const n = Number.parseInt(s, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Latest LOA row for one student from legacy `loa`, matched by trimmed `student_id`.
+ * Ordering: absent_year DESC, quarter DESC (Fall > Summer > Spring > Winter), seqNumber DESC.
+ */
+export async function findLatestLegacyStudentLoaRow(
+  pool: Pool,
+  studentId: string,
+): Promise<LegacyStudentLoaRow | null> {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+       TRIM(student_id) AS student_id,
+       TRIM(absent_quarter) AS absent_quarter,
+       absent_year,
+       TRIM(return_quarter) AS return_quarter,
+       return_year,
+       TRIM(reasons) AS reasons,
+       HasStuReturned,
+       actual_return,
+       seqNumber
+     FROM loa
+     WHERE TRIM(student_id) = ?
+     ORDER BY
+       CAST(NULLIF(TRIM(absent_year), '') AS SIGNED) DESC,
+       ${legacyQuarterOrderSql("absent_quarter")} DESC,
+       CAST(COALESCE(seqNumber, 0) AS SIGNED) DESC
+     LIMIT 1`,
+    [studentId.trim()],
+  );
+  if (rows.length === 0) {
+    return null;
+  }
+  const row = rows[0]!;
+  return {
+    studentId: normalizeTerm(row.student_id),
+    absentQuarter: strCell(row.absent_quarter),
+    absentYear: parseLegacyNullableInt(row.absent_year),
+    returnQuarter: strCell(row.return_quarter),
+    returnYear: parseLegacyNullableInt(row.return_year),
+    reason: strCell(row.reasons),
+    hasStuReturned: strCell(row.HasStuReturned),
+    actualReturn: strCell(row.actual_return),
+    seqNumber: parseLegacyNullableInt(row.seqNumber),
+  };
 }
 
 /** Columns aligned with admin student profile (`getAdminStudentDetail` / `students` table). */
@@ -400,13 +463,7 @@ const ADMIN_STUDENT_LIST_LATEST_REG_JOIN = `LEFT JOIN (
          ROW_NUMBER() OVER (
            PARTITION BY id
            ORDER BY year DESC,
-             CASE UPPER(TRIM(term))
-               WHEN 'FALL' THEN 4
-               WHEN 'SUMMER' THEN 3
-               WHEN 'SPRING' THEN 2
-               WHEN 'WINTER' THEN 1
-               ELSE 0
-             END DESC
+            ${legacyQuarterOrderSql("term")} DESC
          ) AS rn
        FROM registration
      ) lr ON lr.id = s.id AND lr.rn = 1`;
