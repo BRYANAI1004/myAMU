@@ -4,12 +4,20 @@ import {
   deleteSelectedAdminStudents,
   downloadAdminStudentsCsv,
   fetchAdminStudents,
-  type AdminStudentsProgramFilter,
+  type AdminStudentEnrollmentFilterOptions,
   type AdminStudentListItem,
+  type AdminStudentsListView,
+  type AdminStudentsProgramFilter,
+  type AdminStudentsTrackFilter,
 } from '../../lib/api'
 
 const PAGE_SIZE = 25
 const SEARCH_DEBOUNCE_MS = 300
+
+const EMPTY_ENROLLMENT_FILTER_OPTIONS: AdminStudentEnrollmentFilterOptions = {
+  years: [],
+  intakes: [],
+}
 
 function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debounced, setDebounced] = useState(value)
@@ -25,6 +33,10 @@ function displayCell(value: string | null): string {
   return value
 }
 
+function formatOptionalNumber(value: number | null): string {
+  return value == null ? '—' : String(value)
+}
+
 /** Display ISO `YYYY-MM-DD` as MM/DD/YYYY for table cells. */
 function formatTableDate(iso: string | null): string {
   if (iso == null || iso.trim() === '') return '—'
@@ -37,8 +49,12 @@ function formatTableDate(iso: string | null): string {
 }
 
 export function AdminStudentsPage() {
+  const [view, setView] = useState<AdminStudentsListView>('roster')
   const [q, setQ] = useState('')
   const [program, setProgram] = useState<AdminStudentsProgramFilter>('all')
+  const [track, setTrack] = useState<AdminStudentsTrackFilter>('all')
+  const [entryYear, setEntryYear] = useState('')
+  const [intakeCode, setIntakeCode] = useState('')
   const debouncedSearch = useDebouncedValue(q.trim(), SEARCH_DEBOUNCE_MS)
   const [page, setPage] = useState(1)
   const [rows, setRows] = useState<AdminStudentListItem[] | null>(null)
@@ -51,6 +67,15 @@ export function AdminStudentsPage() {
   const [deleting, setDeleting] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [enrollmentFilterOptions, setEnrollmentFilterOptions] =
+    useState<AdminStudentEnrollmentFilterOptions>(
+      EMPTY_ENROLLMENT_FILTER_OPTIONS,
+    )
+
+  const isEnrollmentView = view === 'new-enrollment'
+  const activeTrack = isEnrollmentView ? track : 'all'
+  const activeEntryYear = isEnrollmentView ? entryYear : ''
+  const activeIntakeCode = isEnrollmentView ? intakeCode : ''
 
   const debouncedSearchPrev = useRef<string | null>(null)
   useEffect(() => {
@@ -76,18 +101,21 @@ export function AdminStudentsPage() {
           pageSize: PAGE_SIZE,
           search: debouncedSearch,
           program,
+          track: activeTrack,
+          entryYear: activeEntryYear,
+          intakeCode: activeIntakeCode,
         })
         if (ac.signal.aborted) return
         setRows(res.items)
         setTotal(res.total)
+        setEnrollmentFilterOptions(res.enrollmentFilterOptions)
         setError(null)
       } catch (e) {
         if (ac.signal.aborted) return
         setRows(null)
         setTotal(0)
-        setError(
-          e instanceof Error ? e.message : 'Could not load students.',
-        )
+        setEnrollmentFilterOptions(EMPTY_ENROLLMENT_FILTER_OPTIONS)
+        setError(e instanceof Error ? e.message : 'Could not load students.')
       } finally {
         if (!ac.signal.aborted) {
           setLoading(false)
@@ -95,7 +123,15 @@ export function AdminStudentsPage() {
       }
     })()
     return () => ac.abort()
-  }, [page, debouncedSearch, program, reloadKey])
+  }, [
+    page,
+    debouncedSearch,
+    program,
+    activeTrack,
+    activeEntryYear,
+    activeIntakeCode,
+    reloadKey,
+  ])
 
   const items = rows ?? []
 
@@ -126,15 +162,19 @@ export function AdminStudentsPage() {
   }, [selectedIds, visibleIdSet])
 
   const allVisibleSelected =
-    items.length > 0 && selectedInViewCount === items.length
+    !isEnrollmentView && items.length > 0 && selectedInViewCount === items.length
 
   const sectionLoading = loading && rows === null && error === null
 
   const canGoPrev = page > 1 && !sectionLoading && !error
-  const canGoNext =
-    !sectionLoading &&
-    !error &&
-    page * PAGE_SIZE < total
+  const canGoNext = !sectionLoading && !error && page * PAGE_SIZE < total
+
+  const hasEnrollmentFilters =
+    debouncedSearch !== '' ||
+    program !== 'all' ||
+    track !== 'all' ||
+    entryYear !== '' ||
+    intakeCode !== ''
 
   function toggleRow(id: string, checked: boolean) {
     setSelectedIds((prev) => {
@@ -159,6 +199,24 @@ export function AdminStudentsPage() {
       }
       return next
     })
+  }
+
+  function resetEnrollmentFilters() {
+    setQ('')
+    setProgram('all')
+    setTrack('all')
+    setEntryYear('')
+    setIntakeCode('')
+    setPage(1)
+  }
+
+  function changeView(nextView: AdminStudentsListView) {
+    if (nextView === view) return
+    setView(nextView)
+    setPage(1)
+    setSelectedIds(new Set())
+    setDeleteSummary(null)
+    setExportError(null)
   }
 
   async function onDeleteSelected() {
@@ -199,14 +257,29 @@ export function AdminStudentsPage() {
     setExporting(true)
     setExportError(null)
     try {
-      const ids = Array.from(selectedIds)
-      if (ids.length > 0) {
-        await downloadAdminStudentsCsv({ studentIds: ids })
-      } else {
+      if (isEnrollmentView) {
         await downloadAdminStudentsCsv({
           search: debouncedSearch,
           program,
+          track,
+          entryYear,
+          intakeCode,
+          view: 'new-enrollment',
         })
+      } else {
+        const ids = Array.from(selectedIds)
+        if (ids.length > 0) {
+          await downloadAdminStudentsCsv({
+            studentIds: ids,
+            view: 'roster',
+          })
+        } else {
+          await downloadAdminStudentsCsv({
+            search: debouncedSearch,
+            program,
+            view: 'roster',
+          })
+        }
       }
     } catch (e) {
       setExportError(e instanceof Error ? e.message : 'CSV export failed.')
@@ -215,70 +288,240 @@ export function AdminStudentsPage() {
     }
   }
 
+  function onPrint() {
+    window.print()
+  }
+
   const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeEnd = Math.min(page * PAGE_SIZE, total)
+  const emptyMessage =
+    total === 0 &&
+    debouncedSearch === '' &&
+    program === 'all' &&
+    (!isEnrollmentView || (!hasEnrollmentFilters && items.length === 0))
+      ? 'No students on file.'
+      : 'No students match your filters.'
+
+  const printFilterSummary = [
+    entryYear !== '' ? `Year: ${entryYear}` : null,
+    intakeCode !== ''
+      ? `Intake: ${
+          enrollmentFilterOptions.intakes.find((option) => option.code === intakeCode)
+            ?.label ?? intakeCode
+        }`
+      : null,
+    program !== 'all' ? `Program: ${program.toUpperCase()}` : null,
+    track === 'C' ? 'Track: Chinese' : track === 'E' ? 'Track: English' : null,
+    debouncedSearch !== '' ? `Search: ${debouncedSearch}` : null,
+  ]
+    .filter((value): value is string => value != null)
+    .join(' | ')
 
   return (
-    <main className="admin-page">
+    <main
+      className={`admin-page admin-students-page${
+        isEnrollmentView ? ' admin-students-page--enrollment' : ''
+      }`}
+    >
       <div className="admin-page__toolbar">
-        <h1 className="admin-page__title admin-page__title--inline">Students</h1>
-        <div className="admin-page__toolbar-actions">
-          <input
-            type="search"
-            className="admin-input admin-input--search"
-            placeholder="Search by student ID, name, email, or program"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            aria-label="Search students"
-            disabled={sectionLoading || Boolean(error)}
-          />
-          <select
-            className="admin-input"
-            value={program}
-            onChange={(e) => {
-              setProgram(e.target.value as AdminStudentsProgramFilter)
-              setPage(1)
-            }}
-            aria-label="Filter students by program"
-            disabled={sectionLoading || Boolean(error)}
+        <div className="admin-students-page__heading">
+          <h1 className="admin-page__title admin-page__title--inline">Students</h1>
+          <div
+            className="admin-students-page__tabs portal-academics-print-hide"
+            role="tablist"
+            aria-label="Student list views"
           >
-            <option value="all">All</option>
-            <option value="dahm">DAHM</option>
-            <option value="mahm">MAHM</option>
-          </select>
-          <button
-            type="button"
-            className="portal-btn portal-btn--secondary"
-            disabled={loading || Boolean(error) || exporting}
-            onClick={() => void onExportCsv()}
-          >
-            {exporting ? 'Exporting…' : 'Export CSV'}
-          </button>
-          <button
-            type="button"
-            className="portal-btn portal-btn--secondary"
-            disabled={
-              sectionLoading ||
-              Boolean(error) ||
-              selectedIds.size === 0 ||
-              deleting
-            }
-            onClick={() => void onDeleteSelected()}
-          >
-            {deleting ? 'Deleting…' : 'Delete Selected'}
-          </button>
-          <Link
-            to="/admin/students/new"
-            className="portal-btn portal-btn--primary"
-          >
-            Add Student
-          </Link>
+            <button
+              type="button"
+              className={`admin-students-page__tab${
+                !isEnrollmentView ? ' admin-students-page__tab--active' : ''
+              }`}
+              role="tab"
+              aria-selected={!isEnrollmentView}
+              onClick={() => changeView('roster')}
+            >
+              All Students
+            </button>
+            <button
+              type="button"
+              className={`admin-students-page__tab${
+                isEnrollmentView ? ' admin-students-page__tab--active' : ''
+              }`}
+              role="tab"
+              aria-selected={isEnrollmentView}
+              onClick={() => changeView('new-enrollment')}
+            >
+              New Enrollment List
+            </button>
+          </div>
         </div>
+
+        {isEnrollmentView ? (
+          <div className="admin-page__toolbar-actions admin-page__toolbar-actions--wrap portal-academics-print-hide">
+            <select
+              className="admin-input"
+              value={entryYear}
+              onChange={(e) => {
+                setEntryYear(e.target.value)
+                setPage(1)
+              }}
+              aria-label="Filter new enrollments by year"
+              disabled={sectionLoading || Boolean(error)}
+            >
+              <option value="">All Years</option>
+              {enrollmentFilterOptions.years.map((year) => (
+                <option key={year} value={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+            <select
+              className="admin-input"
+              value={intakeCode}
+              onChange={(e) => {
+                setIntakeCode(e.target.value)
+                setPage(1)
+              }}
+              aria-label="Filter new enrollments by intake"
+              disabled={sectionLoading || Boolean(error)}
+            >
+              <option value="">All Intakes</option>
+              {enrollmentFilterOptions.intakes.map((intake) => (
+                <option key={intake.code} value={intake.code}>
+                  {intake.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="admin-input"
+              value={program}
+              onChange={(e) => {
+                setProgram(e.target.value as AdminStudentsProgramFilter)
+                setPage(1)
+              }}
+              aria-label="Filter new enrollments by program"
+              disabled={sectionLoading || Boolean(error)}
+            >
+              <option value="all">All Programs</option>
+              <option value="dahm">DAHM</option>
+              <option value="mahm">MAHM</option>
+            </select>
+            <select
+              className="admin-input"
+              value={track}
+              onChange={(e) => {
+                setTrack(e.target.value as AdminStudentsTrackFilter)
+                setPage(1)
+              }}
+              aria-label="Filter new enrollments by track"
+              disabled={sectionLoading || Boolean(error)}
+            >
+              <option value="all">All Tracks</option>
+              <option value="C">Chinese</option>
+              <option value="E">English</option>
+            </select>
+            <input
+              type="search"
+              className="admin-input admin-input--search"
+              placeholder="Search by student ID, name, email, or program"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Search new enrollments"
+              disabled={sectionLoading || Boolean(error)}
+            />
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={!hasEnrollmentFilters || loading}
+              onClick={resetEnrollmentFilters}
+            >
+              Reset Filters
+            </button>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={loading || Boolean(error) || exporting}
+              onClick={() => void onExportCsv()}
+            >
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={sectionLoading || Boolean(error) || items.length === 0}
+              onClick={onPrint}
+            >
+              Print
+            </button>
+          </div>
+        ) : (
+          <div className="admin-page__toolbar-actions portal-academics-print-hide">
+            <input
+              type="search"
+              className="admin-input admin-input--search"
+              placeholder="Search by student ID, name, email, or program"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              aria-label="Search students"
+              disabled={sectionLoading || Boolean(error)}
+            />
+            <select
+              className="admin-input"
+              value={program}
+              onChange={(e) => {
+                setProgram(e.target.value as AdminStudentsProgramFilter)
+                setPage(1)
+              }}
+              aria-label="Filter students by program"
+              disabled={sectionLoading || Boolean(error)}
+            >
+              <option value="all">All</option>
+              <option value="dahm">DAHM</option>
+              <option value="mahm">MAHM</option>
+            </select>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={loading || Boolean(error) || exporting}
+              onClick={() => void onExportCsv()}
+            >
+              {exporting ? 'Exporting…' : 'Export CSV'}
+            </button>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={
+                sectionLoading ||
+                Boolean(error) ||
+                selectedIds.size === 0 ||
+                deleting
+              }
+              onClick={() => void onDeleteSelected()}
+            >
+              {deleting ? 'Deleting…' : 'Delete Selected'}
+            </button>
+            <Link
+              to="/admin/students/new"
+              className="portal-btn portal-btn--primary"
+            >
+              Add Student
+            </Link>
+          </div>
+        )}
       </div>
+
+      {isEnrollmentView ? (
+        <section className="admin-students-page__print-header" aria-hidden="true">
+          <h2 className="admin-students-page__print-title">New Enrollment List</h2>
+          <p className="admin-students-page__print-meta">
+            {printFilterSummary === '' ? 'All current new enrollment rows' : printFilterSummary}
+          </p>
+        </section>
+      ) : null}
 
       {deleteSummary && !sectionLoading ? (
         <section
-          className="portal-card portal-profile-state"
+          className="portal-card portal-profile-state portal-academics-print-hide"
           role="status"
           aria-live="polite"
           style={{ marginBottom: '1rem' }}
@@ -302,7 +545,7 @@ export function AdminStudentsPage() {
 
       {exportError && !sectionLoading ? (
         <section
-          className="portal-card portal-profile-state portal-profile-state--error"
+          className="portal-card portal-profile-state portal-profile-state--error portal-academics-print-hide"
           role="alert"
           aria-live="assertive"
           style={{ marginBottom: '1rem' }}
@@ -318,7 +561,7 @@ export function AdminStudentsPage() {
 
       {sectionLoading ? (
         <section
-          className="portal-card portal-profile-state"
+          className="portal-card portal-profile-state portal-academics-print-hide"
           aria-busy="true"
           aria-live="polite"
         >
@@ -331,7 +574,7 @@ export function AdminStudentsPage() {
 
       {!sectionLoading && error ? (
         <section
-          className="portal-card portal-profile-state portal-profile-state--error"
+          className="portal-card portal-profile-state portal-profile-state--error portal-academics-print-hide"
           role="alert"
           aria-live="assertive"
         >
@@ -355,47 +598,63 @@ export function AdminStudentsPage() {
             <table className="portal-table portal-data-table admin-students-table--center">
               <thead>
                 <tr>
-                  <th scope="col" className="admin-students-table__select">
-                    <input
-                      type="checkbox"
-                      aria-label="Select all visible students"
-                      checked={allVisibleSelected}
-                      onChange={(e) => toggleSelectAllVisible(e.target.checked)}
-                      disabled={items.length === 0 || deleting}
-                    />
-                  </th>
+                  {!isEnrollmentView ? (
+                    <th scope="col" className="admin-students-table__select portal-academics-print-hide">
+                      <input
+                        type="checkbox"
+                        aria-label="Select all visible students"
+                        checked={allVisibleSelected}
+                        onChange={(e) => toggleSelectAllVisible(e.target.checked)}
+                        disabled={items.length === 0 || deleting}
+                      />
+                    </th>
+                  ) : null}
                   <th scope="col">Student ID</th>
                   <th scope="col">Name</th>
-                  <th scope="col">Division</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Program</th>
-                  <th scope="col">Signed Date</th>
-                  <th scope="col">Latest Registration Term</th>
+                  {isEnrollmentView ? (
+                    <>
+                      <th scope="col">Track</th>
+                      <th scope="col">Entry Year</th>
+                      <th scope="col">Intake</th>
+                      <th scope="col">Program</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Enroll Start Date</th>
+                    </>
+                  ) : (
+                    <>
+                      <th scope="col">Division</th>
+                      <th scope="col">Email</th>
+                      <th scope="col">Program</th>
+                      <th scope="col">Signed Date</th>
+                      <th scope="col">Latest Registration Term</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="portal-card-note">
-                      {total === 0 && debouncedSearch === '' && program === 'all'
-                        ? 'No students on file.'
-                        : 'No students match your filters.'}
+                    <td colSpan={isEnrollmentView ? 9 : 8} className="portal-card-note">
+                      {emptyMessage}
                     </td>
                   </tr>
                 ) : (
                   items.map((r) => (
                     <tr key={r.studentId}>
-                      <td className="admin-students-table__select">
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${r.studentId}`}
-                          checked={selectedIds.has(r.studentId)}
-                          onChange={(e) =>
-                            toggleRow(r.studentId, e.target.checked)
-                          }
-                          disabled={deleting}
-                        />
-                      </td>
+                      {!isEnrollmentView ? (
+                        <td className="admin-students-table__select portal-academics-print-hide">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${r.studentId}`}
+                            checked={selectedIds.has(r.studentId)}
+                            onChange={(e) =>
+                              toggleRow(r.studentId, e.target.checked)
+                            }
+                            disabled={deleting}
+                          />
+                        </td>
+                      ) : null}
                       <td>{r.studentId}</td>
                       <td>
                         <Link
@@ -405,11 +664,25 @@ export function AdminStudentsPage() {
                           {r.name}
                         </Link>
                       </td>
-                      <td>{r.division}</td>
-                      <td>{displayCell(r.email)}</td>
-                      <td>{r.program}</td>
-                      <td>{formatTableDate(r.signedDate)}</td>
-                      <td>{displayCell(r.latestRegistrationTerm)}</td>
+                      {isEnrollmentView ? (
+                        <>
+                          <td>{displayCell(r.trackLabel)}</td>
+                          <td>{formatOptionalNumber(r.entryYear)}</td>
+                          <td>{displayCell(r.intakeLabel)}</td>
+                          <td>{r.program}</td>
+                          <td>{displayCell(r.email)}</td>
+                          <td>{displayCell(r.status)}</td>
+                          <td>{formatTableDate(r.enrollStartDate)}</td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{r.division}</td>
+                          <td>{displayCell(r.email)}</td>
+                          <td>{r.program}</td>
+                          <td>{formatTableDate(r.signedDate)}</td>
+                          <td>{displayCell(r.latestRegistrationTerm)}</td>
+                        </>
+                      )}
                     </tr>
                   ))
                 )}
@@ -418,7 +691,7 @@ export function AdminStudentsPage() {
           </div>
 
           <div
-            className="portal-actions"
+            className="portal-actions portal-academics-print-hide"
             style={{
               marginTop: '1rem',
               display: 'flex',

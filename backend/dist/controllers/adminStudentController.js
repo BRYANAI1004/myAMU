@@ -157,6 +157,37 @@ function parseAdminStudentProgramParam(raw) {
             return "all";
     }
 }
+function parseAdminStudentTrackParam(raw) {
+    if (typeof raw !== "string")
+        return "all";
+    switch (raw.trim().toUpperCase()) {
+        case "C":
+            return "C";
+        case "E":
+            return "E";
+        default:
+            return "all";
+    }
+}
+function parseAdminStudentEntryYearParam(raw) {
+    if (typeof raw !== "string")
+        return null;
+    const trimmed = raw.trim();
+    return /^20\d{2}$/.test(trimmed) ? trimmed : null;
+}
+function parseAdminStudentIntakeCodeParam(raw) {
+    if (typeof raw !== "string")
+        return null;
+    const trimmed = raw.trim().toUpperCase();
+    return trimmed === "" ? null : trimmed.slice(0, 1);
+}
+function parseAdminStudentListViewParam(raw) {
+    if (typeof raw !== "string")
+        return "roster";
+    return raw.trim().toLowerCase() === "new-enrollment"
+        ? "new-enrollment"
+        : "roster";
+}
 function parseAdminStudentIds(raw) {
     if (raw == null)
         return { ok: true, value: [] };
@@ -188,23 +219,32 @@ function parseAdminStudentsExportBody(raw) {
     const studentIds = parseAdminStudentIds(raw.studentIds);
     if (!studentIds.ok)
         return studentIds;
+    const view = parseAdminStudentListViewParam(raw.view);
     if (studentIds.value.length > 0) {
         return {
             ok: true,
             value: {
                 mode: "selected",
                 studentIds: studentIds.value,
+                view,
             },
         };
     }
     const search = typeof raw.search === "string" ? raw.search.trim().slice(0, 200) : "";
     const program = parseAdminStudentProgramParam(raw.program);
+    const track = parseAdminStudentTrackParam(raw.track);
+    const entryYear = parseAdminStudentEntryYearParam(raw.entryYear);
+    const intakeCode = parseAdminStudentIntakeCodeParam(raw.intakeCode);
     return {
         ok: true,
         value: {
             mode: "filtered",
             search,
             program,
+            track,
+            entryYear,
+            intakeCode,
+            view,
         },
     };
 }
@@ -219,11 +259,17 @@ export async function getAdminStudents(req, res) {
             ? searchRaw.trim().slice(0, 200)
             : "";
         const program = parseAdminStudentProgramParam(req.query.program);
+        const track = parseAdminStudentTrackParam(req.query.track);
+        const entryYear = parseAdminStudentEntryYearParam(req.query.entryYear);
+        const intakeCode = parseAdminStudentIntakeCodeParam(req.query.intakeCode);
         const result = await listAdminStudentsPage({
             page,
             pageSize,
             search,
             program,
+            track,
+            entryYear,
+            intakeCode,
             includeClinicalSummary,
         });
         res.json({
@@ -231,6 +277,7 @@ export async function getAdminStudents(req, res) {
             total: result.total,
             page: result.page,
             pageSize: result.pageSize,
+            enrollmentFilterOptions: result.enrollmentFilterOptions,
         });
     }
     catch (e) {

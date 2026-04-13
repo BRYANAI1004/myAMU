@@ -61,7 +61,7 @@ export function parseAdminStudentEnrollmentInfo(
   }
 
   const normalizedId = studentId.toUpperCase();
-  const trackCandidate = normalizedId.length >= 1 ? normalizedId.charAt(0) : "";
+  const trackCandidate = normalizedId.length >= 4 ? normalizedId.charAt(0) : "";
   const trackCode =
     trackCandidate === "C" || trackCandidate === "E" ? trackCandidate : null;
   const trackLabel = getAdminStudentTrackLabel(trackCode);

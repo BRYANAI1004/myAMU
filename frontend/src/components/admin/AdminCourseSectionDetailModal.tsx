@@ -80,6 +80,18 @@ export function AdminCourseSectionDetailModal({
     courseCode: section.prerequisite_course_code,
     courseTitle: section.prerequisite_course_title,
   })
+  const selectedCourseCode = section.course_code.trim()
+  const selectedAcademicTermId = academicTermId?.trim() ?? ''
+  const courseSectionsSearch = (() => {
+    if (selectedCourseCode === '' || selectedAcademicTermId === '') return null
+    const q = new URLSearchParams(returnSearch).get('q')?.trim() ?? ''
+    const pairs = [
+      `term=${encodeURIComponent(selectedAcademicTermId)}`,
+      `course=${encodeURIComponent(selectedCourseCode)}`,
+    ]
+    if (q !== '') pairs.push(`q=${encodeURIComponent(q)}`)
+    return `?${pairs.join('&')}`
+  })()
 
   return (
     <div
@@ -156,14 +168,14 @@ export function AdminCourseSectionDetailModal({
           </button>
           {academicTermId != null &&
             academicTermId !== '' &&
-            section.course_code.trim() !== '' && (
+            selectedCourseCode !== '' && (
               <Link
                 to={{
                   pathname: '/admin/course-sections',
                   search: (() => {
                     const n = new URLSearchParams(returnSearch)
-                    n.set('term', academicTermId)
-                    n.set('course', section.course_code.trim())
+                    n.set('term', selectedAcademicTermId)
+                    n.set('course', selectedCourseCode)
                     n.set('edit', String(section.id))
                     const s = n.toString()
                     return s ? `?${s}` : ''
@@ -175,16 +187,26 @@ export function AdminCourseSectionDetailModal({
                 Edit section
               </Link>
             )}
-          <Link
-            to={{
-              pathname: '/admin/course-sections',
-              search: returnSearch.trim() ? `?${returnSearch.trim()}` : '',
-            }}
-            className="portal-btn portal-btn--secondary portal-btn--compact"
-            onClick={onClose}
-          >
-            Course Sections
-          </Link>
+          {courseSectionsSearch != null ? (
+            <Link
+              to={{
+                pathname: '/admin/course-sections',
+                search: courseSectionsSearch,
+              }}
+              className="portal-btn portal-btn--secondary portal-btn--compact"
+              onClick={onClose}
+            >
+              Course Sections
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary portal-btn--compact"
+              disabled
+            >
+              Course Sections
+            </button>
+          )}
           <button
             type="button"
             className="portal-btn portal-btn--primary portal-btn--compact"

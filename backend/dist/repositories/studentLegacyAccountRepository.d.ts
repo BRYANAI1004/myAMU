@@ -103,6 +103,7 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
     id: string;
     name: unknown;
     email: unknown;
+    status: unknown;
     program: unknown;
     background: unknown;
     requirements_id: unknown;
@@ -117,6 +118,12 @@ export type LegacyAdminStudentListQuery = {
     search: string;
     /** Admin roster program filter backed by `students.program`. */
     program: "all" | "dahm" | "mahm";
+    /** Derived from the first character of `students.id`. */
+    track: "all" | "C" | "E";
+    /** Derived 4-digit year from `students.id` characters 2-3. */
+    entryYear: string | null;
+    /** Derived intake code from `students.id` character 4. */
+    intakeCode: string | null;
 };
 /**
  * Count of students matching the admin roster search (before pagination).
@@ -135,6 +142,11 @@ export declare function listLegacyAdminStudentListRowsPage(pool: Pool, query: Le
  * Full admin roster result set for the same search/program filters as the paginated list.
  */
 export declare function listLegacyAdminStudentListRows(pool: Pool, query: LegacyAdminStudentListQuery): Promise<LegacyAdminStudentListRow[]>;
+export type LegacyAdminStudentEnrollmentFacetRow = RowDataPacket & {
+    entry_year: string | null;
+    intake_code: string | null;
+};
+export declare function listLegacyAdminStudentEnrollmentFacetRows(pool: Pool, query: LegacyAdminStudentListQuery): Promise<LegacyAdminStudentEnrollmentFacetRow[]>;
 /**
  * Export rows for an explicit student selection, sorted by student id for stable CSV output.
  */

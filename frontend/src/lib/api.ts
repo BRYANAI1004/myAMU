@@ -883,7 +883,13 @@ export async function downloadAdminStudentsCsv(options?: {
   )
   const filename =
     fromHeader ??
-    (isSelectedExport ? 'students_selected.csv' : 'students_filtered.csv')
+    (options?.view === 'new-enrollment'
+      ? isSelectedExport
+        ? 'new_enrollment_selected.csv'
+        : 'new_enrollment_filtered.csv'
+      : isSelectedExport
+        ? 'students_selected.csv'
+        : 'students_filtered.csv')
   const url = URL.createObjectURL(blob)
   try {
     const a = document.createElement('a')

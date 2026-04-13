@@ -3904,6 +3904,21 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
     background: #fff !important;
   }
 
+  .admin-students-page--enrollment .admin-students-page__print-header {
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  .admin-students-page--enrollment .portal-table-wrap {
+    box-shadow: none !important;
+    border-color: #bbb !important;
+  }
+
+  .admin-students-page--enrollment .portal-table th,
+  .admin-students-page--enrollment .portal-table td {
+    font-size: 0.8rem;
+  }
+
   /* Academics module: strip layout chrome so only the transcript sheet remains visible. */
   .portal-academics-module:has(.portal-academics-transcript-sheet) {
     max-width: none !important;
@@ -6717,6 +6732,60 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   align-items: center;
   gap: 0.65rem 0.75rem;
   margin-left: auto;
+}
+
+.admin-students-page__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-students-page__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.admin-students-page__tab {
+  appearance: none;
+  border: 1px solid var(--portal-border-subtle);
+  background: var(--amu-card);
+  color: var(--text-dark);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.admin-students-page__tab:hover {
+  border-color: var(--amu-red);
+}
+
+.admin-students-page__tab--active {
+  background: var(--amu-red);
+  border-color: var(--amu-red);
+  color: #fff;
+}
+
+.admin-students-page__print-header {
+  display: none;
+}
+
+.admin-students-page__print-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.25rem;
+}
+
+.admin-students-page__print-meta {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--portal-text-muted);
 }
 
 .admin-page__toolbar-actions--wrap {

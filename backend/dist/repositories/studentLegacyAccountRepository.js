@@ -263,12 +263,39 @@ function escapeMysqlLikePattern(fragment) {
         .replace(/%/g, "\\%")
         .replace(/_/g, "\\_");
 }
+const ADMIN_STUDENT_ID_TRIM_SQL = "TRIM(s.id)";
+const ADMIN_STUDENT_TRACK_SQL = `CASE
+  WHEN s.id IS NOT NULL AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 4
+    THEN UPPER(LEFT(${ADMIN_STUDENT_ID_TRIM_SQL}, 1))
+  ELSE NULL
+END`;
+const ADMIN_STUDENT_ENTRY_YEAR_SQL = `CASE
+  WHEN s.id IS NOT NULL
+    AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 4
+    AND SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 2, 2) REGEXP '^[0-9]{2}$'
+    THEN CONCAT('20', SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 2, 2))
+  ELSE NULL
+END`;
+const ADMIN_STUDENT_INTAKE_CODE_SQL = `CASE
+  WHEN s.id IS NOT NULL AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 4
+    THEN UPPER(SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 4, 1))
+  ELSE NULL
+END`;
 function buildAdminStudentProgramClause(program) {
     switch (program) {
         case "dahm":
             return `UPPER(TRIM(s.program)) = 'DAHM'`;
         case "mahm":
             return `UPPER(TRIM(s.program)) = 'MAHM'`;
+        default:
+            return "";
+    }
+}
+function buildAdminStudentTrackClause(track) {
+    switch (track) {
+        case "C":
+        case "E":
+            return `${ADMIN_STUDENT_TRACK_SQL} = '${track}'`;
         default:
             return "";
     }
@@ -290,6 +317,18 @@ function buildAdminStudentListFilters(query) {
     const programClause = buildAdminStudentProgramClause(query.program);
     if (programClause !== "") {
         clauses.push(programClause);
+    }
+    const trackClause = buildAdminStudentTrackClause(query.track);
+    if (trackClause !== "") {
+        clauses.push(trackClause);
+    }
+    if (query.entryYear != null) {
+        clauses.push(`${ADMIN_STUDENT_ENTRY_YEAR_SQL} = ?`);
+        params.push(query.entryYear);
+    }
+    if (query.intakeCode != null) {
+        clauses.push(`${ADMIN_STUDENT_INTAKE_CODE_SQL} = ?`);
+        params.push(query.intakeCode);
     }
     if (clauses.length === 0) {
         return { clause: "", params };
@@ -318,6 +357,7 @@ const ADMIN_STUDENT_LIST_SELECT_SQL = `SELECT
        TRIM(s.id) AS id,
        s.name,
        s.email,
+       NULLIF(TRIM(s.status), '') AS status,
        TRIM(s.program) AS program,
        s.background,
        s.requirements_id,
@@ -350,6 +390,17 @@ export async function listLegacyAdminStudentListRows(pool, query) {
     const [rows] = await pool.query(`${ADMIN_STUDENT_LIST_SELECT_SQL}
      ${clause}
      ORDER BY s.name ASC, s.id ASC`, params);
+    return rows;
+}
+export async function listLegacyAdminStudentEnrollmentFacetRows(pool, query) {
+    const { clause, params } = buildAdminStudentListFilters(query);
+    const [rows] = await pool.query(`SELECT DISTINCT
+       ${ADMIN_STUDENT_ENTRY_YEAR_SQL} AS entry_year,
+       ${ADMIN_STUDENT_INTAKE_CODE_SQL} AS intake_code
+     FROM students s
+     ${ADMIN_STUDENT_LIST_LATEST_REG_JOIN}
+     ${clause}
+     ORDER BY entry_year DESC, intake_code ASC`, params);
     return rows;
 }
 /**

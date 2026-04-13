@@ -19,20 +19,34 @@ export type AdminStudentListItem = {
     division: "Chinese" | "English" | "Unknown";
     name: string;
     email: string | null;
+    status: string | null;
     program: StudentProgram;
+    trackCode: "C" | "E" | null;
+    trackLabel: "Chinese" | "English" | null;
     requirementsId: string | null;
     highestDegree: string | null;
     backgroundSchool: string | null;
     signedDate: string | null;
     enrollStartDate: string | null;
     resolvedEntryDate: string | null;
+    /** Derived from student id characters 2-3 (for enrollment filtering). */
     entryYear: number | null;
+    intakeCode: string | null;
+    intakeLabel: string | null;
     latestRegistrationTerm: string | null;
     /** Present when the list is requested with `clinicalSummary=1`. */
     clinicalProgressSummary?: AdminStudentClinicalProgressSummary;
 };
 /** Temporary `/api/admin/students` roster filter only. */
 export type AdminStudentRosterProgramFilter = "all" | "dahm" | "mahm";
+export type AdminStudentRosterTrackFilter = "all" | "C" | "E";
+export type AdminStudentEnrollmentFilterOptions = {
+    years: string[];
+    intakes: Array<{
+        code: string;
+        label: string;
+    }>;
+};
 /**
  * GET /api/admin/students — paginated roster payload (`items` is one page only).
  * Query: `page`, `pageSize`, `search`, optional `clinicalSummary`.
@@ -42,6 +56,7 @@ export type AdminStudentListPageResponse = {
     total: number;
     page: number;
     pageSize: number;
+    enrollmentFilterOptions: AdminStudentEnrollmentFilterOptions;
 };
 /** GET /api/admin/students/:studentId — full admin read model. */
 export type AdminStudentDetail = {

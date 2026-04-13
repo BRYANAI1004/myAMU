@@ -1,24 +1,33 @@
-import type { AdminStudentCreateBody, AdminStudentDetail, AdminStudentListItem, AdminStudentRosterProgramFilter, AdminStudentUpdateBody } from "../types/adminStudent.js";
+import type { AdminStudentCreateBody, AdminStudentDetail, AdminStudentEnrollmentFilterOptions, AdminStudentListItem, AdminStudentRosterProgramFilter, AdminStudentRosterTrackFilter, AdminStudentUpdateBody } from "../types/adminStudent.js";
 export type AdminStudentListPageResult = {
     items: AdminStudentListItem[];
     total: number;
     page: number;
     pageSize: number;
+    enrollmentFilterOptions: AdminStudentEnrollmentFilterOptions;
 };
 export declare function listAdminStudentsPage(options: {
     page: number;
     pageSize: number;
     search: string;
     program: AdminStudentRosterProgramFilter;
+    track: AdminStudentRosterTrackFilter;
+    entryYear: string | null;
+    intakeCode: string | null;
     includeClinicalSummary?: boolean;
 }): Promise<AdminStudentListPageResult>;
 export type BuildAdminStudentsCsvInput = {
     mode: "selected";
     studentIds: string[];
+    view: "roster" | "new-enrollment";
 } | {
     mode: "filtered";
     search: string;
     program: AdminStudentRosterProgramFilter;
+    track: AdminStudentRosterTrackFilter;
+    entryYear: string | null;
+    intakeCode: string | null;
+    view: "roster" | "new-enrollment";
 };
 export type BuildAdminStudentsCsvResult = {
     mode: "selected" | "filtered";

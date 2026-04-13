@@ -1,7 +1,8 @@
 import { pool } from "../lib/db.js";
-import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, countLegacyAdminStudentListRows, listLegacyAdminStudentListRows, listLegacyAdminStudentListRowsPage, listLegacyAdminStudentListRowsByStudentIds, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
+import { createLegacyStudentMasterRow, createLegacyStudentPasswordRow, deleteLegacyStudentMasterRow, deleteLegacyStudentPasswordRow, findLatestLegacyTermYear, getNextLegacyStudentId, hasLegacyStudentAccounting, hasLegacyStudentMarks, hasLegacyStudentRegistration, legacyStudentMasterExists, legacyStudentPasswordRowExists, countLegacyAdminStudentListRows, listLegacyAdminStudentEnrollmentFacetRows, listLegacyAdminStudentListRows, listLegacyAdminStudentListRowsPage, listLegacyAdminStudentListRowsByStudentIds, loadLegacyStudentProfileRow, updateLegacyStudentMasterRow, } from "../repositories/studentLegacyAccountRepository.js";
 import { combineAddressLine, legacyDbDateToIso, resolveEnrollmentDate, } from "./studentProfileService.js";
 import { batchBuildClinicalProgressForStudentIds, buildClinicalProgress, } from "./clinicalProgressService.js";
+import { getAdminStudentIntakeLabel, parseAdminStudentEnrollmentInfo, } from "./adminStudentEnrollmentMetadata.js";
 function str(v) {
     if (v == null)
         return "";
@@ -42,6 +43,10 @@ function requirementsIdToApi(v) {
     const s = String(v).trim();
     return s.length > 0 ? s : null;
 }
+function statusToApi(v) {
+    const s = str(v);
+    return s === "" ? null : s;
+}
 function entryYearFromResolved(iso) {
     if (iso == null || iso.length < 4)
         return null;
@@ -74,6 +79,7 @@ function mapRowToListItem(r) {
     const name = nameRaw.length > 0 ? nameRaw : studentId;
     const emailRaw = str(r.email);
     const email = emailRaw.length > 0 ? emailRaw : null;
+    const enrollment = parseAdminStudentEnrollmentInfo(studentId);
     const signedDate = legacyDbDateToIso(r.signed_date);
     const enrollStartDate = legacyDbDateToIso(readEnrollStart(r));
     const resolvedEntryDate = resolveEnrollmentDate(r.signed_date, readEnrollStart(r));
@@ -84,29 +90,68 @@ function mapRowToListItem(r) {
         division: divisionFromStudentId(studentId),
         name,
         email,
+        status: statusToApi(r.status),
         program: studentProgramFromDb(r.program),
+        trackCode: enrollment.trackCode,
+        trackLabel: enrollment.trackLabel,
         requirementsId: requirementsIdToApi(r.requirements_id),
         highestDegree: tertiary.length > 0 ? tertiary : null,
         backgroundSchool: bg.length > 0 ? bg : null,
         signedDate,
         enrollStartDate,
         resolvedEntryDate,
-        entryYear: entryYearFromResolved(resolvedEntryDate),
+        entryYear: enrollment.entryYear,
+        intakeCode: enrollment.intakeCode,
+        intakeLabel: enrollment.intakeLabel,
         latestRegistrationTerm: formatLatestRegistrationTerm(r.latest_term, r.latest_year),
     };
+}
+async function buildAdminStudentEnrollmentFilterOptions(options) {
+    const rows = await listLegacyAdminStudentEnrollmentFacetRows(pool, options);
+    const years = Array.from(new Set(rows
+        .map((row) => str(row.entry_year))
+        .filter((entryYear) => /^\d{4}$/.test(entryYear)))).sort((a, b) => Number(b) - Number(a));
+    const intakes = Array.from(new Set(rows
+        .map((row) => str(row.intake_code))
+        .filter((intakeCode) => intakeCode !== "")))
+        .sort((a, b) => a.localeCompare(b))
+        .map((code) => ({
+        code,
+        label: getAdminStudentIntakeLabel(code) ?? code,
+    }));
+    return { years, intakes };
 }
 export async function listAdminStudentsPage(options) {
     const page = Math.max(1, Math.trunc(options.page));
     const pageSize = Math.max(1, Math.trunc(options.pageSize));
     const search = options.search.trim();
     const program = options.program;
+    const track = options.track;
+    const entryYear = options.entryYear;
+    const intakeCode = options.intakeCode;
     const offset = (page - 1) * pageSize;
-    const total = await countLegacyAdminStudentListRows(pool, { search, program });
+    const total = await countLegacyAdminStudentListRows(pool, {
+        search,
+        program,
+        track,
+        entryYear,
+        intakeCode,
+    });
     const rows = await listLegacyAdminStudentListRowsPage(pool, {
         search,
         program,
+        track,
+        entryYear,
+        intakeCode,
         limit: pageSize,
         offset,
+    });
+    const enrollmentFilterOptions = await buildAdminStudentEnrollmentFilterOptions({
+        search,
+        program,
+        track,
+        entryYear,
+        intakeCode,
     });
     const base = rows.map((row) => mapRowToListItem(row));
     let items;
@@ -132,7 +177,7 @@ export async function listAdminStudentsPage(options) {
             items = base;
         }
     }
-    return { items, total, page, pageSize };
+    return { items, total, page, pageSize, enrollmentFilterOptions };
 }
 function csvEscapeCell(value) {
     const normalized = value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -175,31 +220,67 @@ const ADMIN_STUDENTS_CSV_HEADERS = [
     "Signed Date",
     "Latest Registration Term",
 ];
+const ADMIN_NEW_ENROLLMENT_CSV_HEADERS = [
+    "Student ID",
+    "Name",
+    "Track",
+    "Entry Year",
+    "Intake",
+    "Program",
+    "Email",
+    "Status",
+    "Enroll Start Date",
+];
 export async function buildAdminStudentsCsv(input) {
     const rows = input.mode === "selected"
         ? await listLegacyAdminStudentListRowsByStudentIds(pool, input.studentIds)
         : await listLegacyAdminStudentListRows(pool, {
             search: input.search.trim(),
             program: input.program,
+            track: input.track,
+            entryYear: input.entryYear,
+            intakeCode: input.intakeCode,
         });
     const items = rows.map((row) => mapRowToListItem(row));
     const lines = [
-        ADMIN_STUDENTS_CSV_HEADERS.map((header) => csvEscapeCell(header)).join(","),
+        (input.view === "new-enrollment"
+            ? ADMIN_NEW_ENROLLMENT_CSV_HEADERS
+            : ADMIN_STUDENTS_CSV_HEADERS)
+            .map((header) => csvEscapeCell(header))
+            .join(","),
     ];
     for (const item of items) {
-        const values = [
-            item.studentId,
-            item.name,
-            item.division,
-            csvCell(item.email),
-            item.program,
-            formatCsvDate(item.signedDate),
-            csvCell(item.latestRegistrationTerm),
-        ];
+        const values = input.view === "new-enrollment"
+            ? [
+                item.studentId,
+                item.name,
+                csvCell(item.trackLabel),
+                item.entryYear == null ? "" : String(item.entryYear),
+                csvCell(item.intakeLabel),
+                item.program,
+                csvCell(item.email),
+                csvCell(item.status),
+                formatCsvDate(item.enrollStartDate),
+            ]
+            : [
+                item.studentId,
+                item.name,
+                item.division,
+                csvCell(item.email),
+                item.program,
+                formatCsvDate(item.signedDate),
+                csvCell(item.latestRegistrationTerm),
+            ];
         lines.push(values.map(csvEscapeCell).join(","));
     }
     const timestamp = buildAdminStudentsExportTimestamp();
-    const prefix = input.mode === "selected" ? "students_selected_" : "students_filtered_";
+    const prefix = input.view === "new-enrollment"
+        ? input.mode === "selected"
+            ? "new_enrollment_selected_"
+            : "new_enrollment_filtered_"
+        : input.mode === "selected"
+            ? "students_selected_"
+            : "students_filtered_";
     return {
         mode: input.mode,
         filename: `${prefix}${timestamp}.csv`,
