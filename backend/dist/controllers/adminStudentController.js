@@ -11,24 +11,48 @@ function parseNullableStringField(v) {
     const s = trimStr(v);
     return s === "" ? null : s;
 }
+function parseStudentProgramField(raw, options) {
+    if (typeof raw !== "string") {
+        return {
+            ok: false,
+            error: options?.required === false
+                ? "program must be DAHM or MAHM."
+                : "program is required.",
+        };
+    }
+    switch (raw.trim().toUpperCase()) {
+        case "DAHM":
+            return { ok: true, value: "DAHM" };
+        case "MAHM":
+            return { ok: true, value: "MAHM" };
+        default:
+            return { ok: false, error: "program must be DAHM or MAHM." };
+    }
+}
 function parseUpdateBody(raw) {
-    if (!isRecord(raw))
-        return null;
-    if (typeof raw.name !== "string")
-        return null;
+    if (!isRecord(raw) || typeof raw.name !== "string") {
+        return { ok: false, error: "Invalid request body." };
+    }
+    const program = parseStudentProgramField(raw.program);
+    if (!program.ok)
+        return program;
     return {
-        name: raw.name,
-        email: parseNullableStringField(raw.email),
-        gender: parseNullableStringField(raw.gender),
-        backgroundSchool: parseNullableStringField(raw.backgroundSchool),
-        highestDegree: parseNullableStringField(raw.highestDegree),
-        requirementsId: parseNullableStringField(raw.requirementsId),
-        address: parseNullableStringField(raw.address),
-        city: parseNullableStringField(raw.city),
-        state: parseNullableStringField(raw.state),
-        zip: parseNullableStringField(raw.zip),
-        signedDate: parseNullableStringField(raw.signedDate),
-        enrollStartDate: parseNullableStringField(raw.enrollStartDate),
+        ok: true,
+        value: {
+            name: raw.name,
+            program: program.value,
+            email: parseNullableStringField(raw.email),
+            gender: parseNullableStringField(raw.gender),
+            backgroundSchool: parseNullableStringField(raw.backgroundSchool),
+            highestDegree: parseNullableStringField(raw.highestDegree),
+            requirementsId: parseNullableStringField(raw.requirementsId),
+            address: parseNullableStringField(raw.address),
+            city: parseNullableStringField(raw.city),
+            state: parseNullableStringField(raw.state),
+            zip: parseNullableStringField(raw.zip),
+            signedDate: parseNullableStringField(raw.signedDate),
+            enrollStartDate: parseNullableStringField(raw.enrollStartDate),
+        },
     };
 }
 function parseEntryDateFromBody(raw) {
@@ -56,37 +80,44 @@ function parseRequirementsIdFromBody(raw) {
 }
 function parseCreateBody(raw) {
     if (!isRecord(raw))
-        return null;
-    if (raw.division !== "Chinese" && raw.division !== "English")
-        return null;
-    if (typeof raw.name !== "string")
-        return null;
-    if (typeof raw.initialPassword !== "string")
-        return null;
+        return { ok: false, error: "Invalid request body." };
+    if (raw.division !== "Chinese" && raw.division !== "English") {
+        return { ok: false, error: "Invalid request body." };
+    }
+    if (typeof raw.name !== "string" || typeof raw.initialPassword !== "string") {
+        return { ok: false, error: "Invalid request body." };
+    }
     const entryDate = parseEntryDateFromBody(raw.entryDate);
     if (entryDate == null)
-        return null;
+        return { ok: false, error: "Invalid request body." };
+    const program = parseStudentProgramField(raw.program);
+    if (!program.ok)
+        return program;
     const requirementsId = parseRequirementsIdFromBody(raw.requirementsId);
     if (requirementsId === undefined && raw.requirementsId != null) {
-        return null;
+        return { ok: false, error: "Invalid request body." };
     }
     return {
-        division: raw.division,
-        entryDate,
-        name: raw.name,
-        email: parseNullableStringField(raw.email),
-        gender: parseNullableStringField(raw.gender),
-        requirementsId: requirementsId === undefined ? null : requirementsId,
-        highestDegree: parseNullableStringField(raw.highestDegree),
-        backgroundSchool: parseNullableStringField(raw.backgroundSchool),
-        signedDate: parseNullableStringField(raw.signedDate),
-        enrollStartDate: parseNullableStringField(raw.enrollStartDate),
-        address: parseNullableStringField(raw.address),
-        address2: parseNullableStringField(raw.address2),
-        city: parseNullableStringField(raw.city),
-        state: parseNullableStringField(raw.state),
-        zip: parseNullableStringField(raw.zip),
-        initialPassword: raw.initialPassword,
+        ok: true,
+        value: {
+            division: raw.division,
+            entryDate,
+            name: raw.name,
+            program: program.value,
+            email: parseNullableStringField(raw.email),
+            gender: parseNullableStringField(raw.gender),
+            requirementsId: requirementsId === undefined ? null : requirementsId,
+            highestDegree: parseNullableStringField(raw.highestDegree),
+            backgroundSchool: parseNullableStringField(raw.backgroundSchool),
+            signedDate: parseNullableStringField(raw.signedDate),
+            enrollStartDate: parseNullableStringField(raw.enrollStartDate),
+            address: parseNullableStringField(raw.address),
+            address2: parseNullableStringField(raw.address2),
+            city: parseNullableStringField(raw.city),
+            state: parseNullableStringField(raw.state),
+            zip: parseNullableStringField(raw.zip),
+            initialPassword: raw.initialPassword,
+        },
     };
 }
 const STUDENT_ID_PARAM = /^[A-Za-z0-9._-]{1,64}$/;
@@ -197,12 +228,12 @@ export async function getNextAdminStudentId(req, res) {
 }
 export async function postAdminStudent(req, res) {
     const body = parseCreateBody(req.body);
-    if (!body) {
-        res.status(400).json({ error: "Invalid request body." });
+    if (!body.ok) {
+        res.status(400).json({ error: body.error });
         return;
     }
     try {
-        const result = await createAdminStudent(body);
+        const result = await createAdminStudent(body.value);
         if (!result.ok) {
             res.status(result.status).json({ error: result.message });
             return;
@@ -241,12 +272,12 @@ export async function putAdminStudent(req, res) {
         return;
     }
     const body = parseUpdateBody(req.body);
-    if (!body) {
-        res.status(400).json({ error: "Invalid request body." });
+    if (!body.ok) {
+        res.status(400).json({ error: body.error });
         return;
     }
     try {
-        const result = await updateAdminStudent(studentId, body);
+        const result = await updateAdminStudent(studentId, body.value);
         if (!result.ok) {
             res.status(result.status).json({ error: result.message });
             return;

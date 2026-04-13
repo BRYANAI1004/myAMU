@@ -98,6 +98,9 @@ function creditsFromDb(v) {
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
 }
+function studentProgramFromDb(v) {
+    return str(v).toUpperCase() === "DAHM" ? "DAHM" : "MAHM";
+}
 export function trackFromRequirementsId(v) {
     if (v == null || v === "")
         return null;
@@ -127,6 +130,7 @@ function readRow(row) {
         state: str(r.state),
         zip: str(r.zip),
         email: str(r.email),
+        program: r.program,
         requirements_id: r.requirements_id,
     };
 }
@@ -137,6 +141,7 @@ export function mapLegacyStudentRowToProfile(row) {
     return {
         studentId: r.id,
         fullName,
+        program: studentProgramFromDb(r.program),
         track: trackFromRequirementsId(r.requirements_id),
         gender: r.gender.length > 0 ? r.gender : null,
         age: ageFromDob(r.dob),

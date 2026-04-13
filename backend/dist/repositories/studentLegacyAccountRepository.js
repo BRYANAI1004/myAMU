@@ -123,6 +123,7 @@ export async function loadLegacyStudentProfileRow(pool, studentId) {
     const [rows] = await pool.query(`SELECT
        id,
        name,
+       program,
        gender,
        dob,
        signed_date,
@@ -168,7 +169,7 @@ export async function mapLegacyStudentProfileExportRowsById(pool, studentIds) {
        name,
        gender,
        email,
-       requirements_id,
+       program,
        tertiary,
        background
      FROM students
@@ -180,7 +181,7 @@ export async function mapLegacyStudentProfileExportRowsById(pool, studentIds) {
         const name = strCell(r.name);
         const gender = strCell(r.gender);
         const email = strCell(r.email);
-        const req = strCell(r.requirements_id);
+        const program = strCell(r.program);
         const tertiary = strCell(r.tertiary);
         const bg = strCell(r.background);
         out.set(id, {
@@ -188,7 +189,7 @@ export async function mapLegacyStudentProfileExportRowsById(pool, studentIds) {
             name,
             gender,
             email,
-            program: req,
+            program,
             highestDegree: tertiary,
             backgroundSchool: bg,
         });
@@ -265,17 +266,9 @@ function escapeMysqlLikePattern(fragment) {
 function buildAdminStudentProgramClause(program) {
     switch (program) {
         case "dahm":
-            return `EXISTS (
-        SELECT 1
-        FROM daim_students_info dsi
-        WHERE TRIM(dsi.student_id) = TRIM(s.id)
-      )`;
+            return `UPPER(TRIM(s.program)) = 'DAHM'`;
         case "mahm":
-            return `NOT EXISTS (
-        SELECT 1
-        FROM daim_students_info dsi
-        WHERE TRIM(dsi.student_id) = TRIM(s.id)
-      )`;
+            return `UPPER(TRIM(s.program)) = 'MAHM'`;
         default:
             return "";
     }
@@ -290,7 +283,7 @@ function buildAdminStudentListFilters(query) {
       LOWER(TRIM(s.id)) LIKE ? ESCAPE '\\\\'
       OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '\\\\'
       OR LOWER(COALESCE(s.email, '')) LIKE ? ESCAPE '\\\\'
-      OR LOWER(TRIM(CAST(IFNULL(s.requirements_id, '') AS CHAR))) LIKE ? ESCAPE '\\\\'
+      OR LOWER(TRIM(COALESCE(s.program, ''))) LIKE ? ESCAPE '\\\\'
     )`);
         params.push(like, like, like, like);
     }
@@ -333,6 +326,7 @@ export async function listLegacyAdminStudentListRowsPage(pool, query) {
        TRIM(s.id) AS id,
        s.name,
        s.email,
+       TRIM(s.program) AS program,
        s.background,
        s.requirements_id,
        s.tertiary,
@@ -355,6 +349,7 @@ export async function updateLegacyStudentMasterRow(pool, studentId, patch) {
     const [result] = await pool.execute(`UPDATE students SET
        name = ?,
        email = ?,
+       program = ?,
        gender = ?,
        background = ?,
        tertiary = ?,
@@ -369,6 +364,7 @@ export async function updateLegacyStudentMasterRow(pool, studentId, patch) {
      WHERE id = ?`, [
         patch.name,
         patch.email,
+        patch.program,
         patch.gender,
         patch.background,
         patch.tertiary,
@@ -468,7 +464,7 @@ export async function createLegacyStudentMasterRow(pool, input) {
        notes, cpr, toefl, exam, level1exam, level2exam, level3exam, cnt,
        hold, signed_date, grad_date, grad_term, grad_year, withdraw_date,
        required_units_to_grad, marital, citizenship,
-       EnrollStartDate, requirements_id, financial_aid, grad_check_out,
+       EnrollStartDate, requirements_id, program, financial_aid, grad_check_out,
        cale_license, cale_date, level1practice
      ) VALUES (
        ?, '', ?, '0000-00-00',
@@ -480,7 +476,7 @@ export async function createLegacyStudentMasterRow(pool, input) {
        '', '', '', '', '', '', '', '',
        0, ?, '0000-00-00', '-', 0, '0000-00-00',
        0, '', '',
-       ?, ?, 0, 0,
+       ?, ?, ?, 0, 0,
        NULL, '0000-00-00', ''
      )`, [
         input.name,
@@ -497,6 +493,7 @@ export async function createLegacyStudentMasterRow(pool, input) {
         input.signed_date_sql,
         input.enroll_start_sql,
         input.requirements_id,
+        input.program,
     ]);
 }
 /** Legacy `password_stu.password` values are MD5 hex (32 chars), matching the school database. */

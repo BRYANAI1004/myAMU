@@ -22,6 +22,9 @@ function readEnrollStart(row) {
         row.enroll_start ??
         null);
 }
+function studentProgramFromDb(v) {
+    return str(v).toUpperCase() === "DAHM" ? "DAHM" : "MAHM";
+}
 /** e.g. `Fall 2025` from legacy `registration` term + year. */
 function formatLatestRegistrationTerm(termRaw, yearRaw) {
     const t = str(termRaw);
@@ -81,6 +84,7 @@ function mapRowToListItem(r) {
         division: divisionFromStudentId(studentId),
         name,
         email,
+        program: studentProgramFromDb(r.program),
         requirementsId: requirementsIdToApi(r.requirements_id),
         highestDegree: tertiary.length > 0 ? tertiary : null,
         backgroundSchool: bg.length > 0 ? bg : null,
@@ -158,6 +162,7 @@ function mapProfileRowToAdminDetail(row, latestRegistrationTerm) {
         division: divisionFromStudentId(studentId),
         name,
         email,
+        program: studentProgramFromDb(row.program),
         requirementsId: requirementsIdToApi(row.requirements_id),
         highestDegree: tertiary.length > 0 ? tertiary : null,
         backgroundSchool: bg.length > 0 ? bg : null,
@@ -281,6 +286,7 @@ export async function updateAdminStudent(studentIdRaw, body) {
     const patch = {
         name,
         email: str(body.email),
+        program: body.program,
         gender: str(body.gender),
         background: str(body.backgroundSchool),
         tertiary: str(body.highestDegree),
@@ -409,6 +415,7 @@ export async function createAdminStudent(body) {
     const insertPayload = {
         name,
         email: str(body.email),
+        program: body.program,
         gender: str(body.gender),
         background: str(body.backgroundSchool),
         tertiary: str(body.highestDegree),

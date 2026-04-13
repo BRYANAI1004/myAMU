@@ -103,6 +103,7 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
     id: string;
     name: unknown;
     email: unknown;
+    program: unknown;
     background: unknown;
     requirements_id: unknown;
     tertiary: unknown;
@@ -112,9 +113,9 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
     latest_year: unknown;
 };
 export type LegacyAdminStudentListQuery = {
-    /** Trimmed search string; matches student id, name, email, and program (`requirements_id`) case-insensitively. */
+    /** Trimmed search string; matches student id, name, email, and program case-insensitively. */
     search: string;
-    /** Temporary admin roster program filter: DAHM = exists in legacy `daim_students_info`; MAHM = not in that set. */
+    /** Admin roster program filter backed by `students.program`. */
     program: "all" | "dahm" | "mahm";
 };
 /**
@@ -133,6 +134,7 @@ export declare function listLegacyAdminStudentListRowsPage(pool: Pool, query: Le
 export type LegacyStudentMasterUpdate = {
     name: string;
     email: string;
+    program: string;
     gender: string;
     background: string;
     tertiary: string;
@@ -154,6 +156,7 @@ export type LegacyStudentMasterInsert = {
     studentId: string;
     name: string;
     email: string;
+    program: string;
     gender: string;
     requirements_id: number | null;
     tertiary: string;
