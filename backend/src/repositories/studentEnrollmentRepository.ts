@@ -1,5 +1,6 @@
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { pool } from "../lib/db.js";
+import { listMarksForStudent } from "./studentAcademicsRepository.js";
 import {
   type CourseSectionDetail,
   mapCourseSectionRow,
@@ -11,6 +12,34 @@ export type EnrollSectionInput = {
   /** Disambiguates duplicate section_code across EN vs CN offered timetables. */
   schedule_track?: "EN" | "CN";
 };
+
+export type ResolvedEnrollmentSection = {
+  course_section_id: number;
+  course_code: string;
+  section_code: string;
+  schedule_track: "EN" | "CN";
+  prerequisite_course_id: string | null;
+  prerequisite_course_code: string | null;
+  prerequisite_course_title: string | null;
+};
+
+export type StudentHistoricalCourseReference = {
+  course_id: string | null;
+  course_code: string | null;
+  source: "marks" | "portal";
+};
+
+type MysqlQueryable = Pool | PoolConnection;
+
+function trimNullableString(value: unknown): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+function normalizeScheduleTrackForEnrollment(raw: unknown): "EN" | "CN" {
+  return String(raw ?? "").trim().toUpperCase() === "CN" ? "CN" : "EN";
+}
 
 function isMysqlDupEntry(e: unknown): boolean {
   return (
@@ -115,6 +144,206 @@ function normalizeEnrollmentStatusForCompare(raw: unknown): string {
   return String(raw).trim().toLowerCase();
 }
 
+async function resolveRequestedEnrollmentSectionsForTermWithQueryable(
+  db: MysqlQueryable,
+  term: string,
+  year: number,
+  sections: EnrollSectionInput[],
+): Promise<
+  { ok: true; sections: ResolvedEnrollmentSection[] } | { ok: false; error: string }
+> {
+  const trimmedTerm = term.trim();
+  const resolvedSections: ResolvedEnrollmentSection[] = [];
+
+  for (const raw of sections) {
+    const courseCode = raw.course_code.trim();
+    const sectionCode = raw.section_code.trim();
+    if (!courseCode || !sectionCode) {
+      return {
+        ok: false,
+        error: "Each section must include course_code and section_code.",
+      };
+    }
+
+    let secRows: RowDataPacket[];
+    if (raw.schedule_track === "EN" || raw.schedule_track === "CN") {
+      const [rows] = await db.query<RowDataPacket[]>(
+        `SELECT
+           cs.id,
+           TRIM(cs.course_code) AS course_code,
+           TRIM(cs.section_code) AS section_code,
+           cs.schedule_track,
+           cs.prerequisite_course_id,
+           pc.course_code AS prerequisite_course_code,
+           pc.title AS prerequisite_course_title
+         FROM course_sections cs
+         LEFT JOIN portal_courses pc
+           ON pc.course_id = cs.prerequisite_course_id
+         WHERE cs.course_code = ?
+           AND cs.section_code = ?
+           AND cs.term = ?
+           AND cs.year = ?
+           AND cs.schedule_track = ?`,
+        [courseCode, sectionCode, trimmedTerm, year, raw.schedule_track],
+      );
+      secRows = rows;
+    } else {
+      const [rows] = await db.query<RowDataPacket[]>(
+        `SELECT
+           cs.id,
+           TRIM(cs.course_code) AS course_code,
+           TRIM(cs.section_code) AS section_code,
+           cs.schedule_track,
+           cs.prerequisite_course_id,
+           pc.course_code AS prerequisite_course_code,
+           pc.title AS prerequisite_course_title
+         FROM course_sections cs
+         LEFT JOIN portal_courses pc
+           ON pc.course_id = cs.prerequisite_course_id
+         WHERE cs.course_code = ?
+           AND cs.section_code = ?
+           AND cs.term = ?
+           AND cs.year = ?
+         ORDER BY
+           CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END,
+           cs.id ASC`,
+        [courseCode, sectionCode, trimmedTerm, year],
+      );
+      secRows = rows;
+    }
+
+    if (secRows.length === 0) {
+      return {
+        ok: false,
+        error: `No section ${sectionCode} for course ${courseCode} in this term.`,
+      };
+    }
+    if (secRows.length > 1) {
+      return {
+        ok: false,
+        error: `Multiple timetable sections match ${courseCode} ${sectionCode} for this term. Specify schedule_track EN or CN.`,
+      };
+    }
+
+    const secRow = secRows[0]!;
+    const courseSectionId = Number(secRow.id);
+    if (!Number.isFinite(courseSectionId) || courseSectionId <= 0) {
+      return {
+        ok: false,
+        error: `Invalid section id for ${courseCode} ${sectionCode}.`,
+      };
+    }
+
+    resolvedSections.push({
+      course_section_id: courseSectionId,
+      course_code: trimNullableString(secRow.course_code) ?? courseCode,
+      section_code: trimNullableString(secRow.section_code) ?? sectionCode,
+      schedule_track: normalizeScheduleTrackForEnrollment(secRow.schedule_track),
+      prerequisite_course_id: trimNullableString(secRow.prerequisite_course_id),
+      prerequisite_course_code: trimNullableString(secRow.prerequisite_course_code),
+      prerequisite_course_title: trimNullableString(secRow.prerequisite_course_title),
+    });
+  }
+
+  return { ok: true, sections: resolvedSections };
+}
+
+export async function resolveRequestedEnrollmentSectionsForTerm(
+  term: string,
+  year: number,
+  sections: EnrollSectionInput[],
+): Promise<
+  { ok: true; sections: ResolvedEnrollmentSection[] } | { ok: false; error: string }
+> {
+  return resolveRequestedEnrollmentSectionsForTermWithQueryable(
+    pool,
+    term,
+    year,
+    sections,
+  );
+}
+
+export async function listStudentHistoricalCourseReferences(
+  studentExternalId: string,
+): Promise<StudentHistoricalCourseReference[]> {
+  const sid = studentExternalId.trim();
+  const refs: StudentHistoricalCourseReference[] = [];
+  const seen = new Set<string>();
+
+  const pushRef = (ref: StudentHistoricalCourseReference): void => {
+    const courseId = trimNullableString(ref.course_id);
+    const courseCode = trimNullableString(ref.course_code);
+    if (courseId == null && courseCode == null) return;
+    const key = `${ref.source}:${(courseId ?? "").toLowerCase()}:${(courseCode ?? "").toLowerCase()}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    refs.push({
+      course_id: courseId,
+      course_code: courseCode,
+      source: ref.source,
+    });
+  };
+
+  const [[portalRows], marksRows] = await Promise.all([
+    pool.query<RowDataPacket[]>(
+      `SELECT DISTINCT
+         TRIM(e.course_id) AS course_id,
+         TRIM(pc.course_code) AS course_code
+       FROM portal_enrollments e
+       INNER JOIN portal_courses pc
+         ON pc.course_id COLLATE utf8mb4_unicode_ci =
+            e.course_id COLLATE utf8mb4_unicode_ci
+       WHERE e.student_external_id COLLATE utf8mb4_unicode_ci =
+             CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci`,
+      [sid],
+    ),
+    listMarksForStudent(pool, sid),
+  ]);
+
+  for (const row of portalRows) {
+    pushRef({
+      course_id: trimNullableString(row.course_id),
+      course_code: trimNullableString(row.course_code),
+      source: "portal",
+    });
+  }
+
+  const uniqueMarksCodes = Array.from(
+    new Set(
+      marksRows
+        .map((row) => row.code.trim())
+        .filter((code) => code !== ""),
+    ),
+  );
+  if (uniqueMarksCodes.length === 0) {
+    return refs;
+  }
+
+  const placeholders = uniqueMarksCodes.map(() => "?").join(", ");
+  const [catalogRows] = await pool.query<RowDataPacket[]>(
+    `SELECT TRIM(course_id) AS course_id, TRIM(course_code) AS course_code
+     FROM portal_courses
+     WHERE TRIM(course_code) COLLATE utf8mb4_unicode_ci IN (${placeholders})`,
+    uniqueMarksCodes,
+  );
+  const catalogByCode = new Map(
+    catalogRows.map((row) => [
+      String(row.course_code ?? "").trim().toLowerCase(),
+      trimNullableString(row.course_id),
+    ]),
+  );
+
+  for (const courseCode of uniqueMarksCodes) {
+    pushRef({
+      course_id: catalogByCode.get(courseCode.toLowerCase()) ?? null,
+      course_code: courseCode,
+      source: "marks",
+    });
+  }
+
+  return refs;
+}
+
 /**
  * Validates each section against `course_sections` and `portal_courses`, then inserts or reactivates
  * `portal_enrollments` rows. Duplicate / idempotency: same student + `course_section_id` + term + year
@@ -125,6 +354,7 @@ export async function enrollStudentInSections(
   term: string,
   year: number,
   sections: EnrollSectionInput[],
+  options?: { resolvedSections?: ResolvedEnrollmentSection[] },
 ): Promise<
   { ok: true; insertedCount: number } | { ok: false; error: string }
 > {
@@ -138,69 +368,25 @@ export async function enrollStudentInSections(
   try {
     await conn.beginTransaction();
     let insertedCount = 0;
+    const resolvedSections =
+      options?.resolvedSections != null
+        ? { ok: true as const, sections: options.resolvedSections }
+        : await resolveRequestedEnrollmentSectionsForTermWithQueryable(
+            conn,
+            trimmedTerm,
+            year,
+            sections,
+          );
+    if (!resolvedSections.ok) {
+      await conn.rollback();
+      return resolvedSections;
+    }
 
-    for (const raw of sections) {
-      const courseCode = raw.course_code.trim();
-      const sectionCode = raw.section_code.trim();
-      if (!courseCode || !sectionCode) {
-        await conn.rollback();
-        return {
-          ok: false,
-          error: "Each section must include course_code and section_code.",
-        };
-      }
-
-      let secRows: RowDataPacket[];
-      if (raw.schedule_track === "EN" || raw.schedule_track === "CN") {
-        const [rows] = await conn.query<RowDataPacket[]>(
-          `SELECT id, section_code, schedule_track FROM course_sections
-           WHERE course_code = ? AND section_code = ? AND term = ? AND year = ?
-             AND schedule_track = ?`,
-          [courseCode, sectionCode, trimmedTerm, year, raw.schedule_track],
-        );
-        secRows = rows;
-      } else {
-        const [rows] = await conn.query<RowDataPacket[]>(
-          `SELECT id, section_code, schedule_track FROM course_sections
-           WHERE course_code = ? AND section_code = ? AND term = ? AND year = ?
-           ORDER BY CASE schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, id ASC`,
-          [courseCode, sectionCode, trimmedTerm, year],
-        );
-        secRows = rows;
-      }
-
-      if (secRows.length === 0) {
-        await conn.rollback();
-        return {
-          ok: false,
-          error: `No section ${sectionCode} for course ${courseCode} in this term.`,
-        };
-      }
-      if (secRows.length > 1) {
-        await conn.rollback();
-        return {
-          ok: false,
-          error: `Multiple timetable sections match ${courseCode} ${sectionCode} for this term. Specify schedule_track EN or CN.`,
-        };
-      }
-      const secRow = secRows[0]!;
-      const courseSectionId = Number(secRow.id);
-      if (!Number.isFinite(courseSectionId) || courseSectionId <= 0) {
-        await conn.rollback();
-        return {
-          ok: false,
-          error: `Invalid section id for ${courseCode} ${sectionCode}.`,
-        };
-      }
-      const secCodeStored = String(secRow.section_code ?? sectionCode).trim();
-      const trRaw = secRow.schedule_track;
-      const scheduleTrackStored =
-        trRaw === null || trRaw === undefined
-          ? ""
-          : String(trRaw).trim().toUpperCase() === "CN"
-            ? "CN"
-            : "EN";
-
+    for (const section of resolvedSections.sections) {
+      const courseCode = section.course_code.trim();
+      const courseSectionId = section.course_section_id;
+      const secCodeStored = section.section_code.trim();
+      const scheduleTrackStored = section.schedule_track;
       const resolved = await resolvePortalCourseIdForEnrollment(conn, courseCode);
       if (!resolved.ok) {
         await conn.rollback();

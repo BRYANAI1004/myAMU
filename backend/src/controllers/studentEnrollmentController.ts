@@ -9,6 +9,7 @@ import {
   enrollStudentForAcademicTerm,
   RegistrationLockedOverdueBalanceError,
   type EnrollSectionInput,
+  type MissingPrerequisiteDetail,
 } from "../services/studentEnrollmentService.js";
 
 function devMessage(e: unknown): string {
@@ -110,7 +111,12 @@ export async function postStudentEnroll(
       parsed.sections,
     );
     if (!result.ok) {
-      res.status(400).json({ error: result.error });
+      const body: {
+        error: string;
+        details?: MissingPrerequisiteDetail[];
+      } = { error: result.error };
+      if (result.details != null) body.details = result.details;
+      res.status(400).json(body);
       return;
     }
     res.json({ success: true, insertedCount: result.insertedCount });

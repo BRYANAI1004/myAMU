@@ -108,7 +108,11 @@ export function CourseBinCheckoutPage() {
         )}
 
         {error != null && (
-          <p className="portal-login-error" role="alert" style={{ margin: '0 0 0.75rem' }}>
+          <p
+            className="portal-login-error"
+            role="alert"
+            style={{ margin: '0 0 0.75rem', whiteSpace: 'pre-line' }}
+          >
             {error}
           </p>
         )}

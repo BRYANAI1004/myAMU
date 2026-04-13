@@ -13,6 +13,18 @@ export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '')
 
 const JSON_SNIPPET_MAX = 280
 
+export class ApiError extends Error {
+  status: number
+  body: unknown
+
+  constructor(message: string, status: number, body: unknown) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.body = body
+  }
+}
+
 /**
  * Join base + path. `path` must start with `/` (e.g. `/api/students/x/account` or `...?term=Fall&year=2026`).
  */
@@ -84,7 +96,7 @@ export async function fetchApiJson(
       (typeof body.message === 'string' && body.message) ||
       (typeof body.error === 'string' && body.error) ||
       'Request failed'
-    throw new Error(`${msg} (HTTP ${res.status})`)
+    throw new ApiError(`${msg} (HTTP ${res.status})`, res.status, data)
   }
 
   return data
@@ -3153,6 +3165,68 @@ export type PostStudentEnrollResponse = {
   insertedCount: number
 }
 
+export type PostStudentEnrollErrorDetail = {
+  courseCode: string
+  sectionCode: string
+  missingPrerequisiteCourseCode: string
+  missingPrerequisiteCourseTitle: string | null
+}
+
+function parsePostStudentEnrollErrorDetails(
+  value: unknown,
+): PostStudentEnrollErrorDetail[] {
+  if (value == null || typeof value !== 'object') return []
+  const details = (value as { details?: unknown }).details
+  if (!Array.isArray(details)) return []
+  return details.flatMap((item) => {
+    if (item == null || typeof item !== 'object') return []
+    const row = item as Record<string, unknown>
+    const courseCode =
+      typeof row.courseCode === 'string' ? row.courseCode.trim() : ''
+    const sectionCode =
+      typeof row.sectionCode === 'string' ? row.sectionCode.trim() : ''
+    const missingPrerequisiteCourseCode =
+      typeof row.missingPrerequisiteCourseCode === 'string'
+        ? row.missingPrerequisiteCourseCode.trim()
+        : ''
+    const missingPrerequisiteCourseTitle =
+      typeof row.missingPrerequisiteCourseTitle === 'string'
+        ? row.missingPrerequisiteCourseTitle.trim() || null
+        : null
+    if (
+      courseCode === '' ||
+      sectionCode === '' ||
+      missingPrerequisiteCourseCode === ''
+    ) {
+      return []
+    }
+    return [
+      {
+        courseCode,
+        sectionCode,
+        missingPrerequisiteCourseCode,
+        missingPrerequisiteCourseTitle,
+      },
+    ]
+  })
+}
+
+function formatPostStudentEnrollErrorMessage(
+  baseMessage: string,
+  details: PostStudentEnrollErrorDetail[],
+): string {
+  if (details.length === 0) return baseMessage
+  return [
+    baseMessage,
+    ...details.map((item) => {
+      const titleSuffix = item.missingPrerequisiteCourseTitle
+        ? ` (${item.missingPrerequisiteCourseTitle})`
+        : ''
+      return `${item.courseCode} section ${item.sectionCode} requires ${item.missingPrerequisiteCourseCode}${titleSuffix}.`
+    }),
+  ].join('\n')
+}
+
 /** POST /api/student/enroll — inserts section-keyed `portal_enrollments` for the term (deduped per course_section_id). */
 export async function postStudentEnroll(
   body: PostStudentEnrollBody,
@@ -3175,6 +3249,16 @@ export async function postStudentEnroll(
     }
     throw new Error('Unexpected enroll response')
   } catch (e) {
+    if (e instanceof ApiError) {
+      const cleaned = e.message.replace(/\s*\(HTTP \d+\)\s*$/, '').trim()
+      const details = parsePostStudentEnrollErrorDetails(e.body)
+      if (details.length > 0) {
+        throw new Error(formatPostStudentEnrollErrorMessage(cleaned, details))
+      }
+      if (cleaned !== e.message) {
+        throw new Error(cleaned)
+      }
+    }
     if (e instanceof Error) {
       const cleaned = e.message.replace(/\s*\(HTTP \d+\)\s*$/, '').trim()
       if (cleaned !== e.message) {

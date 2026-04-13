@@ -6,12 +6,22 @@
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import {
   enrollStudentInSections,
+  listStudentHistoricalCourseReferences,
+  resolveRequestedEnrollmentSectionsForTerm,
   type EnrollSectionInput,
+  type ResolvedEnrollmentSection,
 } from "../repositories/studentEnrollmentRepository.js";
 import { InvalidAcademicTermError } from "./courseSectionService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
 
 export type { EnrollSectionInput };
+
+export type MissingPrerequisiteDetail = {
+  courseCode: string;
+  sectionCode: string;
+  missingPrerequisiteCourseCode: string;
+  missingPrerequisiteCourseTitle: string | null;
+};
 
 /** Thrown when academic term policy blocks registration (maps to HTTP 400 with this message). */
 export class RegistrationLockedOverdueBalanceError extends Error {
@@ -27,6 +37,104 @@ function utcTodayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+function normalizeLookupKey(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim().toLowerCase();
+  return trimmed === "" ? null : trimmed;
+}
+
+function formatMissingPrerequisiteLabel(
+  section: ResolvedEnrollmentSection,
+): { code: string; title: string | null } {
+  return {
+    code:
+      section.prerequisite_course_code?.trim() ||
+      section.prerequisite_course_id?.trim() ||
+      "required prerequisite course",
+    title: section.prerequisite_course_title?.trim() || null,
+  };
+}
+
+function formatMissingPrerequisiteError(
+  details: MissingPrerequisiteDetail[],
+): string {
+  if (details.length === 1) {
+    const item = details[0]!;
+    return `Cannot complete registration. Missing prerequisite for ${item.courseCode} section ${item.sectionCode}: ${item.missingPrerequisiteCourseCode}.`;
+  }
+  return `Cannot complete registration. Missing prerequisites for: ${details
+    .map(
+      (item) =>
+        `${item.courseCode} section ${item.sectionCode} requires ${item.missingPrerequisiteCourseCode}`,
+    )
+    .join("; ")}.`;
+}
+
+async function validateEnrollmentPrerequisites(
+  studentId: string,
+  term: string,
+  year: number,
+  sections: EnrollSectionInput[],
+): Promise<
+  | { ok: true; resolvedSections: ResolvedEnrollmentSection[] }
+  | { ok: false; error: string; details?: MissingPrerequisiteDetail[] }
+> {
+  const resolved = await resolveRequestedEnrollmentSectionsForTerm(
+    term,
+    year,
+    sections,
+  );
+  if (!resolved.ok) {
+    return resolved;
+  }
+
+  const history = await listStudentHistoricalCourseReferences(studentId);
+  const historicalCourseIds = new Set<string>();
+  const historicalCourseCodes = new Set<string>();
+  for (const row of history) {
+    const courseId = normalizeLookupKey(row.course_id);
+    const courseCode = normalizeLookupKey(row.course_code);
+    if (courseId != null) historicalCourseIds.add(courseId);
+    if (courseCode != null) historicalCourseCodes.add(courseCode);
+  }
+
+  const missing: MissingPrerequisiteDetail[] = [];
+  for (const section of resolved.sections) {
+    const prerequisiteCourseId = normalizeLookupKey(section.prerequisite_course_id);
+    if (prerequisiteCourseId == null) {
+      continue;
+    }
+    const prerequisiteCourseCode = normalizeLookupKey(
+      section.prerequisite_course_code,
+    );
+    const satisfiedById = historicalCourseIds.has(prerequisiteCourseId);
+    const satisfiedByCode =
+      prerequisiteCourseCode != null &&
+      historicalCourseCodes.has(prerequisiteCourseCode);
+    if (satisfiedById || satisfiedByCode) {
+      continue;
+    }
+
+    const prerequisite = formatMissingPrerequisiteLabel(section);
+    missing.push({
+      courseCode: section.course_code,
+      sectionCode: section.section_code,
+      missingPrerequisiteCourseCode: prerequisite.code,
+      missingPrerequisiteCourseTitle: prerequisite.title,
+    });
+  }
+
+  if (missing.length > 0) {
+    return {
+      ok: false,
+      error: formatMissingPrerequisiteError(missing),
+      details: missing,
+    };
+  }
+
+  return { ok: true, resolvedSections: resolved.sections };
+}
+
 /**
  * Registers sections under the academic term’s `term_name` and `year`. Those values are the same
  * quarter key used by `portal_enrollments` and by finance (`getAccountingQuartersPayload` /
@@ -38,7 +146,8 @@ export async function enrollStudentForAcademicTerm(
   academicTermId: string,
   sections: EnrollSectionInput[],
 ): Promise<
-  { ok: true; insertedCount: number } | { ok: false; error: string }
+  | { ok: true; insertedCount: number }
+  | { ok: false; error: string; details?: MissingPrerequisiteDetail[] }
 > {
   const row = await getAcademicTermById(academicTermId.trim());
   if (!row) throw new InvalidAcademicTermError();
@@ -61,5 +170,17 @@ export async function enrollStudentForAcademicTerm(
     }
   }
 
-  return enrollStudentInSections(studentId, row.term_name, row.year, sections);
+  const validation = await validateEnrollmentPrerequisites(
+    studentId,
+    row.term_name,
+    row.year,
+    sections,
+  );
+  if (!validation.ok) {
+    return validation;
+  }
+
+  return enrollStudentInSections(studentId, row.term_name, row.year, sections, {
+    resolvedSections: validation.resolvedSections,
+  });
 }
