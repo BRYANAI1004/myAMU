@@ -14,6 +14,9 @@ export type CourseBinItem = {
   course_code: string
   eng_name: string
   chi_name: string
+  prerequisite_course_id?: string | null
+  prerequisite_course_code?: string | null
+  prerequisite_course_title?: string | null
   units: string
   section: string
   /** Disambiguates same section code on EN vs CN offered timetables; omitted/legacy = EN. */
@@ -65,6 +68,8 @@ function storageKeyForTerm(registrationTermId: string): string | null {
 function isCourseBinItemRecord(v: unknown): v is CourseBinItem {
   if (v == null || typeof v !== 'object') return false
   const o = v as Record<string, unknown>
+  const isOptionalNullableString = (value: unknown): boolean =>
+    value === undefined || value === null || typeof value === 'string'
   if (
     o.schedule_track !== undefined &&
     o.schedule_track !== 'EN' &&
@@ -84,7 +89,10 @@ function isCourseBinItemRecord(v: unknown): v is CourseBinItem {
     typeof o.time === 'string' &&
     typeof o.days === 'string' &&
     typeof o.instructor === 'string' &&
-    typeof o.location === 'string'
+    typeof o.location === 'string' &&
+    isOptionalNullableString(o.prerequisite_course_id) &&
+    isOptionalNullableString(o.prerequisite_course_code) &&
+    isOptionalNullableString(o.prerequisite_course_title)
   )
 }
 

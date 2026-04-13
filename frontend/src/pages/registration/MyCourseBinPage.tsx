@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { getPreferredCourseTitle } from '../../lib/courseDisplayName'
+import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import {
   courseBinSectionKey,
   useCourseBin,
@@ -10,6 +11,14 @@ import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 function binRowKey(item: CourseBinItem): string {
   return courseBinSectionKey(item.course_code, item.section, item.schedule_track)
+}
+
+function prerequisiteText(item: CourseBinItem, label: string): string | null {
+  const display = formatPrerequisiteCourseDisplay({
+    courseCode: item.prerequisite_course_code,
+    courseTitle: item.prerequisite_course_title,
+  })
+  return display ? `${label}: ${display}` : null
 }
 
 export function MyCourseBinPage() {
@@ -74,49 +83,55 @@ export function MyCourseBinPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr key={binRowKey(item)}>
-                    <td>
-                      <div className="portal-course-bin-course-cell">
-                        <span className="portal-course-bin-course-code">{item.course_code.trim() || '—'}</span>
-                        <span className="portal-course-bin-course-title">
-                          {getPreferredCourseTitle(
-                            {
-                              code: item.course_code,
-                              eng_name: item.eng_name,
-                              chi_name: item.chi_name,
-                            },
-                            item.schedule_track,
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td>{item.section}</td>
-                    <td>{item.session}</td>
-                    <td>{item.type}</td>
-                    <td>{item.units}</td>
-                    <td>{item.registered}</td>
-                    <td>{item.time}</td>
-                    <td>{item.days}</td>
-                    <td>{item.instructor}</td>
-                    <td>{item.location}</td>
-                    <td className="portal-course-section-schedule-col-action">
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--course-search-bin"
-                        onClick={() =>
-                          removeFromCourseBin(
-                            item.course_code,
-                            item.section,
-                            item.schedule_track,
-                          )
-                        }
-                      >
-                        {t('removedFromCourseBin')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const prerequisite = prerequisiteText(item, t('prerequisiteLabel'))
+                  return (
+                    <tr key={binRowKey(item)}>
+                      <td>
+                        <div className="portal-course-bin-course-cell">
+                          <span className="portal-course-bin-course-code">{item.course_code.trim() || '—'}</span>
+                          <span className="portal-course-bin-course-title">
+                            {getPreferredCourseTitle(
+                              {
+                                code: item.course_code,
+                                eng_name: item.eng_name,
+                                chi_name: item.chi_name,
+                              },
+                              item.schedule_track,
+                            )}
+                          </span>
+                          {prerequisite ? (
+                            <span className="portal-text-muted">{prerequisite}</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td>{item.section}</td>
+                      <td>{item.session}</td>
+                      <td>{item.type}</td>
+                      <td>{item.units}</td>
+                      <td>{item.registered}</td>
+                      <td>{item.time}</td>
+                      <td>{item.days}</td>
+                      <td>{item.instructor}</td>
+                      <td>{item.location}</td>
+                      <td className="portal-course-section-schedule-col-action">
+                        <button
+                          type="button"
+                          className="portal-btn portal-btn--course-search-bin"
+                          onClick={() =>
+                            removeFromCourseBin(
+                              item.course_code,
+                              item.section,
+                              item.schedule_track,
+                            )
+                          }
+                        >
+                          {t('removedFromCourseBin')}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

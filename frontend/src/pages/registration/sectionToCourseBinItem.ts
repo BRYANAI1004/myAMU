@@ -1,6 +1,6 @@
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatWeekdaysShortFromStored } from '../../lib/weekdaySchedule'
-import type { AdminCourseSection } from '../../lib/api'
+import type { AdminCourseSection, OpenRegistrationCourseRow } from '../../lib/api'
 import type { CourseBinItem } from './CourseBinContext'
 
 const PLACEHOLDER_REGISTERED = '0 of 0'
@@ -36,6 +36,10 @@ export function typeLabelForCourseBin(sec: AdminCourseSection): string {
 export function adminSectionToCourseBinItem(
   sec: AdminCourseSection,
   catalog: CatalogCourseLite | undefined,
+  prerequisite?: Pick<
+    OpenRegistrationCourseRow,
+    'prerequisiteCourseId' | 'prerequisiteCourseCode' | 'prerequisiteCourseTitle'
+  >,
 ): CourseBinItem {
   const code = cellText(sec.course_code)
   const timeRaw = formatTimeRangeHmsForDisplay(sec.start_time, sec.end_time)
@@ -50,6 +54,9 @@ export function adminSectionToCourseBinItem(
     course_code: code,
     eng_name: eng === '' ? code : eng,
     chi_name: chi,
+    prerequisite_course_id: prerequisite?.prerequisiteCourseId ?? null,
+    prerequisite_course_code: prerequisite?.prerequisiteCourseCode ?? null,
+    prerequisite_course_title: prerequisite?.prerequisiteCourseTitle ?? null,
     units: unitsCat === '' ? '—' : unitsCat,
     section: secCode === '' ? '—' : secCode,
     schedule_track: sec.schedule_track,

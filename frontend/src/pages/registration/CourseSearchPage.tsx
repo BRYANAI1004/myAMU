@@ -1,8 +1,9 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
-import { fetchApiJson } from '../../lib/api'
+import { fetchAdminCoursesOpenForRegistration, fetchApiJson, type OpenRegistrationCourseRow } from '../../lib/api'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
+import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import { formatWeekdaysShortFromStored } from '../../lib/weekdaySchedule'
 import { useCourseBin, type CourseBinItem } from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
@@ -175,6 +176,9 @@ function CourseSectionScheduleTable({
   phase,
   sectionRows,
   course,
+  prerequisiteCourseId,
+  prerequisiteCourseCode,
+  prerequisiteCourseTitle,
   sectionLoad,
   sectionErr,
   addToCourseBin,
@@ -185,12 +189,19 @@ function CourseSectionScheduleTable({
   phase: SectionPanelPhase
   sectionRows: CourseSectionDetail[] | undefined
   course: CourseCatalogItem
+  prerequisiteCourseId?: string | null
+  prerequisiteCourseCode?: string | null
+  prerequisiteCourseTitle?: string | null
   sectionLoad: boolean
   sectionErr: string | undefined
   addToCourseBin: (item: CourseBinItem) => void
   t: (key: StudentPortalKey) => string
 }) {
   const rows = sectionScheduleRows(phase, sectionRows, course, t)
+  const prerequisiteDisplay = formatPrerequisiteCourseDisplay({
+    courseCode: prerequisiteCourseCode,
+    courseTitle: prerequisiteCourseTitle,
+  })
 
   return (
     <div
@@ -212,6 +223,11 @@ function CourseSectionScheduleTable({
           {sectionErr}
         </p>
       )}
+      {prerequisiteDisplay ? (
+        <p className="portal-text-muted">
+          {t('prerequisiteLabel')}: {prerequisiteDisplay}
+        </p>
+      ) : null}
       <div className="portal-course-search-sections-table-wrap portal-course-search-sections-table-wrap--schedule">
         <div className="portal-course-search-sections-table-scroll">
           <table className="portal-table portal-table--course-sections portal-table--course-section-schedule">
@@ -252,6 +268,9 @@ function CourseSectionScheduleTable({
                           course_code: cellText(courseCode),
                           eng_name: cellText(course.eng_name),
                           chi_name: cellText(course.chi_name),
+                          prerequisite_course_id: prerequisiteCourseId ?? null,
+                          prerequisite_course_code: prerequisiteCourseCode ?? null,
+                          prerequisite_course_title: prerequisiteCourseTitle ?? null,
                           units: row.units,
                           section: row.section,
                           session: row.session,
@@ -309,6 +328,7 @@ export function CourseSearchPage() {
   const registrationTermId = useRegistrationTermSearchParam()
   const { addToCourseBin } = useCourseBin()
   const [courses, setCourses] = useState<CourseCatalogItem[]>([])
+  const [openRegistrationCourses, setOpenRegistrationCourses] = useState<OpenRegistrationCourseRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
@@ -361,6 +381,45 @@ export function CourseSearchPage() {
       cancelled = true
     }
   }, [t])
+
+  useEffect(() => {
+    const termId = registrationTermId?.trim() ?? ''
+    if (termId === '') {
+      setOpenRegistrationCourses([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const rows = await fetchAdminCoursesOpenForRegistration({ termId })
+        if (!cancelled) {
+          setOpenRegistrationCourses(rows)
+        }
+      } catch (e) {
+        if (cancelled) return
+        console.error('[course-search] open-registration course load failed', e)
+        setOpenRegistrationCourses([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [registrationTermId])
+
+  const prerequisiteByCode = useMemo(() => {
+    const map = new Map<
+      string,
+      Pick<
+        OpenRegistrationCourseRow,
+        'prerequisiteCourseId' | 'prerequisiteCourseCode' | 'prerequisiteCourseTitle'
+      >
+    >()
+    for (const row of openRegistrationCourses) {
+      const code = cellText(row.courseCode)
+      if (code !== '') map.set(code.toUpperCase(), row)
+    }
+    return map
+  }, [openRegistrationCourses])
 
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -620,6 +679,7 @@ export function CourseSearchPage() {
                                 const rowKey = `${group.prefixKey}-${code || 'row'}-${i}`
                                 const panelId = `course-sections-${rowKey}`
                                 const courseOpen = expandedCourseCodes.has(code)
+                                const prerequisite = prerequisiteByCode.get(code.toUpperCase())
                                 const sectionRows = sectionsByCode[code]
                                 const sectionLoad = sectionsLoading[code] === true
                                 const sectionErr = sectionsError[code]
@@ -661,6 +721,9 @@ export function CourseSearchPage() {
                                             phase={phase}
                                             sectionRows={sectionRows}
                                             course={c}
+                                            prerequisiteCourseId={prerequisite?.prerequisiteCourseId ?? null}
+                                            prerequisiteCourseCode={prerequisite?.prerequisiteCourseCode ?? null}
+                                            prerequisiteCourseTitle={prerequisite?.prerequisiteCourseTitle ?? null}
                                             sectionLoad={sectionLoad}
                                             sectionErr={sectionErr}
                                             addToCourseBin={addToCourseBin}

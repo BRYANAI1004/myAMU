@@ -2780,6 +2780,9 @@ export type OpenRegistrationCourseRow = {
     student_external_id: string
     full_name: string | null
   }>
+  prerequisiteCourseId?: string | null
+  prerequisiteCourseCode?: string | null
+  prerequisiteCourseTitle?: string | null
   registrationStatus: 'Open' | 'Closed'
 }
 
@@ -2847,6 +2850,24 @@ function parseOpenRegistrationCourseRow(
     )
     if (list.length > 0) enrolledStudents = list
   }
+  const prerequisiteCourseIdRaw =
+    row.prerequisiteCourseId ?? row.prerequisite_course_id
+  const prerequisiteCourseCodeRaw =
+    row.prerequisiteCourseCode ?? row.prerequisite_course_code
+  const prerequisiteCourseTitleRaw =
+    row.prerequisiteCourseTitle ?? row.prerequisite_course_title
+  const prerequisiteCourseId =
+    prerequisiteCourseIdRaw == null || String(prerequisiteCourseIdRaw).trim() === ''
+      ? null
+      : String(prerequisiteCourseIdRaw).trim()
+  const prerequisiteCourseCode =
+    prerequisiteCourseCodeRaw == null || String(prerequisiteCourseCodeRaw).trim() === ''
+      ? null
+      : String(prerequisiteCourseCodeRaw).trim()
+  const prerequisiteCourseTitle =
+    prerequisiteCourseTitleRaw == null || String(prerequisiteCourseTitleRaw).trim() === ''
+      ? null
+      : String(prerequisiteCourseTitleRaw).trim()
   return {
     courseCode: courseCode.trim(),
     courseTitle: courseTitle.trim(),
@@ -2857,6 +2878,9 @@ function parseOpenRegistrationCourseRow(
     openSections: os,
     enrolledCount,
     ...(enrolledStudents != null ? { enrolledStudents } : {}),
+    prerequisiteCourseId,
+    prerequisiteCourseCode,
+    prerequisiteCourseTitle,
     registrationStatus,
   }
 }

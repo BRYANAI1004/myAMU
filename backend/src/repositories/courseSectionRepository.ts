@@ -325,6 +325,13 @@ export type CourseSectionCountByCourse = {
   section_count: number;
 };
 
+export type CoursePrerequisiteCandidateByCourse = {
+  course_code: string;
+  prerequisite_course_id: string | null;
+  prerequisite_course_code: string | null;
+  prerequisite_course_title: string | null;
+};
+
 /** Course-level `portal_enrollments` counts (distinct students; multiple section rows per student still count once per course). */
 export type PortalEnrollmentRollupByCourse = {
   course_code: string;
@@ -390,6 +397,51 @@ export async function countCourseSectionsByCourseForTermYear(
   return rows.map((r) => ({
     course_code: String(r.course_code ?? ""),
     section_count: Number(r.section_count ?? 0),
+  }));
+}
+
+function trimNullableString(v: unknown): string | null {
+  const s = nullableString(v);
+  if (s == null) return null;
+  const t = s.trim();
+  return t === "" ? null : t;
+}
+
+/**
+ * Candidate prerequisite rows for each offered course in a term/year.
+ *
+ * Returns one row per section so the service layer can deterministically pick a
+ * course-level prerequisite and optionally warn when sections disagree.
+ */
+export async function listCoursePrerequisiteCandidatesByCourseForTermYear(
+  term: string,
+  year: number,
+): Promise<CoursePrerequisiteCandidateByCourse[]> {
+  const sql = `
+    SELECT
+      cs.course_code,
+      cs.prerequisite_course_id,
+      pc.course_code AS prerequisite_course_code,
+      pc.title AS prerequisite_course_title
+    FROM course_sections cs
+    LEFT JOIN portal_courses pc
+      ON pc.course_id = cs.prerequisite_course_id
+    WHERE cs.term = ? AND cs.year = ?
+    ORDER BY
+      cs.course_code ASC,
+      CASE
+        WHEN cs.prerequisite_course_id IS NULL OR TRIM(cs.prerequisite_course_id) = '' THEN 1
+        ELSE 0
+      END ASC,
+      cs.prerequisite_course_id ASC,
+      cs.id ASC
+  `;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [term.trim(), year]);
+  return rows.map((r) => ({
+    course_code: String(r.course_code ?? "").trim(),
+    prerequisite_course_id: trimNullableString(r.prerequisite_course_id),
+    prerequisite_course_code: trimNullableString(r.prerequisite_course_code),
+    prerequisite_course_title: trimNullableString(r.prerequisite_course_title),
   }));
 }
 

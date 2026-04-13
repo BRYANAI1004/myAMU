@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
 import {
+  fetchAdminCoursesOpenForRegistration,
   fetchAdminCourseSections,
   fetchApiJson,
   type AdminCourseSection,
+  type OpenRegistrationCourseRow,
 } from '../../lib/api'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeHmsForDisplay, formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
+import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import {
   buildTimetablePlacedBlocksByDay,
   STUDENT_REGISTRATION_TIMETABLE_GRID,
@@ -195,6 +198,7 @@ export function OfferedTimetablePage() {
   const [detailSection, setDetailSection] = useState<AdminCourseSection | null>(null)
   const [sections, setSections] = useState<AdminCourseSection[] | null>(null)
   const [catalog, setCatalog] = useState<CatalogCourseLite[]>([])
+  const [openRegistrationCourses, setOpenRegistrationCourses] = useState<OpenRegistrationCourseRow[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -244,6 +248,43 @@ export function OfferedTimetablePage() {
     }
     return m
   }, [catalog])
+
+  useEffect(() => {
+    const termId = registrationTermId?.trim() ?? ''
+    if (termId === '') {
+      setOpenRegistrationCourses([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const rows = await fetchAdminCoursesOpenForRegistration({ termId })
+        if (!cancelled) setOpenRegistrationCourses(rows)
+      } catch (e) {
+        if (cancelled) return
+        console.error('[offered-timetable] open-registration course load failed', e)
+        setOpenRegistrationCourses([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [registrationTermId])
+
+  const prerequisiteByCode = useMemo(() => {
+    const m = new Map<
+      string,
+      Pick<
+        OpenRegistrationCourseRow,
+        'prerequisiteCourseId' | 'prerequisiteCourseCode' | 'prerequisiteCourseTitle'
+      >
+    >()
+    for (const row of openRegistrationCourses) {
+      const code = cellText(row.courseCode)
+      if (code !== '') m.set(code.toUpperCase(), row)
+    }
+    return m
+  }, [openRegistrationCourses])
 
   useEffect(() => {
     const tid = registrationTermId?.trim() ?? ''
@@ -313,10 +354,13 @@ export function OfferedTimetablePage() {
     if (detailSection == null) return
     if (isSectionInBin(binItems, detailSection)) return
     const cat = catalogByCode.get(cellText(detailSection.course_code).toUpperCase())
-    addToCourseBin(adminSectionToCourseBinItem(detailSection, cat))
+    const prerequisite = prerequisiteByCode.get(
+      cellText(detailSection.course_code).toUpperCase(),
+    )
+    addToCourseBin(adminSectionToCourseBinItem(detailSection, cat, prerequisite))
     showToast(t('toastAddedToCourseBin'))
     setDetailSection(null)
-  }, [addToCourseBin, binItems, catalogByCode, detailSection, showToast, t])
+  }, [addToCourseBin, binItems, catalogByCode, detailSection, prerequisiteByCode, showToast, t])
 
   const handleConfirmRemoveFromModal = useCallback(() => {
     if (detailSection == null) return
@@ -358,6 +402,13 @@ export function OfferedTimetablePage() {
       : ''
   const detailInBin =
     detailSection != null && isSectionInBin(binItems, detailSection)
+  const detailPrerequisite = detailSection
+    ? prerequisiteByCode.get(cellText(detailSection.course_code).toUpperCase())
+    : undefined
+  const detailPrerequisiteDisplay = formatPrerequisiteCourseDisplay({
+    courseCode: detailPrerequisite?.prerequisiteCourseCode,
+    courseTitle: detailPrerequisite?.prerequisiteCourseTitle,
+  })
 
   const showTimetableTabs =
     !termMissing &&
@@ -514,6 +565,10 @@ export function OfferedTimetablePage() {
                   <dd>{detailAlternateTitle}</dd>
                 </div>
               ) : null}
+              <div>
+                <dt>{t('prerequisiteLabel')}</dt>
+                <dd>{detailPrerequisiteDisplay ?? '—'}</dd>
+              </div>
               <div>
                 <dt>{t('offeredModalDtTimetableTrack')}</dt>
                 <dd>{scheduleTrackDetailLabel(detailSection.schedule_track)}</dd>

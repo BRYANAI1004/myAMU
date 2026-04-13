@@ -1,7 +1,9 @@
+import { env } from "../config/env.js";
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import { listCoursesFromMysql, type CourseListItem } from "../repositories/courseRepository.js";
 import {
   countCourseSectionsByCourseForTermYear,
+  listCoursePrerequisiteCandidatesByCourseForTermYear,
   listPortalEnrollmentRollupsByCourseForTermYear,
 } from "../repositories/courseSectionRepository.js";
 
@@ -19,6 +21,9 @@ export type AdminOpenRegistrationCourseRow = {
     student_external_id: string;
     full_name: string | null;
   }>;
+  prerequisiteCourseId: string | null;
+  prerequisiteCourseCode: string | null;
+  prerequisiteCourseTitle: string | null;
   registrationStatus: "Open" | "Closed";
 };
 
@@ -54,6 +59,57 @@ function categoryFromCatalog(row: CourseListItem | undefined): string {
   return s === "" ? "—" : s;
 }
 
+type CoursePrerequisiteSummary = Pick<
+  AdminOpenRegistrationCourseRow,
+  "prerequisiteCourseId" | "prerequisiteCourseCode" | "prerequisiteCourseTitle"
+>;
+
+function summarizeCoursePrerequisites(
+  candidates: Awaited<
+    ReturnType<typeof listCoursePrerequisiteCandidatesByCourseForTermYear>
+  >,
+): Map<string, CoursePrerequisiteSummary> {
+  const out = new Map<string, CoursePrerequisiteSummary>();
+  const distinctByCourse = new Map<string, Set<string>>();
+
+  for (const row of candidates) {
+    const code = row.course_code.trim();
+    if (code === "") continue;
+    const key = catalogKey(code);
+    const prerequisiteCourseId =
+      row.prerequisite_course_id?.trim() ? row.prerequisite_course_id.trim() : null;
+    const summary: CoursePrerequisiteSummary = {
+      prerequisiteCourseId,
+      prerequisiteCourseCode:
+        row.prerequisite_course_code?.trim() ? row.prerequisite_course_code.trim() : null,
+      prerequisiteCourseTitle:
+        row.prerequisite_course_title?.trim() ? row.prerequisite_course_title.trim() : null,
+    };
+
+    if (!out.has(key)) {
+      out.set(key, summary);
+    }
+
+    if (prerequisiteCourseId == null) continue;
+    const distinct = distinctByCourse.get(key) ?? new Set<string>();
+    distinct.add(prerequisiteCourseId);
+    distinctByCourse.set(key, distinct);
+  }
+
+  if (env.nodeEnv === "development") {
+    for (const [key, ids] of distinctByCourse) {
+      if (ids.size <= 1) continue;
+      console.warn(
+        `[adminOpenRegistrationCoursesService] inconsistent prerequisites for course ${key}: ${[
+          ...ids,
+        ].join(", ")}`,
+      );
+    }
+  }
+
+  return out;
+}
+
 /**
  * Admin rollup: courses that have at least one section scheduled in the given academic term.
  *
@@ -68,8 +124,9 @@ export async function listAdminOpenRegistrationCourses(
   const term = await getAcademicTermById(academicTermId.trim());
   if (!term) return null;
 
-  const [counts, enrollmentRollups] = await Promise.all([
+  const [counts, prerequisiteCandidates, enrollmentRollups] = await Promise.all([
     countCourseSectionsByCourseForTermYear(term.term_name, term.year),
+    listCoursePrerequisiteCandidatesByCourseForTermYear(term.term_name, term.year),
     listPortalEnrollmentRollupsByCourseForTermYear(term.term_name, term.year),
   ]);
   if (counts.length === 0) return [];
@@ -81,6 +138,8 @@ export async function listAdminOpenRegistrationCourses(
   for (const r of enrollmentRollups) {
     enrollmentByCode.set(catalogKey(r.course_code), r);
   }
+
+  const prerequisiteByCode = summarizeCoursePrerequisites(prerequisiteCandidates);
 
   const catalog = await listCoursesFromMysql();
   const byCode = new Map<string, CourseListItem>();
@@ -99,6 +158,7 @@ export async function listAdminOpenRegistrationCourses(
     if (code === "" || section_count <= 0) continue;
     const cat = byCode.get(catalogKey(code));
     const en = enrollmentByCode.get(catalogKey(code));
+    const prerequisite = prerequisiteByCode.get(catalogKey(code));
     const enrolledCount = en?.enrolled_count ?? 0;
     out.push({
       courseCode: code,
@@ -109,6 +169,9 @@ export async function listAdminOpenRegistrationCourses(
       termLabel: term.term_label,
       openSections: section_count,
       enrolledCount,
+      prerequisiteCourseId: prerequisite?.prerequisiteCourseId ?? null,
+      prerequisiteCourseCode: prerequisite?.prerequisiteCourseCode ?? null,
+      prerequisiteCourseTitle: prerequisite?.prerequisiteCourseTitle ?? null,
       ...(en?.enrolled_students != null && en.enrolled_students.length > 0
         ? { enrolledStudents: en.enrolled_students }
         : {}),

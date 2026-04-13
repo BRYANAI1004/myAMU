@@ -771,6 +771,7 @@ export const STUDENT_PORTAL_EN = {
   registrationScheduleUnplacedTitle: 'Not shown on grid',
   registrationScheduleUnplacedHelp:
     'These entries do not have enough schedule detail to place on the timetable.',
+  prerequisiteLabel: 'Prerequisite',
 
   offeredTimetableHeading: 'Offered Timetable',
   offeredTimetableLanguageAria: 'Timetable language',
@@ -1840,6 +1841,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationTimetableBlockAria: '{code} 第 {section} 班。{title}',
   registrationScheduleUnplacedTitle: '未顯示於課表格線',
   registrationScheduleUnplacedHelp: '以下項目缺乏足夠排課細節，無法置於課表。',
+  prerequisiteLabel: '先修課程',
 
   offeredTimetableHeading: '開課時間表',
   offeredTimetableLanguageAria: '課表語言',
