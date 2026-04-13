@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { AdminFinanceLedgerPanel } from '../../components/admin/AdminFinanceLedgerPanel'
 import {
   fetchAdminFinanceStudents,
@@ -295,46 +296,56 @@ export function AdminFinancePage() {
                   </tr>
                 ) : null}
                 {rows != null && rows.length > 0
-                  ? rows.map((r) => (
-                      <Fragment key={r.studentId}>
-                        <tr>
-                          <td className="admin-finance-student-id-cell">
-                            {r.studentId}
-                          </td>
-                          <td>{r.name}</td>
-                          <td className="admin-table-numeric">
-                            {Number.isFinite(r.balance)
-                              ? formatMoney(r.balance)
-                              : '—'}
-                          </td>
-                          <td>
-                            <button
-                              type="button"
-                              className="portal-btn portal-btn--secondary portal-btn--compact"
-                              onClick={() => toggleLedger(r.studentId)}
-                              aria-expanded={expandedId === r.studentId}
-                            >
-                              {expandedId === r.studentId
-                                ? 'Hide ledger'
-                                : 'View Ledger'}
-                            </button>
-                          </td>
-                        </tr>
-                        {expandedId === r.studentId ? (
-                          <tr className="admin-finance-expand-row">
-                            <td colSpan={4} className="admin-finance-expand-cell">
-                              <AdminFinanceLedgerPanel
-                                studentId={r.studentId}
-                                term={selectedQuarter.term}
-                                year={selectedQuarter.year}
-                                quarterLabel={selectedQuarter.label}
-                                onRosterRefresh={bumpRoster}
-                              />
+                  ? rows.map((r) => {
+                      const studentName = r.name?.trim() || 'Unknown student'
+                      return (
+                        <Fragment key={r.studentId}>
+                          <tr>
+                            <td className="admin-finance-student-id-cell">
+                              {r.studentId}
+                            </td>
+                            <td>
+                              <Link
+                                to={`/admin/students/${encodeURIComponent(r.studentId)}`}
+                                className="admin-student-name-link"
+                              >
+                                {studentName}
+                              </Link>
+                            </td>
+                            <td className="admin-table-numeric">
+                              {Number.isFinite(r.balance)
+                                ? formatMoney(r.balance)
+                                : '—'}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="portal-btn portal-btn--secondary portal-btn--compact"
+                                onClick={() => toggleLedger(r.studentId)}
+                                aria-expanded={expandedId === r.studentId}
+                              >
+                                {expandedId === r.studentId
+                                  ? 'Hide ledger'
+                                  : 'View Ledger'}
+                              </button>
                             </td>
                           </tr>
-                        ) : null}
-                      </Fragment>
-                    ))
+                          {expandedId === r.studentId ? (
+                            <tr className="admin-finance-expand-row">
+                              <td colSpan={4} className="admin-finance-expand-cell">
+                                <AdminFinanceLedgerPanel
+                                  studentId={r.studentId}
+                                  term={selectedQuarter.term}
+                                  year={selectedQuarter.year}
+                                  quarterLabel={selectedQuarter.label}
+                                  onRosterRefresh={bumpRoster}
+                                />
+                              </td>
+                            </tr>
+                          ) : null}
+                        </Fragment>
+                      )
+                    })
                   : null}
               </tbody>
             </table>

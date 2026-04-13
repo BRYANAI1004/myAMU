@@ -380,6 +380,7 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
   id: string;
   name: unknown;
   email: unknown;
+  status: unknown;
   program: unknown;
   background: unknown;
   requirements_id: unknown;
@@ -423,7 +424,32 @@ export type LegacyAdminStudentListQuery = {
   search: string;
   /** Admin roster program filter backed by `students.program`. */
   program: "all" | "dahm" | "mahm";
+  /** Derived from the first character of `students.id`. */
+  track: "all" | "C" | "E";
+  /** Derived 4-digit year from `students.id` characters 2-3. */
+  entryYear: string | null;
+  /** Derived intake code from `students.id` character 4. */
+  intakeCode: string | null;
 };
+
+const ADMIN_STUDENT_ID_TRIM_SQL = "TRIM(s.id)";
+const ADMIN_STUDENT_TRACK_SQL = `CASE
+  WHEN s.id IS NOT NULL AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 1
+    THEN UPPER(LEFT(${ADMIN_STUDENT_ID_TRIM_SQL}, 1))
+  ELSE NULL
+END`;
+const ADMIN_STUDENT_ENTRY_YEAR_SQL = `CASE
+  WHEN s.id IS NOT NULL
+    AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 4
+    AND SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 2, 2) REGEXP '^[0-9]{2}$'
+    THEN CONCAT('20', SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 2, 2))
+  ELSE NULL
+END`;
+const ADMIN_STUDENT_INTAKE_CODE_SQL = `CASE
+  WHEN s.id IS NOT NULL AND CHAR_LENGTH(${ADMIN_STUDENT_ID_TRIM_SQL}) >= 4
+    THEN UPPER(SUBSTRING(${ADMIN_STUDENT_ID_TRIM_SQL}, 4, 1))
+  ELSE NULL
+END`;
 
 function buildAdminStudentProgramClause(
   program: LegacyAdminStudentListQuery["program"],
@@ -433,6 +459,18 @@ function buildAdminStudentProgramClause(
       return `UPPER(TRIM(s.program)) = 'DAHM'`;
     case "mahm":
       return `UPPER(TRIM(s.program)) = 'MAHM'`;
+    default:
+      return "";
+  }
+}
+
+function buildAdminStudentTrackClause(
+  track: LegacyAdminStudentListQuery["track"],
+): string {
+  switch (track) {
+    case "C":
+    case "E":
+      return `${ADMIN_STUDENT_TRACK_SQL} = '${track}'`;
     default:
       return "";
   }
@@ -457,6 +495,18 @@ function buildAdminStudentListFilters(
   const programClause = buildAdminStudentProgramClause(query.program);
   if (programClause !== "") {
     clauses.push(programClause);
+  }
+  const trackClause = buildAdminStudentTrackClause(query.track);
+  if (trackClause !== "") {
+    clauses.push(trackClause);
+  }
+  if (query.entryYear != null) {
+    clauses.push(`${ADMIN_STUDENT_ENTRY_YEAR_SQL} = ?`);
+    params.push(query.entryYear);
+  }
+  if (query.intakeCode != null) {
+    clauses.push(`${ADMIN_STUDENT_INTAKE_CODE_SQL} = ?`);
+    params.push(query.intakeCode);
   }
   if (clauses.length === 0) {
     return { clause: "", params };
@@ -492,6 +542,7 @@ const ADMIN_STUDENT_LIST_SELECT_SQL = `SELECT
        TRIM(s.id) AS id,
        s.name,
        s.email,
+       NULLIF(TRIM(s.status), '') AS status,
        TRIM(s.program) AS program,
        s.background,
        s.requirements_id,
@@ -541,6 +592,29 @@ export async function listLegacyAdminStudentListRows(
     `${ADMIN_STUDENT_LIST_SELECT_SQL}
      ${clause}
      ORDER BY s.name ASC, s.id ASC`,
+    params,
+  );
+  return rows;
+}
+
+export type LegacyAdminStudentEnrollmentFacetRow = RowDataPacket & {
+  entry_year: string | null;
+  intake_code: string | null;
+};
+
+export async function listLegacyAdminStudentEnrollmentFacetRows(
+  pool: Pool,
+  query: LegacyAdminStudentListQuery,
+): Promise<LegacyAdminStudentEnrollmentFacetRow[]> {
+  const { clause, params } = buildAdminStudentListFilters(query);
+  const [rows] = await pool.query<LegacyAdminStudentEnrollmentFacetRow[]>(
+    `SELECT DISTINCT
+       ${ADMIN_STUDENT_ENTRY_YEAR_SQL} AS entry_year,
+       ${ADMIN_STUDENT_INTAKE_CODE_SQL} AS intake_code
+     FROM students s
+     ${ADMIN_STUDENT_LIST_LATEST_REG_JOIN}
+     ${clause}
+     ORDER BY entry_year DESC, intake_code ASC`,
     params,
   );
   return rows;

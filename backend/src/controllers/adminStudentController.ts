@@ -11,6 +11,7 @@ import {
 import type {
   AdminStudentCreateBody,
   AdminStudentRosterProgramFilter,
+  AdminStudentRosterTrackFilter,
   AdminStudentUpdateBody,
 } from "../types/adminStudent.js";
 import type { StudentProgram } from "../types/studentProgram.js";
@@ -184,6 +185,39 @@ function parseAdminStudentProgramParam(
   }
 }
 
+function parseAdminStudentTrackParam(raw: unknown): AdminStudentRosterTrackFilter {
+  if (typeof raw !== "string") return "all";
+  switch (raw.trim().toUpperCase()) {
+    case "C":
+      return "C";
+    case "E":
+      return "E";
+    default:
+      return "all";
+  }
+}
+
+function parseAdminStudentEntryYearParam(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  return /^20\d{2}$/.test(trimmed) ? trimmed : null;
+}
+
+function parseAdminStudentIntakeCodeParam(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim().toUpperCase();
+  return trimmed === "" ? null : trimmed.slice(0, 1);
+}
+
+function parseAdminStudentListViewParam(
+  raw: unknown,
+): "roster" | "new-enrollment" {
+  if (typeof raw !== "string") return "roster";
+  return raw.trim().toLowerCase() === "new-enrollment"
+    ? "new-enrollment"
+    : "roster";
+}
+
 function parseAdminStudentIds(raw: unknown): ParseBodyResult<string[]> {
   if (raw == null) return { ok: true, value: [] };
   if (!Array.isArray(raw)) {
@@ -211,34 +245,51 @@ function parseAdminStudentIds(raw: unknown): ParseBodyResult<string[]> {
 function parseAdminStudentsExportBody(
   raw: unknown,
 ): ParseBodyResult<
-  | { mode: "selected"; studentIds: string[] }
+  | {
+      mode: "selected";
+      studentIds: string[];
+      view: "roster" | "new-enrollment";
+    }
   | {
       mode: "filtered";
       search: string;
       program: AdminStudentRosterProgramFilter;
+      track: AdminStudentRosterTrackFilter;
+      entryYear: string | null;
+      intakeCode: string | null;
+      view: "roster" | "new-enrollment";
     }
 > {
   if (!isRecord(raw)) return { ok: false, error: "Invalid request body." };
   const studentIds = parseAdminStudentIds(raw.studentIds);
   if (!studentIds.ok) return studentIds;
+  const view = parseAdminStudentListViewParam(raw.view);
   if (studentIds.value.length > 0) {
     return {
       ok: true,
       value: {
         mode: "selected",
         studentIds: studentIds.value,
+        view,
       },
     };
   }
   const search =
     typeof raw.search === "string" ? raw.search.trim().slice(0, 200) : "";
   const program = parseAdminStudentProgramParam(raw.program);
+  const track = parseAdminStudentTrackParam(raw.track);
+  const entryYear = parseAdminStudentEntryYearParam(raw.entryYear);
+  const intakeCode = parseAdminStudentIntakeCodeParam(raw.intakeCode);
   return {
     ok: true,
     value: {
       mode: "filtered",
       search,
       program,
+      track,
+      entryYear,
+      intakeCode,
+      view,
     },
   };
 }
@@ -266,12 +317,18 @@ export async function getAdminStudents(
         ? searchRaw.trim().slice(0, 200)
         : "";
     const program = parseAdminStudentProgramParam(req.query.program);
+    const track = parseAdminStudentTrackParam(req.query.track);
+    const entryYear = parseAdminStudentEntryYearParam(req.query.entryYear);
+    const intakeCode = parseAdminStudentIntakeCodeParam(req.query.intakeCode);
 
     const result = await listAdminStudentsPage({
       page,
       pageSize,
       search,
       program,
+      track,
+      entryYear,
+      intakeCode,
       includeClinicalSummary,
     });
     res.json({
@@ -279,6 +336,7 @@ export async function getAdminStudents(
       total: result.total,
       page: result.page,
       pageSize: result.pageSize,
+      enrollmentFilterOptions: result.enrollmentFilterOptions,
     });
   } catch (e) {
     console.error(e);
