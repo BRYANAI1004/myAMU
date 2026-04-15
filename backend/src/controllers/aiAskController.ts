@@ -1,9 +1,10 @@
 import type { Request, Response } from "express";
 import { verifyStudentAccessToken } from "../lib/studentAuthToken.js";
-import { buildStudentAiContext } from "../services/studentAiContextService.js";
 import {
   RagQuestionValidationError,
+  answerGeneralQuestion,
   answerAmuQuestion,
+  answerStudentRecordQuestionFromFacts,
 } from "../services/ragService.js";
 import { classifyStudentAiIntent } from "../services/studentAiQuestionRouter.js";
 import {
@@ -67,14 +68,15 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       : undefined;
 
   try {
-    console.debug("[ai/ask] authenticated student resolved", {
-      studentId: authStudent.studentId,
-    });
     const routedIntent = classifyStudentAiIntent(q);
-    console.debug("[ai/ask] routed intent", {
-      studentId: authStudent.studentId,
-      intent: routedIntent,
-    });
+    console.debug("[ai/ask] detected intent", { intent: routedIntent });
+
+    if (routedIntent === "general") {
+      console.debug("[ai/ask] pipeline used", { pipeline: "general" });
+      const result = await answerGeneralQuestion(q);
+      res.status(200).json(result);
+      return;
+    }
 
     if (routedIntent === "student_record") {
       const deterministic = await answerDeterministicStudentRecordQuestion(
@@ -82,8 +84,8 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         q,
       );
       if (deterministic != null) {
-        console.debug("[ai/ask] route execution", {
-          intent: routedIntent,
+        console.debug("[ai/ask] pipeline used", {
+          pipeline: "student_record",
           deterministicStudentFactsUsed: true,
           ragUsed: false,
           helperCount: deterministic.usedHelpers.length,
@@ -91,39 +93,64 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         res.status(200).json(deterministic.result);
         return;
       }
-    }
-
-    let studentContextText: string | undefined;
-    let deterministicStudentFactsUsed = false;
-
-    if (routedIntent === "mixed") {
       const recordFacts = await buildStudentRecordFactsForQuestion(
         authStudent.studentId,
         q,
       );
       if (recordFacts != null) {
-        studentContextText = recordFacts.contextText;
-        deterministicStudentFactsUsed = true;
+        console.debug("[ai/ask] pipeline used", {
+          pipeline: "student_record",
+          deterministicStudentFactsUsed: true,
+          ragUsed: false,
+          helperCount: recordFacts.usedHelpers.length,
+        });
+        const result = await answerStudentRecordQuestionFromFacts(
+          q,
+          recordFacts.contextText,
+        );
+        res.status(200).json(result);
+        return;
       }
-    }
-
-    if (studentContextText == null) {
-      const studentContext = await buildStudentAiContext(authStudent.studentId);
-      console.debug("[ai/ask] student context built", {
-        studentId: authStudent.studentId,
-        dataSources: studentContext.dataSources,
-        ...studentContext.meta,
+      console.debug("[ai/ask] pipeline used", {
+        pipeline: "student_record",
+        deterministicStudentFactsUsed: false,
+        ragUsed: false,
       });
-      studentContextText = studentContext.contextText;
+      res.status(200).json({
+        question: q,
+        answer: "I don't have enough information from your records to confirm this.",
+        sources: [],
+      });
+      return;
     }
 
-    console.debug("[ai/ask] route execution", {
-      intent: routedIntent,
-      deterministicStudentFactsUsed,
+    if (routedIntent === "policy") {
+      console.debug("[ai/ask] pipeline used", { pipeline: "policy" });
+      const result = await answerAmuQuestion(q, rawHistory, {
+        pipeline: "policy",
+      });
+      res.status(200).json(result);
+      return;
+    }
+
+    const recordFacts = await buildStudentRecordFactsForQuestion(
+      authStudent.studentId,
+      q,
+    );
+    const studentContextText =
+      recordFacts?.contextText ??
+      `Student Record Facts
+- I don't have enough information from your records to confirm this.`;
+
+    console.debug("[ai/ask] pipeline used", {
+      pipeline: "mixed",
+      deterministicStudentFactsUsed: recordFacts != null,
       ragUsed: true,
+      helperCount: recordFacts?.usedHelpers.length ?? 0,
     });
 
     const result = await answerAmuQuestion(q, rawHistory, {
+      pipeline: "mixed",
       studentContext: studentContextText,
     });
     res.status(200).json(result);

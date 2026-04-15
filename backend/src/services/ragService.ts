@@ -71,8 +71,11 @@ export type ChatHistoryItem = {
   content: string;
 };
 
+export type GroundedAmuPipeline = "policy" | "mixed";
+
 export type AnswerAmuQuestionOptions = {
   studentContext?: string | null;
+  pipeline?: GroundedAmuPipeline;
 };
 
 export class RagQuestionValidationError extends Error {
@@ -83,6 +86,49 @@ export class RagQuestionValidationError extends Error {
 }
 
 let cachedChunks: KnowledgeChunkRow[] | null = null;
+
+const DUAL_MODE_SYSTEM_PROMPT = `You are AMU's AI assistant.
+
+You operate under STRICT safety rules:
+
+### ACADEMIC / FINANCIAL / ADMINISTRATIVE TOPICS (HIGH PRECISION MODE)
+
+For ANY question related to:
+- courses
+- enrollment
+- credits
+- grades
+- tuition / fees
+- academic policies
+- graduation requirements
+
+You MUST:
+- use ONLY verified student data and/or retrieved AMU documents
+- NEVER guess or infer missing information
+- NEVER fabricate policies, deadlines, or records
+- if information is missing, say clearly:
+  "I cannot confirm this from your records" or
+  "I cannot find this in AMU documents"
+
+### GENERAL / CASUAL TOPICS (FLEXIBLE MODE)
+
+For questions NOT related to AMU academics or student records:
+- you may answer normally using general knowledge
+- be natural, friendly, and helpful
+- DO NOT unnecessarily refuse
+- DO NOT say "I cannot answer" unless unsafe
+
+### IMPORTANT BOUNDARY
+
+If a question is general:
+- answer normally
+
+If a question is AMU-related:
+- be strict and grounded
+
+NEVER mix the two:
+- do NOT use general knowledge to answer AMU-specific questions
+- do NOT invent AMU facts`;
 
 async function getKnowledgeChunks(): Promise<KnowledgeChunkRow[]> {
   if (cachedChunks !== null) return cachedChunks;
@@ -617,6 +663,46 @@ function languageInstructionForLlm(question: string): string {
     : "Respond in English.";
 }
 
+function buildGeneralSystemPrompt(question: string): string {
+  return `${DUAL_MODE_SYSTEM_PROMPT}\n\nThe current request is general or casual, so use FLEXIBLE MODE.\n${languageInstructionForLlm(question)}`;
+}
+
+function buildGroundedAcademicSystemPrompt(
+  question: string,
+  pipeline: GroundedAmuPipeline,
+): string {
+  const pipelineLine =
+    pipeline === "mixed"
+      ? `The current request is AMU-related and combines student-specific facts with AMU policy. Stay in HIGH PRECISION MODE.
+Use only the verified student record facts and retrieved AMU documents provided in the user message.
+Structure the answer with these sections when possible:
+- What your record shows
+- What AMU policy says
+- What that means`
+      : `The current request is AMU-related. Stay in HIGH PRECISION MODE.
+Use only the retrieved AMU documents provided in the user message.
+Do not answer AMU-specific questions from general knowledge.`;
+
+  return `${DUAL_MODE_SYSTEM_PROMPT}
+
+${pipelineLine}
+If the provided evidence does not support a claim, say "I cannot find this in AMU documents."
+If student-specific confirmation is missing, say "I don't have enough information from your records to confirm this."
+Keep the answer natural, concise, and grounded.
+${languageInstructionForLlm(question)}`;
+}
+
+function buildStudentRecordSystemPrompt(question: string): string {
+  return `${DUAL_MODE_SYSTEM_PROMPT}
+
+The current request is about the student's verified record. Stay in HIGH PRECISION MODE.
+Use only the verified student record facts provided in the user message.
+Do not infer missing enrollments, credits, grades, courses, terms, or other AMU-specific facts.
+If the facts do not support the answer, say "I don't have enough information from your records to confirm this."
+Keep the answer natural, concise, and grounded.
+${languageInstructionForLlm(question)}`;
+}
+
 const ACADEMIC_CONTACT_BLOCK_EN = `For final academic advising or official confirmation, please contact:
 
 Lillian Li
@@ -861,8 +947,69 @@ function appendSupportContactBlocks(
   return parts.join("\n\n");
 }
 
+function getOpenAiClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Missing OPENAI_API_KEY");
+  }
+  return new OpenAI({ apiKey });
+}
+
+export async function answerGeneralQuestion(
+  question: string,
+): Promise<RagAnswerResult> {
+  const q = validateQuestion(question);
+  const client = getOpenAiClient();
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: buildGeneralSystemPrompt(q) },
+      { role: "user", content: q },
+    ],
+    temperature: 0.7,
+  });
+
+  return {
+    question: q,
+    answer: completion.choices[0]?.message?.content?.trim() ?? "(no response)",
+    sources: [],
+  };
+}
+
+export async function answerStudentRecordQuestionFromFacts(
+  question: string,
+  studentFacts: string,
+): Promise<RagAnswerResult> {
+  const q = validateQuestion(question);
+  const client = getOpenAiClient();
+  const facts = studentFacts.trim();
+
+  const completion = await client.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      { role: "system", content: buildStudentRecordSystemPrompt(q) },
+      {
+        role: "user",
+        content: `VERIFIED STUDENT RECORD FACTS:
+${facts}
+
+USER QUESTION:
+${q}`,
+      },
+    ],
+    temperature: 0.2,
+  });
+
+  return {
+    question: q,
+    answer: completion.choices[0]?.message?.content?.trim() ?? "(no response)",
+    sources: [],
+  };
+}
+
 /**
- * End-to-end AMU catalog RAG: intent routing, optional retrieval, grounded chat completion.
+ * Grounded AMU answer path for policy-only and mixed student+policy questions.
  * @param rawHistory - Optional recent turns; sanitized (capped, invalid entries dropped).
  */
 export async function answerAmuQuestion(
@@ -872,42 +1019,16 @@ export async function answerAmuQuestion(
 ): Promise<RagAnswerResult> {
   const q = validateQuestion(question);
   const history = sanitizeChatHistory(rawHistory);
-
-  const intent = detectIntent(q);
-
-  if (intent === "direct") {
-    return {
-      question: q,
-      answer: buildDirectReply(q),
-      sources: [],
-    };
-  }
-
-  if (intent === "out_of_scope") {
-    return {
-      question: q,
-      answer: buildOutOfScopeReply(q),
-      sources: [],
-    };
-  }
-
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
-  if (!apiKey) {
-    throw new Error("Missing OPENAI_API_KEY");
-  }
-
-  const client = new OpenAI({ apiKey });
+  const pipeline = options?.pipeline ?? "policy";
+  const client = getOpenAiClient();
   const chunks = await getKnowledgeChunks();
-
-  const guidanceSubtype: GuidanceSubtype | undefined =
-    intent === "guidance" ? detectGuidanceSubtype(q, history) : undefined;
 
   const retrievalQuery = await rewriteQuestionForRetrieval(
     client,
     q,
     history,
-    intent,
-    guidanceSubtype,
+    "strict",
+    undefined,
   );
 
   const embedRes = await client.embeddings.create({
@@ -927,43 +1048,39 @@ export async function answerAmuQuestion(
   scored.sort((x, y) => y.score - x.score);
   const top = scored.slice(0, TOP_K);
 
+  if (top.length === 0) {
+    return {
+      question: q,
+      answer: "I cannot find this in AMU documents.",
+      sources: [],
+    };
+  }
+
   const studentContextBlock = formatStudentContextBlock(options?.studentContext);
   const contextBlock = formatRetrievedDocumentContextBlock(top);
-  const langLine = languageInstructionForLlm(q);
-
-  const systemPrompt =
-    intent === "guidance"
-      ? guidanceSubtype === "support"
-        ? `${GUIDANCE_SUPPORT_SYSTEM_PROMPT_BASE}\n\n${langLine}`
-        : `${GUIDANCE_ACADEMIC_SYSTEM_PROMPT_BASE}\n\n${langLine}`
-      : `${STRICT_SYSTEM_PROMPT_BASE}\n\n${langLine}`;
-
   const historyPrefix =
-    intent === "guidance" && history && history.length > 0
+    history != null && history.length > 0
       ? `${formatRecentConversationBlock(history)}\n\n`
       : "";
-
   const userPreamble =
-    intent === "guidance"
-      ? `${historyPrefix}STUDENT CONTEXT:
+    pipeline === "mixed"
+      ? `${historyPrefix}VERIFIED STUDENT RECORD FACTS:
 ${studentContextBlock}
 
-RETRIEVED SCHOOL DOCUMENT CONTEXT:
+RETRIEVED AMU DOCUMENT CONTEXT:
 ${contextBlock}
 
 USER QUESTION:
 ${q}`
-      : `STUDENT CONTEXT:
-${studentContextBlock}
-
-RETRIEVED SCHOOL DOCUMENT CONTEXT:
+      : `${historyPrefix}RETRIEVED AMU DOCUMENT CONTEXT:
 ${contextBlock}
 
 USER QUESTION:
 ${q}`;
 
   console.debug("[ai/ask] retrieval context prepared", {
-    hasStudentContext: (options?.studentContext?.trim()?.length ?? 0) > 0,
+    pipeline,
+    hasStudentContext: pipeline === "mixed",
     retrievedSourceCount: top.length,
     topRetrievedSource: top[0]?.chunk.source ?? null,
   });
@@ -971,23 +1088,15 @@ ${q}`;
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: buildGroundedAcademicSystemPrompt(q, pipeline) },
       { role: "user", content: userPreamble },
     ],
-    temperature: intent === "guidance" ? 0.35 : 0.2,
+    temperature: 0.2,
   });
-
-  let answer =
-    completion.choices[0]?.message?.content?.trim() ?? "(no response)";
-  if (intent === "guidance" && guidanceSubtype !== undefined) {
-    answer = applyGuidanceFallbackIfNeeded(answer, q, guidanceSubtype);
-  }
-
-  answer = appendSupportContactBlocks(answer, q, intent, guidanceSubtype);
 
   return {
     question: q,
-    answer,
+    answer: completion.choices[0]?.message?.content?.trim() ?? "(no response)",
     sources: top.map(({ chunk, score }) => toRetrieved(chunk, score)),
   };
 }
