@@ -1,4 +1,5 @@
 import { type StudentAiIntent } from "./studentAiQuestionRouter.js";
+import { type IdentityContext } from "./conversationFactsService.js";
 export type RetrievedChunk = {
     id: string;
     source: string;
@@ -27,9 +28,14 @@ export type GroundedAmuPipeline = "policy" | "mixed";
 export type AnswerAmuQuestionOptions = {
     studentContext?: string | null;
     pipeline?: GroundedAmuPipeline;
+    identityContext?: IdentityContext | null;
+};
+export type AnswerGeneralQuestionOptions = {
+    identityContext?: IdentityContext | null;
 };
 export type AnswerGraduationQuestionOptions = {
     graduationEvaluation: string;
+    identityContext?: IdentityContext | null;
 };
 export declare class RagQuestionValidationError extends Error {
     constructor(message: string);
@@ -40,8 +46,8 @@ export declare class RagQuestionValidationError extends Error {
 export declare function sanitizeChatHistory(raw: unknown): ChatHistoryItem[] | undefined;
 export declare function planShortConversationMemory(question: string, rawHistory: unknown, initialIntent: StudentAiIntent): ShortMemoryPlan;
 export declare function answerSchoolFactQuestion(question: string): RagAnswerResult;
-export declare function answerGeneralQuestion(question: string, rawHistory?: unknown): Promise<RagAnswerResult>;
-export declare function answerStudentRecordQuestionFromFacts(question: string, studentFacts: string): Promise<RagAnswerResult>;
+export declare function answerGeneralQuestion(question: string, rawHistory?: unknown, options?: AnswerGeneralQuestionOptions): Promise<RagAnswerResult>;
+export declare function answerStudentRecordQuestionFromFacts(question: string, studentFacts: string, identityContext?: IdentityContext | null): Promise<RagAnswerResult>;
 export declare function answerGraduationQuestion(question: string, rawHistory?: unknown, options?: AnswerGraduationQuestionOptions): Promise<RagAnswerResult>;
 /**
  * Grounded AMU answer path for policy-only and mixed student+policy questions.

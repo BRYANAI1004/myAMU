@@ -987,19 +987,33 @@ function detectIntent(question: string): RagIntent {
   return "strict";
 }
 
-function languageInstructionForLlm(question: string): string {
+function languageInstructionForLlm(
+  question: string,
+  identityContext?: IdentityContext | null,
+): string {
+  const preferredLanguage = identityContext?.conversationFacts?.preferredLanguage;
+  if (preferredLanguage === "zh") {
+    return "Respond in Simplified Chinese (简体中文).";
+  }
+  if (preferredLanguage === "en") {
+    return "Respond in English.";
+  }
   return isMostlyChinese(question)
     ? "Respond in Simplified Chinese (简体中文)."
     : "Respond in English.";
 }
 
-function buildGeneralSystemPrompt(question: string): string {
-  return `${DUAL_MODE_SYSTEM_PROMPT}\n\nThe current request is general or casual, so use FLEXIBLE MODE.\n${languageInstructionForLlm(question)}`;
+function buildGeneralSystemPrompt(
+  question: string,
+  identityContext?: IdentityContext | null,
+): string {
+  return `${DUAL_MODE_SYSTEM_PROMPT}\n\nThe current request is general or casual, so use FLEXIBLE MODE.\n${languageInstructionForLlm(question, identityContext)}`;
 }
 
 function buildGroundedAcademicSystemPrompt(
   question: string,
   pipeline: GroundedAmuPipeline,
+  identityContext?: IdentityContext | null,
 ): string {
   const pipelineLine =
     pipeline === "mixed"
@@ -1019,10 +1033,13 @@ ${pipelineLine}
 If the provided evidence does not support a claim, say "I cannot find this in AMU documents."
 If student-specific confirmation is missing, say "I don't have enough information from your records to confirm this."
 Keep the answer natural, concise, and grounded.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
 
-function buildStudentRecordSystemPrompt(question: string): string {
+function buildStudentRecordSystemPrompt(
+  question: string,
+  identityContext?: IdentityContext | null,
+): string {
   return `${DUAL_MODE_SYSTEM_PROMPT}
 
 The current request is about the student's verified record. Stay in HIGH PRECISION MODE.
@@ -1032,10 +1049,13 @@ If the student record facts say academic history coverage is partial, do not tur
 Use "I cannot confirm from the available records" for historical negatives when coverage is partial.
 If the facts do not support the answer, say "I don't have enough information from your records to confirm this."
 Keep the answer natural, concise, and grounded.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
 
-function buildGraduationEvaluationSystemPrompt(question: string): string {
+function buildGraduationEvaluationSystemPrompt(
+  question: string,
+  identityContext?: IdentityContext | null,
+): string {
   return `${DUAL_MODE_SYSTEM_PROMPT}
 
 The current request is a graduation eligibility question.
@@ -1051,7 +1071,7 @@ Do not say you cannot confirm graduation eligibility when the evaluation block i
 Use retrieved AMU documents only to explain or contextualize the result, not to decide it.
 Start with a direct yes/no answer, then clearly summarize credits, missing courses, and any remaining requirements.
 Keep the answer concise and student-facing.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
 
 const ACADEMIC_CONTACT_BLOCK_EN = `For final academic advising or official confirmation, please contact:
@@ -1514,7 +1534,7 @@ export async function answerGeneralQuestion(
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: buildGeneralSystemPrompt(q) },
+      { role: "system", content: buildGeneralSystemPrompt(q, options?.identityContext) },
       {
         role: "user",
         content: `${historyPrefix}${identityBlock}\n\nCurrent user message:\n${q}`,
@@ -1543,7 +1563,7 @@ export async function answerStudentRecordQuestionFromFacts(
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: buildStudentRecordSystemPrompt(q) },
+      { role: "system", content: buildStudentRecordSystemPrompt(q, identityContext) },
       {
         role: "user",
         content: `${identityBlock}
@@ -1609,7 +1629,10 @@ export async function answerGraduationQuestion(
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: buildGraduationEvaluationSystemPrompt(q) },
+      {
+        role: "system",
+        content: buildGraduationEvaluationSystemPrompt(q, options?.identityContext),
+      },
       {
         role: "user",
         content: `${historyPrefix}${identityBlock}
@@ -1719,7 +1742,14 @@ ${q}`;
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
-      { role: "system", content: buildGroundedAcademicSystemPrompt(q, pipeline) },
+      {
+        role: "system",
+        content: buildGroundedAcademicSystemPrompt(
+          q,
+          pipeline,
+          options?.identityContext,
+        ),
+      },
       { role: "user", content: userPreamble },
     ],
     temperature: 0.2,

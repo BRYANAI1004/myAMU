@@ -89,7 +89,7 @@ export function formatIdentityContextBlock(
   - Program: ${safeProfile?.program ?? "Unavailable"}`;
 }
 
-type SelfReferentialQuestionKind = "name" | "gender";
+type SelfReferentialQuestionKind = "name" | "gender" | "student_id" | "program";
 
 function detectSelfReferentialQuestionKind(
   question: string,
@@ -101,7 +101,7 @@ function detectSelfReferentialQuestionKind(
     /\b(what('?s| is)\s+my\s+name|do\s+you\s+remember\s+my\s+name|who\s+am\s+i)\b/i.test(
       lower,
     ) ||
-    /我叫什么|你还记得我的名字吗|你记得我叫什么|我的名字是什么/.test(trimmed)
+    /我叫什么|你还记得我的名字吗|你记得我叫什么|我的名字是什么|我是谁/.test(trimmed)
   ) {
     return "name";
   }
@@ -113,6 +113,24 @@ function detectSelfReferentialQuestionKind(
     /我是男是女|你知道我的性别吗|我的性别是什么/.test(trimmed)
   ) {
     return "gender";
+  }
+
+  if (
+    /\b(what('?s| is)\s+my\s+student\s+id|do\s+you\s+know\s+my\s+student\s+id)\b/i.test(
+      lower,
+    ) ||
+    /我的学号是什么|你知道我的学号吗/.test(trimmed)
+  ) {
+    return "student_id";
+  }
+
+  if (
+    /\b(what\s+program\s+am\s+i\s+in|what('?s| is)\s+my\s+program|do\s+you\s+know\s+my\s+program)\b/i.test(
+      lower,
+    ) ||
+    /我是什么项目|我读什么项目|我的项目是什么|你知道我的项目吗/.test(trimmed)
+  ) {
+    return "program";
   }
 
   return null;
@@ -128,6 +146,8 @@ export function answerSelfReferentialQuestion(
   const zh = isMostlyChinese(question);
   const explicitName = identityContext?.conversationFacts?.statedName?.trim();
   const displayName = identityContext?.safeProfile?.displayName?.trim();
+  const studentId = identityContext?.safeProfile?.studentId?.trim();
+  const program = identityContext?.safeProfile?.program?.trim();
 
   if (kind === "name") {
     if (explicitName) {
@@ -143,6 +163,28 @@ export function answerSelfReferentialQuestion(
     return zh
       ? "我目前无法确认你的名字，因为当前对话里没有明确的自我介绍，而且也没有可用的账户显示名称。"
       : "I can't confirm your name from this chat because I don't have an explicit introduction in the current conversation or an available account display name.";
+  }
+
+  if (kind === "student_id") {
+    if (studentId) {
+      return zh
+        ? `你当前账户对应的学号是 ${studentId}。`
+        : `Your current account is associated with student ID ${studentId}.`;
+    }
+    return zh
+      ? "我目前无法确认你的学号，因为没有可用的账户学号信息。"
+      : "I can't confirm your student ID because no safe account student ID is available.";
+  }
+
+  if (kind === "program") {
+    if (program) {
+      return zh
+        ? `你当前账户显示的项目是 ${program}。`
+        : `Your current account shows the program as ${program}.`;
+    }
+    return zh
+      ? "我目前无法确认你的项目，因为没有可用的账户项目资料。"
+      : "I can't confirm your program because no safe account program context is available.";
   }
 
   return zh

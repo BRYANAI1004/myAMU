@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { AMU_SCHOOL_FACTS } from "../config/schoolFacts.js";
 import { cosineSimilarity, loadKnowledgeChunks, } from "../lib/ragKnowledge.js";
 import { classifyStudentAiIntent, } from "./studentAiQuestionRouter.js";
+import { formatIdentityContextBlock, } from "./conversationFactsService.js";
 const TOP_K = 5;
 const MAX_QUESTION_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 4;
@@ -90,6 +91,14 @@ NEVER mix the two:
 - do NOT use general knowledge to answer AMU-specific questions
 - do NOT invent AMU facts
 
+### SELF-REFERENTIAL USER FACTS
+
+For self-referential questions about the user:
+- use only the explicit conversation facts and safe logged-in profile context provided in the prompt
+- prefer explicit conversation facts over safe logged-in profile context
+- if neither source confirms the answer, say you cannot confirm it
+- never infer gender or any other sensitive trait from names, language, profile fields, or stereotypes
+
 ### HARD IDENTITY RULE
 
 In this product, "AMU" always means "Alhambra Medical University".
@@ -160,6 +169,9 @@ function formatStudentContextBlock(studentContext) {
 - Student data: Unavailable
 - Notes:
   - No verified student context was available for this request.`;
+}
+function formatIdentityContextForPrompt(identityContext) {
+    return formatIdentityContextBlock(identityContext);
 }
 function intentToConversationDomain(intent) {
     return intent === "general" ? "general" : "academic";
@@ -689,15 +701,22 @@ function detectIntent(question) {
         return "guidance";
     return "strict";
 }
-function languageInstructionForLlm(question) {
+function languageInstructionForLlm(question, identityContext) {
+    const preferredLanguage = identityContext?.conversationFacts?.preferredLanguage;
+    if (preferredLanguage === "zh") {
+        return "Respond in Simplified Chinese (简体中文).";
+    }
+    if (preferredLanguage === "en") {
+        return "Respond in English.";
+    }
     return isMostlyChinese(question)
         ? "Respond in Simplified Chinese (简体中文)."
         : "Respond in English.";
 }
-function buildGeneralSystemPrompt(question) {
-    return `${DUAL_MODE_SYSTEM_PROMPT}\n\nThe current request is general or casual, so use FLEXIBLE MODE.\n${languageInstructionForLlm(question)}`;
+function buildGeneralSystemPrompt(question, identityContext) {
+    return `${DUAL_MODE_SYSTEM_PROMPT}\n\nThe current request is general or casual, so use FLEXIBLE MODE.\n${languageInstructionForLlm(question, identityContext)}`;
 }
-function buildGroundedAcademicSystemPrompt(question, pipeline) {
+function buildGroundedAcademicSystemPrompt(question, pipeline, identityContext) {
     const pipelineLine = pipeline === "mixed"
         ? `The current request is AMU-related and combines student-specific facts with AMU policy. Stay in HIGH PRECISION MODE.
 Use only the verified student record facts and retrieved AMU documents provided in the user message.
@@ -714,9 +733,9 @@ ${pipelineLine}
 If the provided evidence does not support a claim, say "I cannot find this in AMU documents."
 If student-specific confirmation is missing, say "I don't have enough information from your records to confirm this."
 Keep the answer natural, concise, and grounded.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
-function buildStudentRecordSystemPrompt(question) {
+function buildStudentRecordSystemPrompt(question, identityContext) {
     return `${DUAL_MODE_SYSTEM_PROMPT}
 
 The current request is about the student's verified record. Stay in HIGH PRECISION MODE.
@@ -726,9 +745,9 @@ If the student record facts say academic history coverage is partial, do not tur
 Use "I cannot confirm from the available records" for historical negatives when coverage is partial.
 If the facts do not support the answer, say "I don't have enough information from your records to confirm this."
 Keep the answer natural, concise, and grounded.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
-function buildGraduationEvaluationSystemPrompt(question) {
+function buildGraduationEvaluationSystemPrompt(question, identityContext) {
     return `${DUAL_MODE_SYSTEM_PROMPT}
 
 The current request is a graduation eligibility question.
@@ -744,7 +763,7 @@ Do not say you cannot confirm graduation eligibility when the evaluation block i
 Use retrieved AMU documents only to explain or contextualize the result, not to decide it.
 Start with a direct yes/no answer, then clearly summarize credits, missing courses, and any remaining requirements.
 Keep the answer concise and student-facing.
-${languageInstructionForLlm(question)}`;
+${languageInstructionForLlm(question, identityContext)}`;
 }
 const ACADEMIC_CONTACT_BLOCK_EN = `For final academic advising or official confirmation, please contact:
 
@@ -1047,20 +1066,21 @@ function getOpenAiClient() {
     }
     return new OpenAI({ apiKey });
 }
-export async function answerGeneralQuestion(question, rawHistory) {
+export async function answerGeneralQuestion(question, rawHistory, options) {
     const q = validateQuestion(question);
     const history = sanitizeChatHistory(rawHistory);
     const client = getOpenAiClient();
+    const identityBlock = formatIdentityContextForPrompt(options?.identityContext);
     const historyPrefix = history != null && history.length > 0
         ? `${formatRecentConversationBlock(history)}\n\n`
         : "";
     const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-            { role: "system", content: buildGeneralSystemPrompt(q) },
+            { role: "system", content: buildGeneralSystemPrompt(q, options?.identityContext) },
             {
                 role: "user",
-                content: `${historyPrefix}Current user message:\n${q}`,
+                content: `${historyPrefix}${identityBlock}\n\nCurrent user message:\n${q}`,
             },
         ],
         temperature: 0.7,
@@ -1071,17 +1091,20 @@ export async function answerGeneralQuestion(question, rawHistory) {
         sources: [],
     };
 }
-export async function answerStudentRecordQuestionFromFacts(question, studentFacts) {
+export async function answerStudentRecordQuestionFromFacts(question, studentFacts, identityContext) {
     const q = validateQuestion(question);
     const client = getOpenAiClient();
     const facts = studentFacts.trim();
+    const identityBlock = formatIdentityContextForPrompt(identityContext);
     const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-            { role: "system", content: buildStudentRecordSystemPrompt(q) },
+            { role: "system", content: buildStudentRecordSystemPrompt(q, identityContext) },
             {
                 role: "user",
-                content: `VERIFIED STUDENT RECORD FACTS:
+                content: `${identityBlock}
+
+VERIFIED STUDENT RECORD FACTS:
 ${facts}
 
 USER QUESTION:
@@ -1120,14 +1143,20 @@ export async function answerGraduationQuestion(question, rawHistory, options) {
         ? `${formatRecentConversationBlock(history)}\n\n`
         : "";
     const evaluationBlock = options?.graduationEvaluation?.trim() ?? "No evaluation available.";
+    const identityBlock = formatIdentityContextForPrompt(options?.identityContext);
     const contextBlock = formatRetrievedDocumentContextBlock(top);
     const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-            { role: "system", content: buildGraduationEvaluationSystemPrompt(q) },
+            {
+                role: "system",
+                content: buildGraduationEvaluationSystemPrompt(q, options?.identityContext),
+            },
             {
                 role: "user",
-                content: `${historyPrefix}STRUCTURED GRADUATION EVALUATION:
+                content: `${historyPrefix}${identityBlock}
+
+STRUCTURED GRADUATION EVALUATION:
 ${evaluationBlock}
 
 RETRIEVED AMU DOCUMENT CONTEXT:
@@ -1179,11 +1208,14 @@ export async function answerAmuQuestion(question, rawHistory, options) {
     }
     const studentContextBlock = formatStudentContextBlock(options?.studentContext);
     const contextBlock = formatRetrievedDocumentContextBlock(top);
+    const identityBlock = formatIdentityContextForPrompt(options?.identityContext);
     const historyPrefix = history != null && history.length > 0
         ? `${formatRecentConversationBlock(history)}\n\n`
         : "";
     const userPreamble = pipeline === "mixed"
-        ? `${historyPrefix}VERIFIED STUDENT RECORD FACTS:
+        ? `${historyPrefix}${identityBlock}
+
+VERIFIED STUDENT RECORD FACTS:
 ${studentContextBlock}
 
 RETRIEVED AMU DOCUMENT CONTEXT:
@@ -1191,7 +1223,9 @@ ${contextBlock}
 
 USER QUESTION:
 ${q}`
-        : `${historyPrefix}RETRIEVED AMU DOCUMENT CONTEXT:
+        : `${historyPrefix}${identityBlock}
+
+RETRIEVED AMU DOCUMENT CONTEXT:
 ${contextBlock}
 
 USER QUESTION:
@@ -1205,7 +1239,10 @@ ${q}`;
     const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
-            { role: "system", content: buildGroundedAcademicSystemPrompt(q, pipeline) },
+            {
+                role: "system",
+                content: buildGroundedAcademicSystemPrompt(q, pipeline, options?.identityContext),
+            },
             { role: "user", content: userPreamble },
         ],
         temperature: 0.2,
