@@ -6,6 +6,7 @@ export const app = express();
 const requiredCorsOrigins = new Set([
     "https://myamu.wanpanel.ai",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]);
 for (const origin of env.corsOrigins ?? []) {
     requiredCorsOrigins.add(origin);
