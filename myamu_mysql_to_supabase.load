@@ -1,6 +1,6 @@
 LOAD DATABASE
     FROM mysql://admin@school-db.cd6o8awqe4ig.us-east-2.rds.amazonaws.com:3306/school
-    INTO postgresql://postgres:YOUR_SUPABASE_PASSWORD@db.hffpwguupjiffaltbjri.supabase.co:5432/postgres?sslmode=require
+    INTO pgsql://postgres.hffpwguupjiffaltbjri@aws-1-us-west-2.pooler.supabase.com:5432/postgres
 
 WITH include drop,
      create tables,
@@ -8,17 +8,17 @@ WITH include drop,
      reset sequences,
      foreign keys,
      downcase identifiers,
-     workers = 4,
+     workers = 2,
      concurrency = 1,
-     batch rows = 1000,
-     prefetch rows = 1000
+     multiple readers per thread,
+     rows per range = 20000
 
 SET PostgreSQL PARAMETERS
     search_path to 'public'
 
 SET MySQL PARAMETERS
-    net_read_timeout = '120',
-    net_write_timeout = '120'
+    net_read_timeout = '600',
+    net_write_timeout = '600'
 
 CAST
     type tinyint when (= precision 1) to boolean using tinyint-to-boolean,
