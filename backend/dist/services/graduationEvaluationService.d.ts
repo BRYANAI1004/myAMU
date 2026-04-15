@@ -1,9 +1,3 @@
-import type { StudentAcademicCourseRecord } from "../types/studentAcademics.js";
-import type { StudentProfilePayload } from "../types/studentProfile.js";
-type GraduationEvaluationRecord = {
-    profile: StudentProfilePayload | null;
-    courseRecords: StudentAcademicCourseRecord[];
-};
 export type GraduationEvaluationResult = {
     eligible: boolean;
     program: string | null;
@@ -25,8 +19,9 @@ export type GraduationEvaluationResult = {
     maximumWithdrawals: number | null;
     notes: string[];
 };
-export declare function evaluateGraduation(studentRecord: GraduationEvaluationRecord): GraduationEvaluationResult;
-export declare function evaluateStudentGraduation(studentId: string): Promise<GraduationEvaluationResult>;
+export type GraduationEvaluationSummary = Pick<GraduationEvaluationResult, "earnedCredits" | "requiredCredits" | "eligible" | "missingCredits">;
+export declare function formatDeterministicGraduationAnswer(question: string, evaluation: GraduationEvaluationSummary): string;
+export declare function evaluateGraduation(studentId: string): Promise<GraduationEvaluationResult>;
+export declare const evaluateStudentGraduation: typeof evaluateGraduation;
 export declare function formatGraduationEvaluationFacts(evaluation: GraduationEvaluationResult): string;
-export {};
 //# sourceMappingURL=graduationEvaluationService.d.ts.map

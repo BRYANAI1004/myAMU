@@ -4,7 +4,6 @@ import {
   RagQuestionValidationError,
   answerGeneralQuestion,
   answerAmuQuestion,
-  answerGraduationQuestion,
   answerLocalSearchQuestion,
   answerSchoolFactQuestion,
   answerStudentRecordQuestionFromFacts,
@@ -17,7 +16,8 @@ import {
   detectGraduationRequirementCreditsQuestion,
 } from "../services/studentAiQuestionRouter.js";
 import {
-  evaluateStudentGraduation,
+  evaluateGraduation,
+  formatDeterministicGraduationAnswer,
   formatGraduationEvaluationFacts,
 } from "../services/graduationEvaluationService.js";
 import {
@@ -34,6 +34,19 @@ import {
 } from "../services/conversationFactsService.js";
 import type { StudentAcademicsResponse } from "../types/studentAcademics.js";
 
+type HistoryTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+type GraduationReplySummary = {
+  earnedCredits: number;
+  requiredCredits: number;
+  eligible: boolean;
+  missingCredits: number;
+  creditSource: "backend" | "history";
+};
+
 function readQuestion(req: Request): unknown {
   const body = req.body as Record<string, unknown> | null | undefined;
   if (body == null || typeof body !== "object") return undefined;
@@ -47,6 +60,89 @@ function hasVerifiedAcademicData(academics: StudentAcademicsResponse): boolean {
     academics.enrollmentHistory.length > 0 ||
     academics.currentSchedule.length > 0
   );
+}
+
+function extractLatestKnownEarnedCredits(history: HistoryTurn[] | undefined): number | null {
+  if (history == null || history.length === 0) return null;
+  const patterns = [
+    /currently have\s+(\d+(?:\.\d+)?)\s+earned\s+credits?/i,
+    /currently have\s+(\d+(?:\.\d+)?)\s+credits?/i,
+    /已有\s*(\d+(?:\.\d+)?)\s*学分/,
+    /你目前已有\s*(\d+(?:\.\d+)?)\s*学分/,
+  ];
+
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    const item = history[i];
+    if (item?.role !== "assistant") continue;
+    for (const pattern of patterns) {
+      const match = pattern.exec(item.content);
+      if (match?.[1] == null) continue;
+      const value = Number(match[1]);
+      if (Number.isFinite(value)) return value;
+    }
+  }
+
+  return null;
+}
+
+function resolveGraduationReplySummary(args: {
+  historyEarnedCredits: number | null;
+  evaluation: Awaited<ReturnType<typeof evaluateGraduation>>;
+}): GraduationReplySummary {
+  const earnedCredits = args.historyEarnedCredits ?? args.evaluation.earnedCredits;
+  const missingCredits = Math.max(args.evaluation.requiredCredits - earnedCredits, 0);
+  const eligible = args.evaluation.eligible && missingCredits <= 0;
+  return {
+    earnedCredits,
+    requiredCredits: args.evaluation.requiredCredits,
+    eligible,
+    missingCredits,
+    creditSource: args.historyEarnedCredits == null ? "backend" : "history",
+  };
+}
+
+function isMostlyChinese(text: string): boolean {
+  const hanCount = text.match(/[\u4E00-\u9FFF]/g)?.length ?? 0;
+  if (hanCount === 0) return false;
+  const latinCount = text.match(/[A-Za-z]/g)?.length ?? 0;
+  return hanCount > latinCount || (latinCount === 0 && hanCount >= 2);
+}
+
+function formatAdditionalGraduationRequirements(
+  question: string,
+  evaluation: Awaited<ReturnType<typeof evaluateGraduation>>,
+): string[] {
+  const zh = isMostlyChinese(question);
+  const lines: string[] = [];
+
+  if (evaluation.missingCourses.length > 0) {
+    lines.push(
+      zh
+        ? `另外，你还缺这些必修课：${evaluation.missingCourses.join("、")}。`
+        : `You are also still missing these required courses: ${evaluation.missingCourses.join(", ")}.`,
+    );
+  }
+
+  if (evaluation.requiredGpa != null && evaluation.missingGpa != null) {
+    lines.push(
+      zh
+        ? `另外，毕业要求 GPA 至少为 ${evaluation.requiredGpa}，你目前还差 ${evaluation.missingGpa}。`
+        : `There is also a GPA requirement of ${evaluation.requiredGpa}, and you are currently short by ${evaluation.missingGpa}.`,
+    );
+  }
+
+  if (
+    evaluation.maximumWithdrawals != null &&
+    evaluation.withdrawalCount > evaluation.maximumWithdrawals
+  ) {
+    lines.push(
+      zh
+        ? `另外，你的退课次数为 ${evaluation.withdrawalCount}，超过了允许的 ${evaluation.maximumWithdrawals} 次。`
+        : `Your withdrawal count is ${evaluation.withdrawalCount}, which exceeds the allowed maximum of ${evaluation.maximumWithdrawals}.`,
+    );
+  }
+
+  return lines;
 }
 
 /**
@@ -141,6 +237,8 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
     const isGraduationQuestion = detectGraduationEligibilityQuestion(q);
     const isGraduationRequirementCreditsQuestion =
       detectGraduationRequirementCreditsQuestion(q);
+    const isGraduationBackendQuestion =
+      isGraduationQuestion || isGraduationRequirementCreditsQuestion;
     console.debug("[ai/ask] detected intent", {
       initialIntent,
       effectiveIntent: routedIntent,
@@ -153,7 +251,7 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
     });
 
     if (
-      isGraduationQuestion ||
+      isGraduationBackendQuestion ||
       routedIntent === "student_record" ||
       routedIntent === "mixed"
     ) {
@@ -206,43 +304,49 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       }
     }
 
-    if (isGraduationQuestion) {
-      const evaluation = await evaluateStudentGraduation(authStudent.studentId);
+    if (isGraduationBackendQuestion) {
+      const evaluation = await evaluateGraduation(authStudent.studentId);
+      const historyEarnedCredits = extractLatestKnownEarnedCredits(memoryPlan.history);
+      const replySummary = resolveGraduationReplySummary({
+        historyEarnedCredits,
+        evaluation,
+      });
+      if (
+        historyEarnedCredits != null &&
+        historyEarnedCredits !== evaluation.earnedCredits
+      ) {
+        console.warn("[ai/ask] graduation credit mismatch between history and backend", {
+          studentId: authStudent.studentId,
+          historyEarnedCredits,
+          backendEarnedCredits: evaluation.earnedCredits,
+          requiredCredits: evaluation.requiredCredits,
+        });
+      }
       console.debug("[ai/ask] graduation evaluation summary", {
         resolvedStudentId: authStudent.studentId,
-        eligible: evaluation.eligible,
-        earnedCredits: evaluation.earnedCredits,
-        requiredCredits: evaluation.requiredCredits,
-        missingCredits: evaluation.missingCredits,
+        earnedCredits: replySummary.earnedCredits,
+        requiredCredits: replySummary.requiredCredits,
+        eligible: replySummary.eligible,
+        missingCredits: replySummary.missingCredits,
+        creditSource: replySummary.creditSource,
         missingCourseCount: evaluation.missingCourses.length,
         ruleSetId: evaluation.ruleSetId,
       });
-      const result = await answerGraduationQuestion(q, memoryPlan.history, {
-        graduationEvaluation: formatGraduationEvaluationFacts(evaluation),
-        identityContext,
-      });
+      const answer = [
+        formatDeterministicGraduationAnswer(q, replySummary),
+        ...formatAdditionalGraduationRequirements(q, evaluation),
+      ].join("\n");
       console.debug("[ai/ask] pipeline used", {
         pipeline: "graduation_evaluation",
-        eligible: evaluation.eligible,
+        eligible: replySummary.eligible,
         ruleSetId: evaluation.ruleSetId,
         missingCourseCount: evaluation.missingCourses.length,
-        missingCredits: evaluation.missingCredits,
-      });
-      res.status(200).json(result);
-      return;
-    }
-
-    if (isGraduationRequirementCreditsQuestion) {
-      const evaluation = await evaluateStudentGraduation(authStudent.studentId);
-      console.debug("[ai/ask] graduation requirement summary", {
-        resolvedStudentId: authStudent.studentId,
-        requiredCredits: evaluation.requiredCredits,
-        earnedCredits: evaluation.earnedCredits,
-        ruleSetId: evaluation.ruleSetId,
+        missingCredits: replySummary.missingCredits,
+        structuredEvaluation: formatGraduationEvaluationFacts(evaluation),
       });
       res.status(200).json({
         question: q,
-        answer: `Your current graduation rule set requires ${evaluation.requiredCredits} credits. Based on the same backend evaluator, you currently have ${evaluation.earnedCredits} counted credits and are missing ${evaluation.missingCredits}.`,
+        answer,
         sources: [],
       });
       return;

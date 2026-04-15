@@ -37,6 +37,11 @@ export type GraduationEvaluationResult = {
   notes: string[];
 };
 
+export type GraduationEvaluationSummary = Pick<
+  GraduationEvaluationResult,
+  "earnedCredits" | "requiredCredits" | "eligible" | "missingCredits"
+>;
+
 function normalizeCourseCode(courseCode: string): string {
   return courseCode.replace(/[\s-]+/g, "").trim().toUpperCase();
 }
@@ -137,7 +142,7 @@ function countWithdrawals(records: StudentAcademicCourseRecord[]): number {
   return count;
 }
 
-export function evaluateGraduation(
+function evaluateGraduationFromRecord(
   studentRecord: GraduationEvaluationRecord,
 ): GraduationEvaluationResult {
   const requirements = getGraduationRequirementsForProgram(studentRecord.profile?.program);
@@ -203,7 +208,56 @@ export function evaluateGraduation(
   };
 }
 
-export async function evaluateStudentGraduation(
+function isMostlyChinese(text: string): boolean {
+  const hanCount = text.match(/[\u4E00-\u9FFF]/g)?.length ?? 0;
+  if (hanCount === 0) return false;
+  const latinCount = text.match(/[A-Za-z]/g)?.length ?? 0;
+  return hanCount > latinCount || (latinCount === 0 && hanCount >= 2);
+}
+
+function formatCreditCount(value: number, zh: boolean): string {
+  return zh ? `${value}学分` : `${value} credit${value === 1 ? "" : "s"}`;
+}
+
+function formatDirectEligibilityLine(
+  evaluation: GraduationEvaluationSummary,
+  zh: boolean,
+): string {
+  if (evaluation.eligible) {
+    return zh
+      ? "你目前符合毕业的学分条件。"
+      : "You are currently eligible to graduate based on the configured backend requirement.";
+  }
+  if (evaluation.missingCredits <= 0) {
+    return zh
+      ? "你的学分已经达到要求，但你目前仍未满足全部毕业条件。"
+      : "Your credits already meet the requirement, but you are still not eligible to graduate because some graduation conditions remain unmet.";
+  }
+  return zh
+    ? `你还差${formatCreditCount(evaluation.missingCredits, true)}，所以你目前还不能毕业。`
+    : `You still need ${formatCreditCount(evaluation.missingCredits, false)}, so you are not yet eligible to graduate.`;
+}
+
+export function formatDeterministicGraduationAnswer(
+  question: string,
+  evaluation: GraduationEvaluationSummary,
+): string {
+  const zh = isMostlyChinese(question);
+  const lines = zh
+    ? [
+        `你目前已有${formatCreditCount(evaluation.earnedCredits, true)}。`,
+        `毕业要求是${formatCreditCount(evaluation.requiredCredits, true)}。`,
+        formatDirectEligibilityLine(evaluation, true),
+      ]
+    : [
+        `You currently have ${formatCreditCount(evaluation.earnedCredits, false)}.`,
+        `The graduation requirement is ${formatCreditCount(evaluation.requiredCredits, false)}.`,
+        formatDirectEligibilityLine(evaluation, false),
+      ];
+  return lines.join("\n");
+}
+
+export async function evaluateGraduation(
   studentId: string,
 ): Promise<GraduationEvaluationResult> {
   const trimmedStudentId = studentId.trim();
@@ -212,11 +266,24 @@ export async function evaluateStudentGraduation(
     getStudentAcademicsPayload(trimmedStudentId),
   ]);
 
-  return evaluateGraduation({
+  const evaluation = evaluateGraduationFromRecord({
     profile,
     courseRecords: academics.courseRecords,
   });
+
+  console.debug("[graduation-evaluation] computed", {
+    studentId: trimmedStudentId,
+    earnedCredits: evaluation.earnedCredits,
+    requiredCredits: evaluation.requiredCredits,
+    eligible: evaluation.eligible,
+    missingCredits: evaluation.missingCredits,
+    ruleSetId: evaluation.ruleSetId,
+  });
+
+  return evaluation;
 }
+
+export const evaluateStudentGraduation = evaluateGraduation;
 
 export function formatGraduationEvaluationFacts(
   evaluation: GraduationEvaluationResult,
