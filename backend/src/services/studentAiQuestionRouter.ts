@@ -2,6 +2,7 @@ export type StudentAiIntent =
   | "student_record"
   | "policy"
   | "mixed"
+  | "school_fact"
   | "general";
 
 export type StudentRecordQuestionKind =
@@ -70,6 +71,31 @@ function hasMixedApplicabilityCue(value: string): boolean {
       value,
     ) || /对我适用吗|适用于我吗|根据我的情况|结合我的情况|按我的情况|看我的记录/.test(value)
   );
+}
+
+function hasAmuIdentityCue(value: string): boolean {
+  return (
+    /\b(amu|alhambra medical university)\b/i.test(value) ||
+    /AMU|阿罕布拉医科大学|阿罕布拉醫科大學/.test(value)
+  );
+}
+
+function hasInstitutionFactCue(value: string): boolean {
+  return (
+    /\b(school|campus|address|location|located|phone|email|contact|housing|dorm|where\s+is)\b/i.test(
+      value,
+    ) ||
+    /学校|學校|校区|校區|校园|校園|地址|位置|地点|地點|电话|電話|邮箱|郵箱|邮件|郵件|联系|聯繫|联系方式|聯繫方式|宿舍|住宿|住校|在哪里|在哪裡|在哪/.test(
+      value,
+    )
+  );
+}
+
+function hasSchoolFactCue(value: string): boolean {
+  const hasAmu = hasAmuIdentityCue(value);
+  const hasInstitutionFact = hasInstitutionFactCue(value);
+  const shortFollowUp = value.length <= 80;
+  return hasAmu || hasInstitutionFact || (shortFollowUp && hasInstitutionFact);
 }
 
 export function extractCourseCode(question: string): string | null {
@@ -240,6 +266,10 @@ export function classifyStudentAiIntent(question: string): StudentAiIntent {
 
   if (policyCue || courseCode != null) {
     return "policy";
+  }
+
+  if (hasSchoolFactCue(normalized)) {
+    return "school_fact";
   }
 
   return "general";

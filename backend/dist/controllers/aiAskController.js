@@ -1,5 +1,5 @@
 import { verifyStudentAccessToken } from "../lib/studentAuthToken.js";
-import { RagQuestionValidationError, answerGeneralQuestion, answerAmuQuestion, answerStudentRecordQuestionFromFacts, } from "../services/ragService.js";
+import { RagQuestionValidationError, answerGeneralQuestion, answerAmuQuestion, answerStudentRecordQuestionFromFacts, planShortConversationMemory, } from "../services/ragService.js";
 import { classifyStudentAiIntent } from "../services/studentAiQuestionRouter.js";
 import { answerDeterministicStudentRecordQuestion, buildStudentRecordFactsForQuestion, } from "../services/studentRecordAiService.js";
 function readQuestion(req) {
@@ -49,11 +49,20 @@ export async function postAiAsk(req, res) {
         ? body.history
         : undefined;
     try {
-        const routedIntent = classifyStudentAiIntent(q);
-        console.debug("[ai/ask] detected intent", { intent: routedIntent });
+        const initialIntent = classifyStudentAiIntent(q);
+        const memoryPlan = planShortConversationMemory(q, rawHistory, initialIntent);
+        const routedIntent = memoryPlan.effectiveIntent;
+        console.debug("[ai/ask] detected intent", {
+            initialIntent,
+            effectiveIntent: routedIntent,
+            isFollowUp: memoryPlan.isFollowUp,
+            isTopicSwitch: memoryPlan.isTopicSwitch,
+            previousDomain: memoryPlan.previousDomain,
+            retainedHistoryMessages: memoryPlan.history?.length ?? 0,
+        });
         if (routedIntent === "general") {
             console.debug("[ai/ask] pipeline used", { pipeline: "general" });
-            const result = await answerGeneralQuestion(q);
+            const result = await answerGeneralQuestion(q, memoryPlan.history);
             res.status(200).json(result);
             return;
         }
@@ -95,7 +104,7 @@ export async function postAiAsk(req, res) {
         }
         if (routedIntent === "policy") {
             console.debug("[ai/ask] pipeline used", { pipeline: "policy" });
-            const result = await answerAmuQuestion(q, rawHistory, {
+            const result = await answerAmuQuestion(q, memoryPlan.history, {
                 pipeline: "policy",
             });
             res.status(200).json(result);
@@ -111,7 +120,7 @@ export async function postAiAsk(req, res) {
             ragUsed: true,
             helperCount: recordFacts?.usedHelpers.length ?? 0,
         });
-        const result = await answerAmuQuestion(q, rawHistory, {
+        const result = await answerAmuQuestion(q, memoryPlan.history, {
             pipeline: "mixed",
             studentContext: studentContextText,
         });

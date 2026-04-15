@@ -4,6 +4,7 @@ import {
   RagQuestionValidationError,
   answerGeneralQuestion,
   answerAmuQuestion,
+  answerSchoolFactQuestion,
   answerStudentRecordQuestionFromFacts,
   planShortConversationMemory,
 } from "../services/ragService.js";
@@ -84,6 +85,13 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
     if (routedIntent === "general") {
       console.debug("[ai/ask] pipeline used", { pipeline: "general" });
       const result = await answerGeneralQuestion(q, memoryPlan.history);
+      res.status(200).json(result);
+      return;
+    }
+
+    if (routedIntent === "school_fact") {
+      console.debug("[ai/ask] pipeline used", { pipeline: "school_fact" });
+      const result = answerSchoolFactQuestion(q);
       res.status(200).json(result);
       return;
     }

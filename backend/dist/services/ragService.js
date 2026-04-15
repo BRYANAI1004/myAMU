@@ -1,8 +1,10 @@
 import OpenAI from "openai";
 import { cosineSimilarity, loadKnowledgeChunks, } from "../lib/ragKnowledge.js";
+import { classifyStudentAiIntent, } from "./studentAiQuestionRouter.js";
 const TOP_K = 5;
 const MAX_QUESTION_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_USER_TURNS = 2;
 const MAX_HISTORY_CONTENT_CHARS = 500;
 const MAX_REWRITE_OUTPUT_CHARS = 320;
 const STUDENT_GROUNDED_RULES = `Use only:
@@ -151,6 +153,221 @@ function formatStudentContextBlock(studentContext) {
 - Notes:
   - No verified student context was available for this request.`;
 }
+function intentToConversationDomain(intent) {
+    return intent === "general" ? "general" : "academic";
+}
+function latestUserHistoryItem(history) {
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+        if (history[i]?.role === "user")
+            return history[i];
+    }
+    return undefined;
+}
+function sharedItemExists(left, right) {
+    const rightSet = new Set(right);
+    for (const item of left) {
+        if (rightSet.has(item))
+            return true;
+    }
+    return false;
+}
+function extractAcademicTopicTags(trimmed, lower) {
+    const tags = new Set();
+    if (/\b(course|courses|class|classes|prerequisite|catalog|curriculum|program)\b/i.test(lower) || /课程|选课|先修|目录|培养方案|课表|科目/.test(trimmed)) {
+        tags.add("courses");
+    }
+    if (/\b(enroll|enrolled|enrollment)\b/i.test(lower) || /入学|enrollment|录取/.test(trimmed)) {
+        tags.add("enrollment");
+    }
+    if (/\b(credit|credits)\b/i.test(lower) || /学分/.test(trimmed)) {
+        tags.add("credits");
+    }
+    if (/\b(grade|grades|gpa|transcript)\b/i.test(lower) || /成绩|绩点|成绩单/.test(trimmed)) {
+        tags.add("grades");
+    }
+    if (/\b(tuition|fee|fees|payment)\b/i.test(lower) || /学费|费用|缴费|付款/.test(trimmed)) {
+        tags.add("tuition");
+    }
+    if (/\b(refund|refunds)\b/i.test(lower) || /退款|退费/.test(trimmed)) {
+        tags.add("refund");
+    }
+    if (/\b(withdraw|withdrawal|drop|add\/drop)\b/i.test(lower) || /退课|退选|加退选/.test(trimmed)) {
+        tags.add("withdrawal");
+    }
+    if (/\b(policy|policies|rule|rules|requirement|requirements|deadline|deadlines)\b/i.test(lower) || /政策|规定|要求|规则|截止/.test(trimmed)) {
+        tags.add("policy");
+    }
+    if (/\b(registration|register|registered)\b/i.test(lower) || /注册|报名|选课开放/.test(trimmed)) {
+        tags.add("registration");
+    }
+    return tags;
+}
+const GENERAL_TOPIC_STOPWORDS = new Set([
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "those",
+    "these",
+    "what",
+    "about",
+    "how",
+    "why",
+    "when",
+    "where",
+    "which",
+    "would",
+    "could",
+    "should",
+    "then",
+    "but",
+    "also",
+    "into",
+    "from",
+    "have",
+    "does",
+    "did",
+    "can",
+    "you",
+    "your",
+    "我",
+    "那",
+    "这",
+    "怎么办",
+    "为什么",
+    "可以",
+    "一下",
+]);
+function extractTopicKeywords(text) {
+    const out = new Set();
+    const lower = text.toLowerCase();
+    const latinTokens = lower.match(/[a-z0-9][a-z0-9+-]{1,}/g) ?? [];
+    for (const token of latinTokens) {
+        if (!GENERAL_TOPIC_STOPWORDS.has(token))
+            out.add(token);
+    }
+    const hanRuns = text.match(/[\u4E00-\u9FFF]{2,}/g) ?? [];
+    for (const run of hanRuns) {
+        for (let i = 0; i < run.length - 1; i += 1) {
+            const bigram = run.slice(i, i + 2);
+            if (!GENERAL_TOPIC_STOPWORDS.has(bigram))
+                out.add(bigram);
+        }
+    }
+    return out;
+}
+function looksLikeFollowUpMessage(trimmed, lower) {
+    if (/\b(that|this|those|these|it|them|they|he|she)\b/i.test(lower))
+        return true;
+    if (/\b(what\s+about|how\s+about|and\s+what\s+about|but\s+if|why\s+is\s+that|why\s+did\s+that\s+happen|can\s+you\s+recommend)\b/i.test(lower)) {
+        return true;
+    }
+    if (/^(那|那我|但|但是|不过|如果这样|为什么会这样|可以推荐|所以|然后|可如果|那如果)/.test(trimmed)) {
+        return true;
+    }
+    if (/那|这|它|怎么办|那我|为什么会这样|可以推荐一下吗|学费呢|第一学期呢|如果我家|怎么支付|如何支付|该怎么做|那如果/.test(trimmed)) {
+        return true;
+    }
+    if (trimmed.length <= 40 && /呢[?？]?$/.test(trimmed))
+        return true;
+    if (trimmed.length <= 60 &&
+        (/\b(vs|versus|or)\b/i.test(lower) || /和|还是|或者/.test(trimmed))) {
+        return true;
+    }
+    return false;
+}
+function detectTopicSwitch(question, currentDomain, previousUserQuestion, previousDomain, isFollowUp) {
+    if (!previousUserQuestion || previousDomain == null)
+        return false;
+    const trimmed = question.trim();
+    const lower = trimmed.toLowerCase();
+    const prevTrimmed = previousUserQuestion.trim();
+    const prevLower = prevTrimmed.toLowerCase();
+    if (currentDomain === "academic" && previousDomain === "general") {
+        return true;
+    }
+    const currentAcademicTags = extractAcademicTopicTags(trimmed, lower);
+    const previousAcademicTags = extractAcademicTopicTags(prevTrimmed, prevLower);
+    if (currentAcademicTags.size > 0 &&
+        previousAcademicTags.size > 0 &&
+        !sharedItemExists(currentAcademicTags, previousAcademicTags)) {
+        return true;
+    }
+    const currentKeywords = extractTopicKeywords(trimmed);
+    const previousKeywords = extractTopicKeywords(previousUserQuestion);
+    const hasSharedKeywords = currentKeywords.size > 0 &&
+        previousKeywords.size > 0 &&
+        sharedItemExists(currentKeywords, previousKeywords);
+    if (currentDomain === "general" && previousDomain === "academic") {
+        if (!hasSharedKeywords && currentKeywords.size > 0)
+            return true;
+        return !isFollowUp;
+    }
+    if (currentDomain !== previousDomain)
+        return true;
+    if (!isFollowUp && currentKeywords.size > 0 && previousKeywords.size > 0) {
+        return !hasSharedKeywords;
+    }
+    return false;
+}
+function selectSameDomainShortHistory(history, targetDomain) {
+    const userIndexes = [];
+    for (let i = history.length - 1; i >= 0; i -= 1) {
+        if (history[i]?.role !== "user")
+            continue;
+        const userDomain = intentToConversationDomain(classifyStudentAiIntent(history[i].content));
+        if (userDomain !== targetDomain) {
+            if (userIndexes.length > 0)
+                break;
+            continue;
+        }
+        userIndexes.unshift(i);
+        if (userIndexes.length >= MAX_HISTORY_USER_TURNS)
+            break;
+    }
+    if (userIndexes.length === 0)
+        return [];
+    return history.slice(userIndexes[0]);
+}
+export function planShortConversationMemory(question, rawHistory, initialIntent) {
+    const history = sanitizeChatHistory(rawHistory) ?? [];
+    const trimmed = question.trim();
+    const lower = trimmed.toLowerCase();
+    const currentDomain = intentToConversationDomain(initialIntent);
+    const previousUser = latestUserHistoryItem(history);
+    const previousIntent = previousUser
+        ? classifyStudentAiIntent(previousUser.content)
+        : null;
+    const previousDomain = previousIntent == null ? null : intentToConversationDomain(previousIntent);
+    const isFollowUp = looksLikeFollowUpMessage(trimmed, lower);
+    const isTopicSwitch = detectTopicSwitch(question, currentDomain, previousUser?.content, previousDomain, isFollowUp);
+    let effectiveIntent = initialIntent;
+    if (initialIntent === "general" &&
+        isFollowUp &&
+        !isTopicSwitch &&
+        previousDomain === "academic") {
+        effectiveIntent = "policy";
+    }
+    const effectiveDomain = intentToConversationDomain(effectiveIntent);
+    let selectedHistory = [];
+    if (!isTopicSwitch && previousDomain === effectiveDomain) {
+        if (effectiveDomain === "academic") {
+            selectedHistory = selectSameDomainShortHistory(history, "academic");
+        }
+        else if (isFollowUp) {
+            selectedHistory = selectSameDomainShortHistory(history, "general");
+        }
+    }
+    return {
+        history: selectedHistory.length > 0 ? selectedHistory : undefined,
+        isFollowUp,
+        isTopicSwitch,
+        previousDomain,
+        effectiveIntent,
+    };
+}
 function formatRetrievedDocumentContextBlock(items) {
     if (items.length === 0) {
         return "No retrieved AMU handbook or policy excerpts were available.";
@@ -159,14 +376,10 @@ function formatRetrievedDocumentContextBlock(items) {
 }
 /** True when the latest question looks like a follow-up or vague reference (with history present). */
 function followUpOrVagueCue(trimmed, lower) {
-    if (/\b(that|this|those|these|it|them)\b/i.test(lower))
+    if (looksLikeFollowUpMessage(trimmed, lower))
         return true;
-    if (/what\s+about|how\s+about|how\s+should\s+i\s+do|how\s+do\s+i\s+do\s+that/i.test(lower)) {
+    if (/how\s+should\s+i\s+do|how\s+do\s+i\s+do\s+that/i.test(lower))
         return true;
-    }
-    if (/那|这|它|怎么办|那我|学费呢|第一学期呢|如果我家|怎么支付|如何支付|该怎么做|那如果/.test(trimmed)) {
-        return true;
-    }
     return false;
 }
 function shouldRewriteForRetrieval(question, history, intent, guidanceSubtype) {
@@ -650,14 +863,21 @@ function getOpenAiClient() {
     }
     return new OpenAI({ apiKey });
 }
-export async function answerGeneralQuestion(question) {
+export async function answerGeneralQuestion(question, rawHistory) {
     const q = validateQuestion(question);
+    const history = sanitizeChatHistory(rawHistory);
     const client = getOpenAiClient();
+    const historyPrefix = history != null && history.length > 0
+        ? `${formatRecentConversationBlock(history)}\n\n`
+        : "";
     const completion = await client.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
             { role: "system", content: buildGeneralSystemPrompt(q) },
-            { role: "user", content: q },
+            {
+                role: "user",
+                content: `${historyPrefix}Current user message:\n${q}`,
+            },
         ],
         temperature: 0.7,
     });
