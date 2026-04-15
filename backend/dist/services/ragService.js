@@ -79,6 +79,15 @@ For questions NOT related to AMU academics or student records:
 - DO NOT unnecessarily refuse
 - DO NOT say "I cannot answer" unless unsafe
 
+### REAL-WORLD LOCAL SEARCH
+
+For real-world, location-based queries such as nearby places, restaurants, or city recommendations:
+- do NOT fabricate businesses, ratings, addresses, distances, or claim results are current
+- do NOT pretend you searched or verified what is nearby
+- give helpful guidance such as suggesting Google Maps or Yelp with concrete search keywords
+- you may mention well-known chains only as reference examples, never as confirmed nearby options
+- keep the tone friendly, natural, and assistant-like
+
 ### IMPORTANT BOUNDARY
 
 If a question is general:
@@ -174,7 +183,9 @@ function formatIdentityContextForPrompt(identityContext) {
     return formatIdentityContextBlock(identityContext);
 }
 function intentToConversationDomain(intent) {
-    return intent === "general" ? "general" : "academic";
+    return intent === "general" || intent === "local_search"
+        ? "general"
+        : "academic";
 }
 function latestUserHistoryItem(history) {
     for (let i = history.length - 1; i >= 0; i -= 1) {
@@ -1057,6 +1068,148 @@ export function answerSchoolFactQuestion(question) {
                 score: 1,
             },
         ],
+    };
+}
+function detectLocalSearchCuisine(question) {
+    const patterns = [
+        {
+            pattern: /\b(hot\s*pot)\b|火锅|火鍋/i,
+            profile: {
+                searchTermEn: "hot pot",
+                searchTermZh: "火锅",
+                brandRefsEn: ["Haidilao", "Little Sheep"],
+                brandRefsZh: ["海底捞", "小肥羊"],
+            },
+        },
+        {
+            pattern: /\b(bbq|barbecue|kbbq)\b|烧烤|燒烤/i,
+            profile: {
+                searchTermEn: "BBQ",
+                searchTermZh: "烧烤",
+            },
+        },
+        {
+            pattern: /\b(ramen)\b|拉面|拉麵/i,
+            profile: {
+                searchTermEn: "ramen",
+                searchTermZh: "拉面",
+            },
+        },
+        {
+            pattern: /\b(sushi)\b|寿司|壽司/i,
+            profile: {
+                searchTermEn: "sushi",
+                searchTermZh: "寿司",
+            },
+        },
+        {
+            pattern: /\b(boba|milk\s*tea)\b|奶茶/i,
+            profile: {
+                searchTermEn: "boba",
+                searchTermZh: "奶茶",
+                brandRefsEn: ["Gong Cha", "Sharetea"],
+                brandRefsZh: ["贡茶", "Sharetea"],
+            },
+        },
+        {
+            pattern: /\b(coffee|cafe)\b|咖啡/i,
+            profile: {
+                searchTermEn: "coffee",
+                searchTermZh: "咖啡",
+                brandRefsEn: ["Starbucks", "Peet's Coffee"],
+                brandRefsZh: ["星巴克", "Peet's Coffee"],
+            },
+        },
+        {
+            pattern: /\b(dessert)\b|甜品|甜点|甜點/i,
+            profile: {
+                searchTermEn: "dessert",
+                searchTermZh: "甜品",
+            },
+        },
+        {
+            pattern: /\b(burger)\b|汉堡|漢堡/i,
+            profile: {
+                searchTermEn: "burgers",
+                searchTermZh: "汉堡",
+                brandRefsEn: ["In-N-Out", "Shake Shack"],
+                brandRefsZh: ["In-N-Out", "Shake Shack"],
+            },
+        },
+        {
+            pattern: /\b(brunch)\b|早午餐/i,
+            profile: {
+                searchTermEn: "brunch",
+                searchTermZh: "早午餐",
+            },
+        },
+    ];
+    for (const { pattern, profile } of patterns) {
+        if (pattern.test(question))
+            return profile;
+    }
+    return {
+        searchTermEn: "restaurants",
+        searchTermZh: "餐厅",
+    };
+}
+function detectLocalSearchLocation(question) {
+    const knownLocationMatches = Array.from(question.matchAll(/Los Angeles|Alhambra|Irvine|Pasadena|San Gabriel|Monterey Park|Arcadia|Rowland Heights|Anaheim|Orange County|洛杉矶|洛杉磯|阿罕布拉|尔湾|爾灣|帕萨迪纳|帕薩迪納|圣盖博|聖蓋博|蒙特利公园|蒙特利公園|亚凯迪亚|亞凱迪亞|橙县|橙縣/gi));
+    const lastKnownLocation = knownLocationMatches.at(-1)?.[0];
+    if (lastKnownLocation)
+        return lastKnownLocation.trim();
+    const englishAreaMatch = question.match(/\b(?:near|around|in)\s+([A-Za-z][A-Za-z\s-]{1,30})/i);
+    if (englishAreaMatch?.[1]) {
+        return englishAreaMatch[1].trim().replace(/\s+(for|with|that|which)$/i, "");
+    }
+    return null;
+}
+function buildLocalSearchKeywordSuggestions(question, zh) {
+    const cuisine = detectLocalSearchCuisine(question);
+    const location = detectLocalSearchLocation(question);
+    const suggestions = zh
+        ? location
+            ? [`${location} ${cuisine.searchTermZh}`, `${location} ${cuisine.searchTermZh} 推荐`]
+            : [`附近 ${cuisine.searchTermZh}`, `${cuisine.searchTermZh} 推荐`]
+        : location
+            ? [
+                `${cuisine.searchTermEn} near ${location}`,
+                `best ${cuisine.searchTermEn} in ${location}`,
+            ]
+            : [`${cuisine.searchTermEn} near me`, `best ${cuisine.searchTermEn} nearby`];
+    return Array.from(new Set(suggestions.map((item) => item.trim()))).slice(0, 2);
+}
+function buildLocalSearchReferenceLine(question, zh) {
+    const cuisine = detectLocalSearchCuisine(question);
+    const refs = zh ? cuisine.brandRefsZh : cuisine.brandRefsEn;
+    if (refs == null || refs.length === 0)
+        return null;
+    return zh
+        ? `如果你只是想先有个方向，像 ${refs.join("、")} 这类比较知名的品牌可以作为参考，但这不代表它们就在你附近。`
+        : `If you want a rough starting point, well-known chains like ${refs.join(", ")} can be useful reference points, but that does not mean they are nearby.`;
+}
+export function answerLocalSearchQuestion(question) {
+    const q = validateQuestion(question);
+    const zh = isMostlyChinese(q);
+    const keywords = buildLocalSearchKeywordSuggestions(q, zh);
+    const referenceLine = buildLocalSearchReferenceLine(q, zh);
+    const lines = zh
+        ? [
+            "我这边没有实时的本地商户数据，没办法保证推荐是最新或离你最近的。",
+            `建议你直接在 Google Maps 或 Yelp 搜索 "${keywords[0]}"${keywords[1] ? `，也可以试试 "${keywords[1]}"` : ""}，这样会比我硬猜更靠谱。`,
+            referenceLine,
+            "如果你告诉我你更想吃什么口味、预算大概多少，或者希望控制在多远的距离内，我可以继续帮你把搜索词缩小一点。",
+        ]
+        : [
+            "I don't have live local business listings, so I can't promise anything is the newest or actually closest to you.",
+            `Your best bet is to search Google Maps or Yelp for "${keywords[0]}"${keywords[1] ? ` or "${keywords[1]}"` : ""}, which will be much more reliable than me guessing.`,
+            referenceLine,
+            "If you tell me the vibe, cuisine, budget, or how far you're willing to go, I can help narrow the search terms down.",
+        ];
+    return {
+        question: q,
+        answer: lines.filter((line) => Boolean(line)).join("\n"),
+        sources: [],
     };
 }
 function getOpenAiClient() {

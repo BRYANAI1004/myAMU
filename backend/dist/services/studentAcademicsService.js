@@ -89,6 +89,14 @@ export async function getStudentAcademicsPayload(studentId) {
         listPortalEnrollmentRowsForStudentAcademics(trimmed),
     ]);
     const latestRegistration = pickNewerRegistrationAnchor(latestLegacy, latestPortal);
+    console.debug("[academics] source rows loaded", {
+        studentId: trimmed,
+        marksRowCount: marksRows.length,
+        portalEnrollmentRowCount: portalRows.length,
+        latestLegacy,
+        latestPortal,
+        latestRegistration,
+    });
     const nameFromMarks = marksRows[0]?.name?.trim() ?? "";
     let studentName = nameFromMarks.length > 0 ? nameFromMarks : trimmed;
     if (nameFromMarks.length === 0) {
@@ -102,6 +110,12 @@ export async function getStudentAcademicsPayload(studentId) {
         }
     }
     if (marksRows.length === 0 && portalRows.length === 0) {
+        console.error("[academics] no verified academic source rows found", {
+            studentId: trimmed,
+            latestLegacy,
+            latestPortal,
+            latestRegistration,
+        });
         const resolvedActive = resolveRegistrationAnchoredAcademicTerm(latestRegistration, []);
         return {
             studentId: trimmed,
@@ -122,6 +136,15 @@ export async function getStudentAcademicsPayload(studentId) {
         .filter((p) => !legacyCompletedBlocksPortalRow(legacyCourseRecords, p.course_code, p.term, p.year))
         .map((p) => portalEnrollmentRowToAcademicCourseRecord(trimmed, p, resolveCourseDisplayTitle(p.course_code, p.course_title_raw.length > 0 ? p.course_title_raw : p.course_code, courseLookup), resolvedActiveForRecords));
     const payload = buildMergedPayload(trimmed, studentName, marksRows, legacyCourseRecords, portalCourseRecords, latestRegistration);
+    console.debug("[academics] merged payload summary", {
+        studentId: trimmed,
+        currentTerm: payload.currentTerm,
+        availableTerms: payload.availableTerms.length,
+        currentScheduleCount: payload.currentSchedule.length,
+        transcriptCount: payload.transcript.length,
+        enrollmentHistoryCount: payload.enrollmentHistory.length,
+        courseRecordCount: payload.courseRecords.length,
+    });
     if (payload.courseRecords.length === 0) {
         return payload;
     }

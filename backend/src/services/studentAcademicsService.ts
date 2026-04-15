@@ -153,6 +153,14 @@ export async function getStudentAcademicsPayload(
     latestLegacy,
     latestPortal,
   );
+  console.debug("[academics] source rows loaded", {
+    studentId: trimmed,
+    marksRowCount: marksRows.length,
+    portalEnrollmentRowCount: portalRows.length,
+    latestLegacy,
+    latestPortal,
+    latestRegistration,
+  });
 
   const nameFromMarks = marksRows[0]?.name?.trim() ?? "";
   let studentName =
@@ -167,6 +175,12 @@ export async function getStudentAcademicsPayload(
   }
 
   if (marksRows.length === 0 && portalRows.length === 0) {
+    console.error("[academics] no verified academic source rows found", {
+      studentId: trimmed,
+      latestLegacy,
+      latestPortal,
+      latestRegistration,
+    });
     const resolvedActive = resolveRegistrationAnchoredAcademicTerm(
       latestRegistration,
       [],
@@ -229,6 +243,15 @@ export async function getStudentAcademicsPayload(
     portalCourseRecords,
     latestRegistration,
   );
+  console.debug("[academics] merged payload summary", {
+    studentId: trimmed,
+    currentTerm: payload.currentTerm,
+    availableTerms: payload.availableTerms.length,
+    currentScheduleCount: payload.currentSchedule.length,
+    transcriptCount: payload.transcript.length,
+    enrollmentHistoryCount: payload.enrollmentHistory.length,
+    courseRecordCount: payload.courseRecords.length,
+  });
 
   if (payload.courseRecords.length === 0) {
     return payload;

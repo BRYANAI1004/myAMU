@@ -1,5 +1,9 @@
 import { pool } from "../lib/db.js";
 import { listLegacyRegistrationTermsForStudent } from "../repositories/studentLegacyAccountRepository.js";
+import {
+  evaluateStudentGraduation,
+  type GraduationEvaluationResult,
+} from "./graduationEvaluationService.js";
 import { type RagAnswerResult } from "./ragService.js";
 import {
   detectStudentRecordQuestion,
@@ -355,7 +359,7 @@ function buildCurrentTermCoursesAnswer(
       result: {
         question,
         answer:
-          "I don't have enough information from your records to confirm your current-term courses.",
+          "I could not identify an active current term from your verified registration and marks data, so I cannot answer a current-term course question.",
         sources: [],
       },
       usedHelpers: ["getCurrentTermCourses"],
@@ -396,7 +400,7 @@ function buildCurrentTermCourseCountAnswer(
       result: {
         question,
         answer:
-          "I don't have enough information from your records to confirm your current-term course count.",
+          "I could not identify an active current term from your verified registration and marks data, so I cannot answer a current-term course-count question.",
         sources: [],
       },
       usedHelpers: ["getCurrentTermCourseCount"],
@@ -423,7 +427,7 @@ function buildCurrentTermCreditsAnswer(
       result: {
         question,
         answer:
-          "I don't have enough information from your records to confirm your current credit load.",
+          "I could not identify an active current term from your verified registration and marks data, so I cannot answer a current-term credit question.",
         sources: [],
       },
       usedHelpers: ["getCurrentTermCredits"],
@@ -444,7 +448,7 @@ function buildCurrentTermCreditsAnswer(
     return {
       result: {
         question,
-        answer: `I found ${records.length} active current-term course${records.length === 1 ? "" : "s"} in ${formatTermLabel(currentTerm.term, currentTerm.year)}, but I don't have enough information from your records to confirm the exact credit total.`,
+        answer: `I found ${records.length} active current-term course${records.length === 1 ? "" : "s"} in ${formatTermLabel(currentTerm.term, currentTerm.year)}, but one or more rows are missing unit values, so I cannot compute an exact current-term credit total.`,
         sources: [],
       },
       usedHelpers: ["getCurrentTermCredits"],
@@ -588,6 +592,54 @@ function buildCoursesInYearAnswer(
   };
 }
 
+function buildAllCoursesHistoryAnswer(
+  question: string,
+  summary: HistoricalAcademicRecordSummary,
+): StudentRecordAnswerResult {
+  if (summary.terms.length === 0) {
+    if (summary.registrationOnlyTerms.length > 0) {
+      return {
+        result: {
+          question,
+          answer: `I found historical registration term${summary.registrationOnlyTerms.length === 1 ? "" : "s"} without course-level detail: ${summary.registrationOnlyTerms
+            .map((term) => formatTermLabel(term.term, term.year))
+            .join("; ")}. I could not find verified course rows in marks or portal enrollments for this request.`,
+          sources: [],
+        },
+        usedHelpers: ["getStudentAcademicsPayload", "getRegisteredTerms"],
+      };
+    }
+
+    return {
+      result: {
+        question,
+        answer:
+          "I could not find any verified course-level academic history in marks or portal enrollments for your account.",
+        sources: [],
+      },
+      usedHelpers: ["getStudentAcademicsPayload", "getRegisteredTerms"],
+    };
+  }
+
+  const details = summary.terms
+    .map(
+      (term) =>
+        `${term.label}: ${term.courses.map((record) => formatHistoricalCourseEntry(record)).join("; ")}`,
+    )
+    .join(" | ");
+  const coverageNote =
+    summary.coverage === "partial" ? ` ${summary.coverageNote}` : "";
+
+  return {
+    result: {
+      question,
+      answer: `Here is your verified academic course history: ${details}.${coverageNote}`,
+      sources: [],
+    },
+    usedHelpers: ["getStudentAcademicsPayload", "getRegisteredTerms"],
+  };
+}
+
 function buildWithdrawalHistoryAnswer(
   question: string,
   history: StudentAcademicCourseRecord[],
@@ -698,15 +750,19 @@ function buildTookCourseAnswer(
 
 function buildCompletedCreditsTotalAnswer(
   question: string,
+  evaluation: GraduationEvaluationResult,
 ): StudentRecordAnswerResult {
+  const transferNote =
+    evaluation.transferCredits > 0
+      ? ` This total includes ${evaluation.transferCredits} transfer or admission credit${evaluation.transferCredits === 1 ? "" : "s"}.`
+      : "";
   return {
     result: {
       question,
-      answer:
-        "I can calculate your current-term credit load exactly, but I am not returning an all-time completed-credit total here because that would require additional earned-credit rules for repeats and credit counting that are not yet defined in this endpoint.",
+      answer: `You currently have ${evaluation.totalCredits} earned credit${evaluation.totalCredits === 1 ? "" : "s"} based on your latest completed transcript records.${transferNote}`,
       sources: [],
     },
-    usedHelpers: [],
+    usedHelpers: ["evaluateStudentGraduation", "getStudentAcademicsPayload"],
   };
 }
 
@@ -747,6 +803,10 @@ export async function answerDeterministicStudentRecordQuestion(
       const summary = await getHistoricalSummary(loader);
       return buildCoursesInYearAnswer(question, match.year, summary);
     }
+    case "all_courses_history": {
+      const summary = await getHistoricalSummary(loader);
+      return buildAllCoursesHistoryAnswer(question, summary);
+    }
     case "withdrawal_history": {
       const history = await getWithdrawalHistory(loader.studentId);
       return buildWithdrawalHistoryAnswer(question, history);
@@ -766,8 +826,10 @@ export async function answerDeterministicStudentRecordQuestion(
         summary.coverage,
       );
     }
-    case "completed_credits_total":
-      return buildCompletedCreditsTotalAnswer(question);
+    case "completed_credits_total": {
+      const evaluation = await evaluateStudentGraduation(loader.studentId);
+      return buildCompletedCreditsTotalAnswer(question, evaluation);
+    }
     default:
       return null;
   }
@@ -1005,6 +1067,14 @@ export async function buildStudentRecordFactsForQuestion(
         usedHelpers.add("getRegisteredTerms");
         break;
       }
+      case "all_courses_history": {
+        lines.push(
+          `- Historical course history answer basis: ${historySummary.terms.length} term${historySummary.terms.length === 1 ? "" : "s"} with course-level detail in verified sources`,
+        );
+        usedHelpers.add("getStudentAcademicsPayload");
+        usedHelpers.add("getRegisteredTerms");
+        break;
+      }
       case "withdrawal_history": {
         const history = await getWithdrawalHistory(loader.studentId);
         pushUnique(lines, buildWithdrawalFacts(history));
@@ -1033,11 +1103,14 @@ export async function buildStudentRecordFactsForQuestion(
         usedHelpers.add("hasCompletedCourse");
         break;
       }
-      case "completed_credits_total":
-        lines.push(
-          "- All-time completed credits are intentionally not computed here because repeat-course credit rules are not yet defined for this endpoint.",
-        );
+      case "completed_credits_total": {
+        const evaluation = await evaluateStudentGraduation(loader.studentId);
+        lines.push(`- Total earned credits: ${evaluation.totalCredits}`);
+        lines.push(`- Transfer / admission credits counted: ${evaluation.transferCredits}`);
+        lines.push(`- Missing credits toward graduation rules: ${evaluation.missingCredits}`);
+        usedHelpers.add("evaluateStudentGraduation");
         break;
+      }
     }
   }
 

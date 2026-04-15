@@ -102,6 +102,10 @@ export function issueStudentAccessToken(studentId: string): string {
   const encodedHeader = base64UrlEncode(JSON.stringify(TOKEN_HEADER));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const unsigned = `${encodedHeader}.${encodedPayload}`;
+  console.debug("[student-auth] issuing token", {
+    studentId: trimmed,
+    payloadSub: payload.sub,
+  });
   return `${unsigned}.${sign(unsigned)}`;
 }
 
@@ -142,6 +146,7 @@ export function verifyStudentAccessToken(
     });
     return null;
   }
+  console.log("[AI DEBUG] token payload.sub:", payload.sub);
 
   const now = Math.floor(Date.now() / 1000);
   if (payload.exp <= now) {
