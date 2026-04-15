@@ -1,34 +1,19 @@
 LOAD DATABASE
-    FROM mysql://admin@school-db.cd6o8awqe4ig.us-east-2.rds.amazonaws.com:3306/school
+    FROM mysql://admin:School123%21aws@school-db.cd6o8awqe4ig.us-east-2.rds.amazonaws.com:3306/school
     INTO pgsql://postgres.hffpwguupjiffaltbjri@aws-1-us-west-2.pooler.supabase.com:5432/postgres
 
-WITH data only,
-     truncate,
-     disable triggers,
-     workers = 1,
-     concurrency = 1,
-     rows per range = 5000
+ WITH include drop, create tables, create indexes, reset sequences,
+      workers = 2, concurrency = 1,
+      prefetch rows = 500, batch rows = 250
 
-INCLUDING ONLY TABLE NAMES MATCHING
-    ~/students/,
-    ~/marks/,
-    ~/course_sections/,
-    ~/portal_enrollments/,
-    ~/portal_courses/,
-    ~/academic_terms/
-
-SET PostgreSQL PARAMETERS
-    search_path to 'public'
-
-SET MySQL PARAMETERS
-    net_read_timeout = '600',
-    net_write_timeout = '600'
-
-CAST
-    type tinyint when (= precision 1) to boolean drop typemod using tinyint-to-boolean,
-    type datetime to timestamptz drop default drop not null using zero-dates-to-null,
-    type timestamp to timestamptz drop default drop not null using zero-dates-to-null,
-    type date to date drop default drop not null using zero-dates-to-null,
+ CAST
+    type datetime to timestamptz drop default drop not null,
+    type date to date drop default,
+    type time to time drop default,
     type enum to text,
-    type set to text,
-    type json to jsonb;
+    type set to text
+
+ EXCLUDING TABLE NAMES MATCHING ~/^copyright_release_agreement$/
+
+ BEFORE LOAD DO
+ $$ create schema if not exists public; $$;
