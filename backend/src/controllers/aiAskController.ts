@@ -5,6 +5,11 @@ import {
   RagQuestionValidationError,
   answerAmuQuestion,
 } from "../services/ragService.js";
+import { classifyStudentAiIntent } from "../services/studentAiQuestionRouter.js";
+import {
+  answerDeterministicStudentRecordQuestion,
+  buildStudentRecordFactsForQuestion,
+} from "../services/studentRecordAiService.js";
 
 function readQuestion(req: Request): unknown {
   const body = req.body as Record<string, unknown> | null | undefined;
@@ -65,14 +70,61 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
     console.debug("[ai/ask] authenticated student resolved", {
       studentId: authStudent.studentId,
     });
-    const studentContext = await buildStudentAiContext(authStudent.studentId);
-    console.debug("[ai/ask] student context built", {
+    const routedIntent = classifyStudentAiIntent(q);
+    console.debug("[ai/ask] routed intent", {
       studentId: authStudent.studentId,
-      dataSources: studentContext.dataSources,
-      ...studentContext.meta,
+      intent: routedIntent,
     });
+
+    if (routedIntent === "student_record") {
+      const deterministic = await answerDeterministicStudentRecordQuestion(
+        authStudent.studentId,
+        q,
+      );
+      if (deterministic != null) {
+        console.debug("[ai/ask] route execution", {
+          intent: routedIntent,
+          deterministicStudentFactsUsed: true,
+          ragUsed: false,
+          helperCount: deterministic.usedHelpers.length,
+        });
+        res.status(200).json(deterministic.result);
+        return;
+      }
+    }
+
+    let studentContextText: string | undefined;
+    let deterministicStudentFactsUsed = false;
+
+    if (routedIntent === "mixed") {
+      const recordFacts = await buildStudentRecordFactsForQuestion(
+        authStudent.studentId,
+        q,
+      );
+      if (recordFacts != null) {
+        studentContextText = recordFacts.contextText;
+        deterministicStudentFactsUsed = true;
+      }
+    }
+
+    if (studentContextText == null) {
+      const studentContext = await buildStudentAiContext(authStudent.studentId);
+      console.debug("[ai/ask] student context built", {
+        studentId: authStudent.studentId,
+        dataSources: studentContext.dataSources,
+        ...studentContext.meta,
+      });
+      studentContextText = studentContext.contextText;
+    }
+
+    console.debug("[ai/ask] route execution", {
+      intent: routedIntent,
+      deterministicStudentFactsUsed,
+      ragUsed: true,
+    });
+
     const result = await answerAmuQuestion(q, rawHistory, {
-      studentContext: studentContext.contextText,
+      studentContext: studentContextText,
     });
     res.status(200).json(result);
   } catch (e) {

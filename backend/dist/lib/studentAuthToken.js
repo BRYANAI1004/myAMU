@@ -1,5 +1,5 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-const DEV_FALLBACK_SECRET = randomBytes(32).toString("hex");
+import { createHmac, timingSafeEqual } from "node:crypto";
+const DEV_FALLBACK_SECRET = "student-auth-dev-fallback-secret-set-student-auth-secret";
 const TOKEN_HEADER = { alg: "HS256", typ: "JWT" };
 const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 12;
 function base64UrlEncode(value) {
@@ -89,22 +89,46 @@ export function verifyStudentAccessToken(authorizationHeader) {
     const raw = authorizationHeader?.trim() ?? "";
     const match = /^Bearer\s+(.+)$/i.exec(raw);
     const token = match?.[1]?.trim() ?? "";
-    if (token === "")
+    if (token === "") {
+        console.debug("[student-auth] verification failed", {
+            reason: "missing-bearer-token",
+        });
         return null;
+    }
     const parts = token.split(".");
-    if (parts.length !== 3)
+    if (parts.length !== 3) {
+        console.debug("[student-auth] verification failed", {
+            reason: "invalid-token-format",
+        });
         return null;
+    }
     const [encodedHeader, encodedPayload, signature] = parts;
     const unsigned = `${encodedHeader}.${encodedPayload}`;
     const expected = sign(unsigned);
-    if (!safeEqualBase64Url(signature, expected))
+    if (!safeEqualBase64Url(signature, expected)) {
+        console.debug("[student-auth] verification failed", {
+            reason: "signature-mismatch",
+        });
         return null;
+    }
     const payload = parsePayload(encodedPayload);
-    if (payload == null)
+    if (payload == null) {
+        console.debug("[student-auth] verification failed", {
+            reason: "invalid-payload",
+        });
         return null;
+    }
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp <= now)
+    if (payload.exp <= now) {
+        console.debug("[student-auth] verification failed", {
+            reason: "token-expired",
+        });
         return null;
-    return { studentId: payload.sub };
+    }
+    const authenticatedStudent = { studentId: payload.sub };
+    console.debug("[student-auth] verification succeeded", {
+        studentId: authenticatedStudent.studentId,
+    });
+    return authenticatedStudent;
 }
 //# sourceMappingURL=studentAuthToken.js.map

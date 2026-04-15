@@ -1,6 +1,8 @@
 import { verifyStudentAccessToken } from "../lib/studentAuthToken.js";
 import { buildStudentAiContext } from "../services/studentAiContextService.js";
 import { RagQuestionValidationError, answerAmuQuestion, } from "../services/ragService.js";
+import { classifyStudentAiIntent } from "../services/studentAiQuestionRouter.js";
+import { answerDeterministicStudentRecordQuestion, buildStudentRecordFactsForQuestion, } from "../services/studentRecordAiService.js";
 function readQuestion(req) {
     const body = req.body;
     if (body == null || typeof body !== "object")
@@ -12,8 +14,17 @@ function readQuestion(req) {
  * Body: { question: string, history?: { role: 'user' | 'assistant', content: string }[] }
  */
 export async function postAiAsk(req, res) {
+    const rawAuthorization = req.headers.authorization?.trim() ?? "";
+    const bearerMatch = /^Bearer\s+(.+)$/i.exec(rawAuthorization);
+    const hasAuthorizationHeader = rawAuthorization.length > 0;
+    const hasBearerToken = (bearerMatch?.[1]?.trim() ?? "") !== "";
+    console.debug("[ai/ask] request entered", {
+        hasAuthorizationHeader,
+        hasBearerToken,
+    });
     const authStudent = verifyStudentAccessToken(req.headers.authorization);
     if (authStudent == null) {
+        console.debug("[ai/ask] authentication required");
         res.status(401).json({ error: "Authentication required" });
         return;
     }
@@ -42,14 +53,49 @@ export async function postAiAsk(req, res) {
         console.debug("[ai/ask] authenticated student resolved", {
             studentId: authStudent.studentId,
         });
-        const studentContext = await buildStudentAiContext(authStudent.studentId);
-        console.debug("[ai/ask] student context built", {
+        const routedIntent = classifyStudentAiIntent(q);
+        console.debug("[ai/ask] routed intent", {
             studentId: authStudent.studentId,
-            dataSources: studentContext.dataSources,
-            ...studentContext.meta,
+            intent: routedIntent,
+        });
+        if (routedIntent === "student_record") {
+            const deterministic = await answerDeterministicStudentRecordQuestion(authStudent.studentId, q);
+            if (deterministic != null) {
+                console.debug("[ai/ask] route execution", {
+                    intent: routedIntent,
+                    deterministicStudentFactsUsed: true,
+                    ragUsed: false,
+                    helperCount: deterministic.usedHelpers.length,
+                });
+                res.status(200).json(deterministic.result);
+                return;
+            }
+        }
+        let studentContextText;
+        let deterministicStudentFactsUsed = false;
+        if (routedIntent === "mixed") {
+            const recordFacts = await buildStudentRecordFactsForQuestion(authStudent.studentId, q);
+            if (recordFacts != null) {
+                studentContextText = recordFacts.contextText;
+                deterministicStudentFactsUsed = true;
+            }
+        }
+        if (studentContextText == null) {
+            const studentContext = await buildStudentAiContext(authStudent.studentId);
+            console.debug("[ai/ask] student context built", {
+                studentId: authStudent.studentId,
+                dataSources: studentContext.dataSources,
+                ...studentContext.meta,
+            });
+            studentContextText = studentContext.contextText;
+        }
+        console.debug("[ai/ask] route execution", {
+            intent: routedIntent,
+            deterministicStudentFactsUsed,
+            ragUsed: true,
         });
         const result = await answerAmuQuestion(q, rawHistory, {
-            studentContext: studentContext.contextText,
+            studentContext: studentContextText,
         });
         res.status(200).json(result);
     }
