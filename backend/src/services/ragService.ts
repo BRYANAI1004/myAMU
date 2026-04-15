@@ -1,13 +1,19 @@
 import OpenAI from "openai";
+import { AMU_SCHOOL_FACTS } from "../config/schoolFacts.js";
 import {
   type KnowledgeChunkRow,
   cosineSimilarity,
   loadKnowledgeChunks,
 } from "../lib/ragKnowledge.js";
+import {
+  classifyStudentAiIntent,
+  type StudentAiIntent,
+} from "./studentAiQuestionRouter.js";
 
 const TOP_K = 5;
 const MAX_QUESTION_CHARS = 2000;
 const MAX_HISTORY_MESSAGES = 4;
+const MAX_HISTORY_USER_TURNS = 2;
 const MAX_HISTORY_CONTENT_CHARS = 500;
 const MAX_REWRITE_OUTPUT_CHARS = 320;
 
@@ -73,12 +79,32 @@ export type ChatHistoryItem = {
   content: string;
 };
 
+type ConversationDomain = "academic" | "general";
+
+export type ShortMemoryPlan = {
+  history: ChatHistoryItem[] | undefined;
+  isFollowUp: boolean;
+  isTopicSwitch: boolean;
+  previousDomain: ConversationDomain | null;
+  effectiveIntent: StudentAiIntent;
+};
+
 export type GroundedAmuPipeline = "policy" | "mixed";
 
 export type AnswerAmuQuestionOptions = {
   studentContext?: string | null;
   pipeline?: GroundedAmuPipeline;
 };
+
+type SchoolFactKind =
+  | "identity"
+  | "address"
+  | "location"
+  | "phone"
+  | "email"
+  | "contact"
+  | "campus"
+  | "housing";
 
 export class RagQuestionValidationError extends Error {
   constructor(message: string) {
@@ -130,7 +156,14 @@ If a question is AMU-related:
 
 NEVER mix the two:
 - do NOT use general knowledge to answer AMU-specific questions
-- do NOT invent AMU facts`;
+- do NOT invent AMU facts
+
+### HARD IDENTITY RULE
+
+In this product, "AMU" always means "Alhambra Medical University".
+Never reinterpret "AMU" as any other institution.
+Never use general knowledge to answer AMU-specific institutional facts such as address, location, phone, email, contact information, campus details, or housing.
+If an AMU-specific institutional fact is not present in controlled AMU sources, say clearly that you cannot confirm it from AMU sources.`;
 
 async function getKnowledgeChunks(): Promise<KnowledgeChunkRow[]> {
   if (cachedChunks !== null) return cachedChunks;
@@ -196,6 +229,286 @@ function formatStudentContextBlock(studentContext: string | null | undefined): s
   - No verified student context was available for this request.`;
 }
 
+function intentToConversationDomain(intent: StudentAiIntent): ConversationDomain {
+  return intent === "general" ? "general" : "academic";
+}
+
+function latestUserHistoryItem(history: ChatHistoryItem[]): ChatHistoryItem | undefined {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i]?.role === "user") return history[i];
+  }
+  return undefined;
+}
+
+function sharedItemExists(left: Iterable<string>, right: Iterable<string>): boolean {
+  const rightSet = new Set(right);
+  for (const item of left) {
+    if (rightSet.has(item)) return true;
+  }
+  return false;
+}
+
+function extractAcademicTopicTags(
+  trimmed: string,
+  lower: string,
+): Set<string> {
+  const tags = new Set<string>();
+  if (
+    /\b(course|courses|class|classes|prerequisite|catalog|curriculum|program)\b/i.test(
+      lower,
+    ) || /课程|选课|先修|目录|培养方案|课表|科目/.test(trimmed)
+  ) {
+    tags.add("courses");
+  }
+  if (
+    /\b(enroll|enrolled|enrollment)\b/i.test(lower) || /入学|enrollment|录取/.test(trimmed)
+  ) {
+    tags.add("enrollment");
+  }
+  if (/\b(credit|credits)\b/i.test(lower) || /学分/.test(trimmed)) {
+    tags.add("credits");
+  }
+  if (/\b(grade|grades|gpa|transcript)\b/i.test(lower) || /成绩|绩点|成绩单/.test(trimmed)) {
+    tags.add("grades");
+  }
+  if (/\b(tuition|fee|fees|payment)\b/i.test(lower) || /学费|费用|缴费|付款/.test(trimmed)) {
+    tags.add("tuition");
+  }
+  if (/\b(refund|refunds)\b/i.test(lower) || /退款|退费/.test(trimmed)) {
+    tags.add("refund");
+  }
+  if (/\b(withdraw|withdrawal|drop|add\/drop)\b/i.test(lower) || /退课|退选|加退选/.test(trimmed)) {
+    tags.add("withdrawal");
+  }
+  if (
+    /\b(policy|policies|rule|rules|requirement|requirements|deadline|deadlines)\b/i.test(
+      lower,
+    ) || /政策|规定|要求|规则|截止/.test(trimmed)
+  ) {
+    tags.add("policy");
+  }
+  if (
+    /\b(registration|register|registered)\b/i.test(lower) || /注册|报名|选课开放/.test(trimmed)
+  ) {
+    tags.add("registration");
+  }
+  return tags;
+}
+
+const GENERAL_TOPIC_STOPWORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "those",
+  "these",
+  "what",
+  "about",
+  "how",
+  "why",
+  "when",
+  "where",
+  "which",
+  "would",
+  "could",
+  "should",
+  "then",
+  "but",
+  "also",
+  "into",
+  "from",
+  "have",
+  "does",
+  "did",
+  "can",
+  "you",
+  "your",
+  "我",
+  "那",
+  "这",
+  "怎么办",
+  "为什么",
+  "可以",
+  "一下",
+]);
+
+function extractTopicKeywords(text: string): Set<string> {
+  const out = new Set<string>();
+  const lower = text.toLowerCase();
+  const latinTokens = lower.match(/[a-z0-9][a-z0-9+-]{1,}/g) ?? [];
+  for (const token of latinTokens) {
+    if (!GENERAL_TOPIC_STOPWORDS.has(token)) out.add(token);
+  }
+
+  const hanRuns = text.match(/[\u4E00-\u9FFF]{2,}/g) ?? [];
+  for (const run of hanRuns) {
+    for (let i = 0; i < run.length - 1; i += 1) {
+      const bigram = run.slice(i, i + 2);
+      if (!GENERAL_TOPIC_STOPWORDS.has(bigram)) out.add(bigram);
+    }
+  }
+
+  return out;
+}
+
+function looksLikeFollowUpMessage(trimmed: string, lower: string): boolean {
+  if (/\b(that|this|those|these|it|them|they|he|she)\b/i.test(lower)) return true;
+  if (
+    /\b(what\s+about|how\s+about|and\s+what\s+about|but\s+if|why\s+is\s+that|why\s+did\s+that\s+happen|can\s+you\s+recommend)\b/i.test(
+      lower,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /^(那|那我|但|但是|不过|如果这样|为什么会这样|可以推荐|所以|然后|可如果|那如果)/.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (
+    /那|这|它|怎么办|那我|为什么会这样|可以推荐一下吗|学费呢|第一学期呢|如果我家|怎么支付|如何支付|该怎么做|那如果/.test(
+      trimmed,
+    )
+  ) {
+    return true;
+  }
+  if (trimmed.length <= 40 && /呢[?？]?$/.test(trimmed)) return true;
+  if (
+    trimmed.length <= 60 &&
+    (/\b(vs|versus|or)\b/i.test(lower) || /和|还是|或者/.test(trimmed))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function detectTopicSwitch(
+  question: string,
+  currentDomain: ConversationDomain,
+  previousUserQuestion: string | undefined,
+  previousDomain: ConversationDomain | null,
+  isFollowUp: boolean,
+): boolean {
+  if (!previousUserQuestion || previousDomain == null) return false;
+
+  const trimmed = question.trim();
+  const lower = trimmed.toLowerCase();
+  const prevTrimmed = previousUserQuestion.trim();
+  const prevLower = prevTrimmed.toLowerCase();
+
+  if (currentDomain === "academic" && previousDomain === "general") {
+    return true;
+  }
+
+  const currentAcademicTags = extractAcademicTopicTags(trimmed, lower);
+  const previousAcademicTags = extractAcademicTopicTags(prevTrimmed, prevLower);
+  if (
+    currentAcademicTags.size > 0 &&
+    previousAcademicTags.size > 0 &&
+    !sharedItemExists(currentAcademicTags, previousAcademicTags)
+  ) {
+    return true;
+  }
+
+  const currentKeywords = extractTopicKeywords(trimmed);
+  const previousKeywords = extractTopicKeywords(previousUserQuestion);
+  const hasSharedKeywords =
+    currentKeywords.size > 0 &&
+    previousKeywords.size > 0 &&
+    sharedItemExists(currentKeywords, previousKeywords);
+
+  if (currentDomain === "general" && previousDomain === "academic") {
+    if (!hasSharedKeywords && currentKeywords.size > 0) return true;
+    return !isFollowUp;
+  }
+
+  if (currentDomain !== previousDomain) return true;
+
+  if (!isFollowUp && currentKeywords.size > 0 && previousKeywords.size > 0) {
+    return !hasSharedKeywords;
+  }
+
+  return false;
+}
+
+function selectSameDomainShortHistory(
+  history: ChatHistoryItem[],
+  targetDomain: ConversationDomain,
+): ChatHistoryItem[] {
+  const userIndexes: number[] = [];
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i]?.role !== "user") continue;
+    const userDomain = intentToConversationDomain(
+      classifyStudentAiIntent(history[i].content),
+    );
+    if (userDomain !== targetDomain) {
+      if (userIndexes.length > 0) break;
+      continue;
+    }
+    userIndexes.unshift(i);
+    if (userIndexes.length >= MAX_HISTORY_USER_TURNS) break;
+  }
+  if (userIndexes.length === 0) return [];
+  return history.slice(userIndexes[0]);
+}
+
+export function planShortConversationMemory(
+  question: string,
+  rawHistory: unknown,
+  initialIntent: StudentAiIntent,
+): ShortMemoryPlan {
+  const history = sanitizeChatHistory(rawHistory) ?? [];
+  const trimmed = question.trim();
+  const lower = trimmed.toLowerCase();
+  const currentDomain = intentToConversationDomain(initialIntent);
+  const previousUser = latestUserHistoryItem(history);
+  const previousIntent = previousUser
+    ? classifyStudentAiIntent(previousUser.content)
+    : null;
+  const previousDomain =
+    previousIntent == null ? null : intentToConversationDomain(previousIntent);
+  const isFollowUp = looksLikeFollowUpMessage(trimmed, lower);
+  const isTopicSwitch = detectTopicSwitch(
+    question,
+    currentDomain,
+    previousUser?.content,
+    previousDomain,
+    isFollowUp,
+  );
+
+  let effectiveIntent = initialIntent;
+  if (
+    initialIntent === "general" &&
+    isFollowUp &&
+    !isTopicSwitch &&
+    previousDomain === "academic"
+  ) {
+    effectiveIntent = previousIntent === "school_fact" ? "school_fact" : "policy";
+  }
+
+  const effectiveDomain = intentToConversationDomain(effectiveIntent);
+  let selectedHistory: ChatHistoryItem[] = [];
+  if (!isTopicSwitch && previousDomain === effectiveDomain) {
+    if (effectiveDomain === "academic") {
+      selectedHistory = selectSameDomainShortHistory(history, "academic");
+    } else if (isFollowUp) {
+      selectedHistory = selectSameDomainShortHistory(history, "general");
+    }
+  }
+
+  return {
+    history: selectedHistory.length > 0 ? selectedHistory : undefined,
+    isFollowUp,
+    isTopicSwitch,
+    previousDomain,
+    effectiveIntent,
+  };
+}
+
 function formatRetrievedDocumentContextBlock(
   items: { chunk: KnowledgeChunkRow; score: number }[],
 ): string {
@@ -207,21 +520,8 @@ function formatRetrievedDocumentContextBlock(
 
 /** True when the latest question looks like a follow-up or vague reference (with history present). */
 function followUpOrVagueCue(trimmed: string, lower: string): boolean {
-  if (/\b(that|this|those|these|it|them)\b/i.test(lower)) return true;
-  if (
-    /what\s+about|how\s+about|how\s+should\s+i\s+do|how\s+do\s+i\s+do\s+that/i.test(
-      lower,
-    )
-  ) {
-    return true;
-  }
-  if (
-    /那|这|它|怎么办|那我|学费呢|第一学期呢|如果我家|怎么支付|如何支付|该怎么做|那如果/.test(
-      trimmed,
-    )
-  ) {
-    return true;
-  }
+  if (looksLikeFollowUpMessage(trimmed, lower)) return true;
+  if (/how\s+should\s+i\s+do|how\s+do\s+i\s+do\s+that/i.test(lower)) return true;
   return false;
 }
 
@@ -951,6 +1251,197 @@ function appendSupportContactBlocks(
   return parts.join("\n\n");
 }
 
+function detectSchoolFactKinds(question: string): Set<SchoolFactKind> {
+  const trimmed = question.trim();
+  const lower = trimmed.toLowerCase();
+  const kinds = new Set<SchoolFactKind>();
+
+  if (
+    /\b(amu|alhambra medical university|what is amu|which school)\b/i.test(lower) ||
+    /AMU|是什么学校|哪所学校|哪个学校|学校名称|学校全名/.test(trimmed)
+  ) {
+    kinds.add("identity");
+  }
+  if (
+    /\b(address|where\s+is|where'?s|located|location)\b/i.test(lower) ||
+    /地址|在哪里|在哪裡|在哪|位置|地点|地點/.test(trimmed)
+  ) {
+    kinds.add("address");
+    kinds.add("location");
+  }
+  if (/\b(phone|telephone|tel)\b/i.test(lower) || /电话|電話/.test(trimmed)) {
+    kinds.add("phone");
+    kinds.add("contact");
+  }
+  if (/\b(email|e-mail|mail)\b/i.test(lower) || /邮箱|郵箱|邮件|郵件/.test(trimmed)) {
+    kinds.add("email");
+    kinds.add("contact");
+  }
+  if (/\b(contact)\b/i.test(lower) || /联系|聯繫|联系方式|聯繫方式/.test(trimmed)) {
+    kinds.add("contact");
+  }
+  if (/\b(campus)\b/i.test(lower) || /校区|校區|校园|校園/.test(trimmed)) {
+    kinds.add("campus");
+  }
+  if (/\b(housing|dorm|dormitory)\b/i.test(lower) || /宿舍|住宿|住校/.test(trimmed)) {
+    kinds.add("housing");
+  }
+
+  if (kinds.size === 0) {
+    kinds.add("identity");
+  }
+
+  return kinds;
+}
+
+function buildSchoolFactSourceContent(): string {
+  const lines = [`Institution: ${AMU_SCHOOL_FACTS.institutionName}`];
+  if (AMU_SCHOOL_FACTS.address) lines.push(`Address: ${AMU_SCHOOL_FACTS.address}`);
+  if (AMU_SCHOOL_FACTS.location) lines.push(`Location: ${AMU_SCHOOL_FACTS.location}`);
+  if (AMU_SCHOOL_FACTS.phone) lines.push(`Phone: ${AMU_SCHOOL_FACTS.phone}`);
+  if (AMU_SCHOOL_FACTS.email) lines.push(`Email: ${AMU_SCHOOL_FACTS.email}`);
+  if (AMU_SCHOOL_FACTS.campusInfo) lines.push(`Campus: ${AMU_SCHOOL_FACTS.campusInfo}`);
+  if (AMU_SCHOOL_FACTS.housingAvailable != null) {
+    lines.push(
+      `Housing: ${AMU_SCHOOL_FACTS.housingAvailable ? "Available" : "Not confirmed as available"}`,
+    );
+  }
+  if (AMU_SCHOOL_FACTS.housingNote) lines.push(`Housing note: ${AMU_SCHOOL_FACTS.housingNote}`);
+  return lines.join("\n");
+}
+
+export function answerSchoolFactQuestion(question: string): RagAnswerResult {
+  const q = validateQuestion(question);
+  const zh = isMostlyChinese(q);
+  const requested = detectSchoolFactKinds(q);
+  const lines: string[] = [
+    zh
+      ? `在这个产品里，AMU 指的是 ${AMU_SCHOOL_FACTS.institutionName}。`
+      : `In this product, AMU means ${AMU_SCHOOL_FACTS.institutionName}.`,
+  ];
+
+  if (requested.has("address") || requested.has("location")) {
+    if (AMU_SCHOOL_FACTS.address || AMU_SCHOOL_FACTS.location) {
+      const addressOrLocation =
+        AMU_SCHOOL_FACTS.address ?? AMU_SCHOOL_FACTS.location ?? "";
+      lines.push(
+        zh
+          ? `我能从受控的 AMU 信息源确认的地址/位置是：${addressOrLocation}`
+          : `The controlled AMU source confirms this address/location: ${addressOrLocation}`,
+      );
+    } else {
+      lines.push(
+        zh
+          ? "我目前无法从受控的 AMU 信息源确认学校地址或位置，因此不能提供未验证的信息。"
+          : "I cannot confirm AMU's address or location from controlled AMU sources, so I won't provide an unverified answer.",
+      );
+    }
+  }
+
+  if (requested.has("phone")) {
+    lines.push(
+      AMU_SCHOOL_FACTS.phone
+        ? zh
+          ? `我能确认的电话是：${AMU_SCHOOL_FACTS.phone}`
+          : `The confirmed phone number is: ${AMU_SCHOOL_FACTS.phone}`
+        : zh
+          ? "我目前无法从受控的 AMU 信息源确认学校电话。"
+          : "I cannot confirm an AMU phone number from controlled AMU sources.",
+    );
+  }
+
+  if (requested.has("email")) {
+    lines.push(
+      AMU_SCHOOL_FACTS.email
+        ? zh
+          ? `我能确认的邮箱是：${AMU_SCHOOL_FACTS.email}`
+          : `The confirmed email address is: ${AMU_SCHOOL_FACTS.email}`
+        : zh
+          ? "我目前无法从受控的 AMU 信息源确认学校邮箱。"
+          : "I cannot confirm an AMU email address from controlled AMU sources.",
+    );
+  }
+
+  if (
+    requested.has("contact") &&
+    !requested.has("phone") &&
+    !requested.has("email")
+  ) {
+    if (AMU_SCHOOL_FACTS.phone || AMU_SCHOOL_FACTS.email) {
+      const contactParts = [
+        AMU_SCHOOL_FACTS.phone ? `phone: ${AMU_SCHOOL_FACTS.phone}` : null,
+        AMU_SCHOOL_FACTS.email ? `email: ${AMU_SCHOOL_FACTS.email}` : null,
+      ].filter((part): part is string => part != null);
+      lines.push(
+        zh
+          ? `我能确认的联系方式是：${contactParts.join("；")}`
+          : `The confirmed contact information is: ${contactParts.join("; ")}`,
+      );
+    } else {
+      lines.push(
+        zh
+          ? "我目前无法从受控的 AMU 信息源确认学校联系方式。"
+          : "I cannot confirm AMU contact information from controlled AMU sources.",
+      );
+    }
+  }
+
+  if (requested.has("campus")) {
+    lines.push(
+      AMU_SCHOOL_FACTS.campusInfo
+        ? zh
+          ? `我能确认的校区信息是：${AMU_SCHOOL_FACTS.campusInfo}`
+          : `The confirmed campus information is: ${AMU_SCHOOL_FACTS.campusInfo}`
+        : zh
+          ? "我目前无法从受控的 AMU 信息源确认校区信息。"
+          : "I cannot confirm campus information from controlled AMU sources.",
+    );
+  }
+
+  if (requested.has("housing")) {
+    if (AMU_SCHOOL_FACTS.housingAvailable == null && !AMU_SCHOOL_FACTS.housingNote) {
+      lines.push(
+        zh
+          ? "我目前无法从受控的 AMU 信息源确认学校是否提供宿舍或住房。"
+          : "I cannot confirm from controlled AMU sources whether the school provides housing or dorms.",
+      );
+    } else if (AMU_SCHOOL_FACTS.housingAvailable === true) {
+      lines.push(
+        zh
+          ? `受控的 AMU 信息源显示学校提供住房。${AMU_SCHOOL_FACTS.housingNote ?? ""}`.trim()
+          : `The controlled AMU source indicates the school provides housing. ${AMU_SCHOOL_FACTS.housingNote ?? ""}`.trim(),
+      );
+    } else if (AMU_SCHOOL_FACTS.housingAvailable === false) {
+      lines.push(
+        zh
+          ? `受控的 AMU 信息源显示学校不提供住房。${AMU_SCHOOL_FACTS.housingNote ?? ""}`.trim()
+          : `The controlled AMU source indicates the school does not provide housing. ${AMU_SCHOOL_FACTS.housingNote ?? ""}`.trim(),
+      );
+    } else if (AMU_SCHOOL_FACTS.housingNote) {
+      lines.push(
+        zh
+          ? `我能确认的住房说明是：${AMU_SCHOOL_FACTS.housingNote}`
+          : `The confirmed housing note is: ${AMU_SCHOOL_FACTS.housingNote}`,
+      );
+    }
+  }
+
+  const answer = lines.join("\n");
+  return {
+    question: q,
+    answer,
+    sources: [
+      {
+        id: "amu-school-facts",
+        source: AMU_SCHOOL_FACTS.sourceLabel,
+        chunkIndex: 0,
+        content: buildSchoolFactSourceContent(),
+        score: 1,
+      },
+    ],
+  };
+}
+
 function getOpenAiClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
@@ -961,15 +1452,24 @@ function getOpenAiClient(): OpenAI {
 
 export async function answerGeneralQuestion(
   question: string,
+  rawHistory?: unknown,
 ): Promise<RagAnswerResult> {
   const q = validateQuestion(question);
+  const history = sanitizeChatHistory(rawHistory);
   const client = getOpenAiClient();
+  const historyPrefix =
+    history != null && history.length > 0
+      ? `${formatRecentConversationBlock(history)}\n\n`
+      : "";
 
   const completion = await client.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: buildGeneralSystemPrompt(q) },
-      { role: "user", content: q },
+      {
+        role: "user",
+        content: `${historyPrefix}Current user message:\n${q}`,
+      },
     ],
     temperature: 0.7,
   });

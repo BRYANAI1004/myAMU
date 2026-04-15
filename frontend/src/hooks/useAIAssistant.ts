@@ -23,6 +23,7 @@ export type AIAssistantAttachment = SendAssistantAttachmentPayload
 const AMU_AI_OPEN = 'amu-ai-open'
 const AMU_AI_MESSAGES = 'amu-ai-messages'
 const PORTAL_LOCALE_KEY = 'portal-locale'
+const MAX_CONTEXT_HISTORY_MESSAGES = 4
 
 function readStoredLocale(): PortalLocale {
   try {
@@ -95,6 +96,18 @@ function persistMessages(messages: AIAssistantChatMessage[]): void {
   } catch {
     /* ignore */
   }
+}
+
+function buildRecentHistoryPayload(
+  messages: AIAssistantChatMessage[],
+): Array<{ role: AIAssistantChatRole; content: string }> {
+  return messages
+    .filter((message) => !message.welcomeLines?.length)
+    .slice(-MAX_CONTEXT_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role,
+      content: message.content,
+    }))
 }
 
 export type AIAssistantPanelState = 'closed' | 'open' | 'minimized'
@@ -261,7 +274,10 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
       const res = await fetch(buildApiUrl('/api/ai/ask'), {
         method: 'POST',
         headers,
-        body: JSON.stringify({ question: userLine }),
+        body: JSON.stringify({
+          question: userLine,
+          history: buildRecentHistoryPayload(messages),
+        }),
         signal: ac.signal,
       })
 

@@ -5,6 +5,7 @@ import {
   answerGeneralQuestion,
   answerAmuQuestion,
   answerStudentRecordQuestionFromFacts,
+  planShortConversationMemory,
 } from "../services/ragService.js";
 import { classifyStudentAiIntent } from "../services/studentAiQuestionRouter.js";
 import {
@@ -68,12 +69,21 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       : undefined;
 
   try {
-    const routedIntent = classifyStudentAiIntent(q);
-    console.debug("[ai/ask] detected intent", { intent: routedIntent });
+    const initialIntent = classifyStudentAiIntent(q);
+    const memoryPlan = planShortConversationMemory(q, rawHistory, initialIntent);
+    const routedIntent = memoryPlan.effectiveIntent;
+    console.debug("[ai/ask] detected intent", {
+      initialIntent,
+      effectiveIntent: routedIntent,
+      isFollowUp: memoryPlan.isFollowUp,
+      isTopicSwitch: memoryPlan.isTopicSwitch,
+      previousDomain: memoryPlan.previousDomain,
+      retainedHistoryMessages: memoryPlan.history?.length ?? 0,
+    });
 
     if (routedIntent === "general") {
       console.debug("[ai/ask] pipeline used", { pipeline: "general" });
-      const result = await answerGeneralQuestion(q);
+      const result = await answerGeneralQuestion(q, memoryPlan.history);
       res.status(200).json(result);
       return;
     }
@@ -126,7 +136,7 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
 
     if (routedIntent === "policy") {
       console.debug("[ai/ask] pipeline used", { pipeline: "policy" });
-      const result = await answerAmuQuestion(q, rawHistory, {
+      const result = await answerAmuQuestion(q, memoryPlan.history, {
         pipeline: "policy",
       });
       res.status(200).json(result);
@@ -149,7 +159,7 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       helperCount: recordFacts?.usedHelpers.length ?? 0,
     });
 
-    const result = await answerAmuQuestion(q, rawHistory, {
+    const result = await answerAmuQuestion(q, memoryPlan.history, {
       pipeline: "mixed",
       studentContext: studentContextText,
     });
