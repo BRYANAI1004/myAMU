@@ -30,6 +30,7 @@ type TermForm = {
   registration_close: string
   withdraw_deadline: string
   payment_due_date: string
+  clinicAppointmentDeadline: string
   status: AcademicTermStatus
   is_visible: boolean
   lock_registration_if_overdue: boolean
@@ -38,6 +39,11 @@ type TermForm = {
 function emptyToNull(iso: string): string | null {
   const s = iso.trim()
   return s === '' ? null : s
+}
+
+function humanizeDateFieldKey(k: string): string {
+  if (k === 'clinicAppointmentDeadline') return 'clinic appointment deadline'
+  return k.replace(/_/g, ' ')
 }
 
 function formatTableDate(iso: string | null): string {
@@ -62,6 +68,7 @@ function termToForm(t: AcademicTerm): TermForm {
     registration_close: t.registration_close ?? '',
     withdraw_deadline: t.withdraw_deadline ?? '',
     payment_due_date: t.payment_due_date ?? '',
+    clinicAppointmentDeadline: t.clinicAppointmentDeadline ?? '',
     status: t.status,
     is_visible: t.is_visible,
     lock_registration_if_overdue: t.lock_registration_if_overdue,
@@ -81,6 +88,7 @@ function defaultAddForm(nextSequence: number): TermForm {
     registration_close: '',
     withdraw_deadline: '',
     payment_due_date: '',
+    clinicAppointmentDeadline: '',
     status: 'planned',
     is_visible: true,
     lock_registration_if_overdue: false,
@@ -175,10 +183,11 @@ export function AdminAcademicTermsPage() {
       registration_close: emptyToNull(form.registration_close),
       withdraw_deadline: emptyToNull(form.withdraw_deadline),
       payment_due_date: emptyToNull(form.payment_due_date),
+      clinicAppointmentDeadline: emptyToNull(form.clinicAppointmentDeadline),
     }
     for (const [k, v] of Object.entries(datePayload)) {
       if (v != null && !/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-        setFormError(`Invalid date for ${k.replace(/_/g, ' ')} (use YYYY-MM-DD).`)
+        setFormError(`Invalid date for ${humanizeDateFieldKey(k)} (use YYYY-MM-DD).`)
         return
       }
     }
@@ -303,6 +312,7 @@ export function AdminAcademicTermsPage() {
                 <th scope="col">Registration Close</th>
                 <th scope="col">Withdraw DDL</th>
                 <th scope="col">Payment DDL</th>
+                <th scope="col">Clinic Appointment DDL</th>
                 <th scope="col">Lock Registration if Overdue</th>
                 <th scope="col">Visible</th>
                 <th scope="col">Posted</th>
@@ -312,7 +322,7 @@ export function AdminAcademicTermsPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="portal-card-note">
+                  <td colSpan={14} className="portal-card-note">
                     No academic terms yet. Use Add Term to create one.
                   </td>
                 </tr>
@@ -330,6 +340,7 @@ export function AdminAcademicTermsPage() {
                     <td>{formatTableDate(t.registration_close)}</td>
                     <td>{formatTableDate(t.withdraw_deadline)}</td>
                     <td>{formatTableDate(t.payment_due_date)}</td>
+                    <td>{formatTableDate(t.clinicAppointmentDeadline)}</td>
                     <td>{t.lock_registration_if_overdue ? 'Yes' : 'No'}</td>
                     <td>{t.is_visible ? 'Yes' : 'No'}</td>
                     <td>{t.is_posted_to_dashboard ? 'Yes' : 'No'}</td>
@@ -596,6 +607,24 @@ export function AdminAcademicTermsPage() {
                     setForm((f) => ({
                       ...f,
                       payment_due_date: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="portal-course-feedback-modal__field">
+                <label htmlFor="admin-term-clinic-ddl">
+                  Clinic appointment deadline
+                </label>
+                <input
+                  id="admin-term-clinic-ddl"
+                  className="admin-input"
+                  style={{ width: '100%', boxSizing: 'border-box' }}
+                  type="date"
+                  value={form.clinicAppointmentDeadline}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      clinicAppointmentDeadline: e.target.value,
                     }))
                   }
                 />

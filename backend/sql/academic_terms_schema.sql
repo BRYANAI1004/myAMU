@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS academic_terms (
   registration_open DATE NULL,
   registration_close DATE NULL,
   payment_due_date DATE NULL COMMENT 'Portal payment due date (DDL) for this term',
+  clinic_appointment_deadline DATE NULL COMMENT 'Clinic appointment scheduling deadline for this term',
   lock_registration_if_overdue TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'When 1, block registration for students past payment DDL',
   status VARCHAR(32) NOT NULL,
   is_visible TINYINT(1) NOT NULL DEFAULT 1,

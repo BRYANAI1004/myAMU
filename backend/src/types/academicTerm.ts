@@ -20,6 +20,7 @@ export type AcademicTermDetail = {
   registration_close: string | null;
   withdraw_deadline: string | null;
   payment_due_date: string | null;
+  clinic_appointment_deadline: string | null;
   lock_registration_if_overdue: boolean;
   status: AcademicTermStatus;
   is_visible: boolean;
@@ -39,6 +40,7 @@ export type CreateAcademicTermInput = {
   registration_close?: string | null;
   withdraw_deadline?: string | null;
   payment_due_date?: string | null;
+  clinic_appointment_deadline?: string | null;
   lock_registration_if_overdue?: boolean;
   status: AcademicTermStatus;
   is_visible?: boolean;

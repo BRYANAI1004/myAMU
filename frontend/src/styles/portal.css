@@ -5504,7 +5504,23 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-dashboard-current-term-card {
   margin: 0;
   padding: 1rem 1.125rem;
-  max-width: 36rem;
+  max-width: 40rem;
+}
+
+.portal-dashboard-current-term-card__dl--two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem 1.25rem;
+  align-items: start;
+}
+
+.portal-dashboard-current-term-card__column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .portal-dashboard-current-term-card--muted {
@@ -5551,6 +5567,12 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   .portal-dashboard-current-term-card__row {
     grid-template-columns: 1fr;
     gap: 0.15rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-dashboard-current-term-card__dl--two-col {
+    grid-template-columns: 1fr;
   }
 }
 

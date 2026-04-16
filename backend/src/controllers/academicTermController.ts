@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import type {
+  AcademicTermDetail,
   AcademicTermName,
   AcademicTermStatus,
   CreateAcademicTermInput,
@@ -56,6 +57,20 @@ function parseOptionalDate(
   return s;
 }
 
+/** JSON shape for API: camelCase for clinic appointment deadline only. */
+type AcademicTermApiJson = Omit<
+  AcademicTermDetail,
+  "clinic_appointment_deadline"
+> & { clinicAppointmentDeadline: string | null };
+
+function serializeAcademicTermForApi(t: AcademicTermDetail): AcademicTermApiJson {
+  const { clinic_appointment_deadline, ...rest } = t;
+  return {
+    ...rest,
+    clinicAppointmentDeadline: clinic_appointment_deadline,
+  };
+}
+
 function parseOptionalBool(v: unknown): boolean | undefined | "invalid" {
   if (v === undefined) return undefined;
   if (typeof v === "boolean") return v;
@@ -88,13 +103,19 @@ function parseCreateBody(body: unknown): CreateAcademicTermInput | null {
   const rc = parseOptionalDate(o.registration_close);
   const wd = parseOptionalDate(o.withdraw_deadline);
   const pdd = parseOptionalDate(o.payment_due_date);
+  const clinRaw =
+    o.clinicAppointmentDeadline !== undefined
+      ? o.clinicAppointmentDeadline
+      : o.clinic_appointment_deadline;
+  const clin = parseOptionalDate(clinRaw);
   if (
     start === "invalid" ||
     end === "invalid" ||
     ro === "invalid" ||
     rc === "invalid" ||
     wd === "invalid" ||
-    pdd === "invalid"
+    pdd === "invalid" ||
+    clin === "invalid"
   ) {
     return null;
   }
@@ -116,6 +137,7 @@ function parseCreateBody(body: unknown): CreateAcademicTermInput | null {
     registration_close: rc,
     withdraw_deadline: wd,
     payment_due_date: pdd,
+    clinic_appointment_deadline: clin,
     ...(lockReg !== undefined ? { lock_registration_if_overdue: lockReg } : {}),
     status: status as AcademicTermStatus,
     ...(vis !== undefined ? { is_visible: vis } : {}),
@@ -177,6 +199,19 @@ function parsePatchBody(body: unknown): UpdateAcademicTermInput | null {
     patch.is_visible = vis;
   }
 
+  if (
+    o.clinicAppointmentDeadline !== undefined ||
+    o.clinic_appointment_deadline !== undefined
+  ) {
+    const d = parseOptionalDate(
+      o.clinicAppointmentDeadline !== undefined
+        ? o.clinicAppointmentDeadline
+        : o.clinic_appointment_deadline,
+    );
+    if (d === "invalid") return null;
+    patch.clinic_appointment_deadline = d;
+  }
+
   return patch;
 }
 
@@ -196,7 +231,7 @@ export async function getAcademicTerms(
   try {
     const terms = await listAllAcademicTerms();
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(terms);
+    res.json(terms.map(serializeAcademicTermForApi));
   } catch (e) {
     console.error("[academic-terms] list failed:", e);
     res.status(500).json({
@@ -223,7 +258,7 @@ export async function getAcademicTermsRecent(
     }
     const terms = await listRecentVisibleTerms(limit);
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(terms);
+    res.json(terms.map(serializeAcademicTermForApi));
   } catch (e) {
     console.error("[academic-terms/recent] failed:", e);
     res.status(500).json({
@@ -239,7 +274,7 @@ export async function getAcademicTermsCurrent(
   try {
     const term = await getCurrentRegistrationOpenTerm();
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(term);
+    res.json(term ? serializeAcademicTermForApi(term) : null);
   } catch (e) {
     console.error("[academic-terms/current] failed:", e);
     res.status(500).json({
@@ -256,7 +291,7 @@ export async function getAcademicTermsCurrentPosted(
   try {
     const term = await getPostedToDashboardTerm();
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(term);
+    res.json(term ? serializeAcademicTermForApi(term) : null);
   } catch (e) {
     console.error("[academic-terms/current-posted] failed:", e);
     res.status(500).json({
@@ -280,7 +315,7 @@ export async function postAdminAcademicTerm(
     }
     const term = await createAcademicTerm(input);
     await setAcademicTermPaymentColumnsHeader(res);
-    res.status(201).json(term);
+    res.status(201).json(serializeAcademicTermForApi(term));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (
@@ -316,7 +351,7 @@ export async function postAdminAcademicTermPost(
       return;
     }
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(term);
+    res.json(serializeAcademicTermForApi(term));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("is_posted_to_dashboard")) {
@@ -360,7 +395,7 @@ export async function patchAdminAcademicTerm(
       return;
     }
     await setAcademicTermPaymentColumnsHeader(res);
-    res.json(term);
+    res.json(serializeAcademicTermForApi(term));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (

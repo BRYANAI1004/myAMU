@@ -163,6 +163,7 @@ export async function createAcademicTerm(
     registration_close: input.registration_close ?? null,
     withdraw_deadline: input.withdraw_deadline ?? null,
     payment_due_date: input.payment_due_date ?? null,
+    clinic_appointment_deadline: input.clinic_appointment_deadline ?? null,
     lock_registration_if_overdue: input.lock_registration_if_overdue === true,
     status: input.status,
     is_visible: input.is_visible !== false,
@@ -255,6 +256,10 @@ export async function updateAcademicTerm(
       patch.payment_due_date !== undefined
         ? patch.payment_due_date
         : existing.payment_due_date,
+    clinic_appointment_deadline:
+      patch.clinic_appointment_deadline !== undefined
+        ? patch.clinic_appointment_deadline
+        : existing.clinic_appointment_deadline,
     lock_registration_if_overdue:
       patch.lock_registration_if_overdue !== undefined
         ? patch.lock_registration_if_overdue

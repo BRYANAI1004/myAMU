@@ -70,6 +70,7 @@ function normalizeRow(row: RowDataPacket): AcademicTermDetail {
     registration_close: nullableDateString(row.registration_close),
     withdraw_deadline: nullableDateString(row.withdraw_deadline),
     payment_due_date: paymentDue,
+    clinic_appointment_deadline: nullableDateString(row.clinic_appointment_deadline),
     lock_registration_if_overdue: lockReg,
     status: row.status as AcademicTermStatus,
     is_visible: asBool(row.is_visible),
@@ -84,9 +85,11 @@ function buildTermSelectSql(
   const paymentBlock = hasPaymentPolicyColumns
     ? `    withdraw_deadline,
     payment_due_date,
+    clinic_appointment_deadline,
     lock_registration_if_overdue,
 `
     : `    withdraw_deadline,
+    clinic_appointment_deadline,
 `;
   const postedSuffix = hasPostedToDashboardColumn
     ? ",\n    is_posted_to_dashboard"
@@ -305,10 +308,11 @@ export async function insertAcademicTerm(
       registration_close,
       withdraw_deadline,
       payment_due_date,
+      clinic_appointment_deadline,
       lock_registration_if_overdue,
       status,
       is_visible${postedCols}
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
   `;
     const params: unknown[] = [
       row.id,
@@ -323,6 +327,7 @@ export async function insertAcademicTerm(
       row.registration_close,
       row.withdraw_deadline,
       row.payment_due_date,
+      row.clinic_appointment_deadline,
       row.lock_registration_if_overdue ? 1 : 0,
       row.status,
       row.is_visible ? 1 : 0,
@@ -349,9 +354,10 @@ export async function insertAcademicTerm(
       registration_open,
       registration_close,
       withdraw_deadline,
+      clinic_appointment_deadline,
       status,
       is_visible${postedCols}
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
   `;
     const params: unknown[] = [
       row.id,
@@ -365,6 +371,7 @@ export async function insertAcademicTerm(
       row.registration_open,
       row.registration_close,
       row.withdraw_deadline,
+      row.clinic_appointment_deadline,
       row.status,
       row.is_visible ? 1 : 0,
     ];
@@ -410,6 +417,7 @@ export async function updateAcademicTermRow(
       registration_close = ?,
       withdraw_deadline = ?,
       payment_due_date = ?,
+      clinic_appointment_deadline = ?,
       lock_registration_if_overdue = ?,
       status = ?,
       is_visible = ?${postedSet}
@@ -428,6 +436,7 @@ export async function updateAcademicTermRow(
       row.registration_close,
       row.withdraw_deadline,
       row.payment_due_date,
+      row.clinic_appointment_deadline,
       row.lock_registration_if_overdue ? 1 : 0,
       row.status,
       row.is_visible ? 1 : 0,
@@ -451,6 +460,7 @@ export async function updateAcademicTermRow(
       registration_open = ?,
       registration_close = ?,
       withdraw_deadline = ?,
+      clinic_appointment_deadline = ?,
       status = ?,
       is_visible = ?${postedSet}
     WHERE id = ?
@@ -467,6 +477,7 @@ export async function updateAcademicTermRow(
       row.registration_open,
       row.registration_close,
       row.withdraw_deadline,
+      row.clinic_appointment_deadline,
       row.status,
       row.is_visible ? 1 : 0,
     ];

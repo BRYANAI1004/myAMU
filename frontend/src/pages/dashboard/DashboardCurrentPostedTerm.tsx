@@ -88,28 +88,38 @@ export function DashboardCurrentPostedTerm() {
       >
         {t('currentAcademicTermTitle')}
       </h2>
-      <dl className="portal-dashboard-current-term-card__dl">
-        <div className="portal-dashboard-current-term-card__row">
-          <dt>{t('currentAcademicTermTermRow')}</dt>
-          <dd>{term.term_label.trim() || '—'}</dd>
-        </div>
-        <div className="portal-dashboard-current-term-card__row">
-          <dt>{t('currentAcademicTermRegistrationOpens')}</dt>
-          <dd>{formatDashboardTermDate(term.registration_open, locale)}</dd>
-        </div>
-        <div className="portal-dashboard-current-term-card__row">
-          <dt>{t('currentAcademicTermRegistrationCloses')}</dt>
-          <dd>{formatDashboardTermDate(term.registration_close, locale)}</dd>
-        </div>
-        <div className="portal-dashboard-current-term-card__row">
-          <dt>{t('currentAcademicTermWithdrawDeadline')}</dt>
-          <dd>{formatDashboardTermDate(term.withdraw_deadline, locale)}</dd>
-        </div>
-        <div className="portal-dashboard-current-term-card__row">
-          <dt>{t('currentAcademicTermPaymentDeadline')}</dt>
-          <dd>{formatDashboardTermDate(term.payment_due_date, locale)}</dd>
-        </div>
-      </dl>
+      <div className="portal-dashboard-current-term-card__dl portal-dashboard-current-term-card__dl--two-col">
+        <dl className="portal-dashboard-current-term-card__column">
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermTermRow')}</dt>
+            <dd>{term.term_label.trim() || '—'}</dd>
+          </div>
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermRegistrationOpens')}</dt>
+            <dd>{formatDashboardTermDate(term.registration_open, locale)}</dd>
+          </div>
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermRegistrationCloses')}</dt>
+            <dd>{formatDashboardTermDate(term.registration_close, locale)}</dd>
+          </div>
+        </dl>
+        <dl className="portal-dashboard-current-term-card__column">
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermWithdrawDeadline')}</dt>
+            <dd>{formatDashboardTermDate(term.withdraw_deadline, locale)}</dd>
+          </div>
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermPaymentDeadline')}</dt>
+            <dd>{formatDashboardTermDate(term.payment_due_date, locale)}</dd>
+          </div>
+          <div className="portal-dashboard-current-term-card__row">
+            <dt>{t('currentAcademicTermClinicAppointmentDeadline')}</dt>
+            <dd>
+              {formatDashboardTermDate(term.clinicAppointmentDeadline, locale)}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </section>
   )
 }

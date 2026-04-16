@@ -2827,6 +2827,8 @@ export type AcademicTerm = {
   /** YYYY-MM-DD when set; controls student withdraw eligibility on Add/Drop. */
   withdraw_deadline: string | null
   payment_due_date: string | null
+  /** YYYY-MM-DD when set; clinic appointment scheduling deadline for this term. */
+  clinicAppointmentDeadline: string | null
   lock_registration_if_overdue: boolean
   status: AcademicTermStatus
   is_visible: boolean
@@ -2927,6 +2929,13 @@ function parseAcademicTermRow(row: Record<string, unknown>): AcademicTerm | null
     ),
     payment_due_date: parseNullableIsoDate(
       row.payment_due_date !== undefined ? row.payment_due_date : null,
+    ),
+    clinicAppointmentDeadline: parseNullableIsoDate(
+      row.clinicAppointmentDeadline !== undefined
+        ? row.clinicAppointmentDeadline
+        : row.clinic_appointment_deadline !== undefined
+          ? row.clinic_appointment_deadline
+          : null,
     ),
     lock_registration_if_overdue:
       row.lock_registration_if_overdue !== undefined
@@ -3041,6 +3050,7 @@ export type CreateAcademicTermBody = {
   registration_close?: string | null
   withdraw_deadline?: string | null
   payment_due_date?: string | null
+  clinicAppointmentDeadline?: string | null
   lock_registration_if_overdue?: boolean
   status: AcademicTermStatus
   is_visible?: boolean
