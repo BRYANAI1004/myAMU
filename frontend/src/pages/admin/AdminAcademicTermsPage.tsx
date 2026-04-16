@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   createAcademicTerm,
   fetchAcademicTerms,
+  postAcademicTermToDashboard,
   updateAcademicTerm,
   type AcademicTerm,
   type AcademicTermName,
@@ -97,11 +98,14 @@ export function AdminAcademicTermsPage() {
   const [form, setForm] = useState<TermForm>(() => defaultAddForm(1))
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [postingId, setPostingId] = useState<string | null>(null)
+  const [postError, setPostError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     const ac = new AbortController()
     setLoading(true)
     setError(null)
+    setPostError(null)
     try {
       const terms = await fetchAcademicTerms({ signal: ac.signal })
       if (ac.signal.aborted) return
@@ -215,6 +219,19 @@ export function AdminAcademicTermsPage() {
     }
   }
 
+  async function onPostTerm(termId: string) {
+    setPostError(null)
+    setPostingId(termId)
+    try {
+      await postAcademicTermToDashboard(termId)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      setPostError(e instanceof Error ? e.message : 'Could not post term.')
+    } finally {
+      setPostingId(null)
+    }
+  }
+
   const sectionLoading = loading && rows === null && error === null
 
   return (
@@ -269,6 +286,11 @@ export function AdminAcademicTermsPage() {
 
       {!sectionLoading && !error && rows != null ? (
         <div className="portal-table-wrap admin-table-wrap admin-academic-terms-table-wrap">
+          {postError ? (
+            <p className="admin-courses-feedback--error" role="alert">
+              {postError}
+            </p>
+          ) : null}
           <table className="portal-table portal-data-table admin-academic-terms-table">
             <thead>
               <tr>
@@ -283,13 +305,14 @@ export function AdminAcademicTermsPage() {
                 <th scope="col">Payment DDL</th>
                 <th scope="col">Lock Registration if Overdue</th>
                 <th scope="col">Visible</th>
+                <th scope="col">Posted</th>
                 <th scope="col">Actions</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="portal-card-note">
+                  <td colSpan={13} className="portal-card-note">
                     No academic terms yet. Use Add Term to create one.
                   </td>
                 </tr>
@@ -309,14 +332,35 @@ export function AdminAcademicTermsPage() {
                     <td>{formatTableDate(t.payment_due_date)}</td>
                     <td>{t.lock_registration_if_overdue ? 'Yes' : 'No'}</td>
                     <td>{t.is_visible ? 'Yes' : 'No'}</td>
+                    <td>{t.is_posted_to_dashboard ? 'Yes' : 'No'}</td>
                     <td>
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        onClick={() => openEdit(t)}
-                      >
-                        Edit
-                      </button>
+                      <div className="admin-academic-terms-actions">
+                        <button
+                          type="button"
+                          className="portal-btn portal-btn--secondary portal-btn--compact"
+                          onClick={() => openEdit(t)}
+                        >
+                          Edit
+                        </button>
+                        {t.is_posted_to_dashboard ? (
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled
+                          >
+                            Posted
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--primary portal-btn--compact"
+                            disabled={postingId !== null}
+                            onClick={() => void onPostTerm(t.id)}
+                          >
+                            {postingId === t.id ? 'Posting…' : 'Post'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

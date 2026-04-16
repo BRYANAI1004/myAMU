@@ -1,6 +1,7 @@
 import { useAccount } from '../context/AccountContext'
 import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { DashboardCoursesWidget } from './dashboard/DashboardCoursesWidget'
+import { DashboardCurrentPostedTerm } from './dashboard/DashboardCurrentPostedTerm'
 import { DashboardServiceLauncher } from './dashboard/DashboardServiceLauncher'
 
 /** Prefer given name when legacy uses "Last, First"; otherwise first token of the display name. */
@@ -47,6 +48,10 @@ export function DashboardPage() {
           {dateLabel}
         </time>
       </header>
+
+      <div className="portal-dashboard-current-term-slot">
+        <DashboardCurrentPostedTerm />
+      </div>
 
       <div className="portal-dashboard-home-grid">
         <div className="portal-dashboard-home-primary">

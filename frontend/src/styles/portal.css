@@ -5495,6 +5495,65 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   text-align: left;
 }
 
+.portal-dashboard-current-term-slot {
+  width: 100%;
+  margin-bottom: 1rem;
+  box-sizing: border-box;
+}
+
+.portal-dashboard-current-term-card {
+  margin: 0;
+  padding: 1rem 1.125rem;
+  max-width: 36rem;
+}
+
+.portal-dashboard-current-term-card--muted {
+  opacity: 0.92;
+}
+
+.portal-dashboard-current-term-card__title {
+  margin: 0 0 0.75rem;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6e1622;
+}
+
+.portal-dashboard-current-term-card__dl {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem 1rem;
+}
+
+.portal-dashboard-current-term-card__row {
+  display: grid;
+  grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.portal-dashboard-current-term-card__row dt {
+  margin: 0;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.portal-dashboard-current-term-card__row dd {
+  margin: 0;
+  color: #1f2937;
+}
+
+@media (max-width: 480px) {
+  .portal-dashboard-current-term-card__row {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+  }
+}
+
 .portal-dashboard-home-grid {
   display: grid;
   width: 100%;
@@ -7703,6 +7762,13 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .admin-section-detail-modal--form-wide {
   max-width: min(42rem, 100%);
   max-height: min(92vh, 46rem);
+}
+
+.admin-academic-terms-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .admin-academic-terms-table-wrap {

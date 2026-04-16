@@ -13,6 +13,8 @@ import {
   listRecentVisibleAcademicTerms,
   listVisibleAcademicTerms,
   getCurrentRegistrationOpenTerm as repoGetCurrentRegistrationOpenTerm,
+  getPostedToDashboardTerm as repoGetPostedToDashboardTerm,
+  postAcademicTermToDashboard as repoPostAcademicTermToDashboard,
   updateAcademicTermRow,
   type AcademicTermInsertRow,
 } from "../repositories/academicTermRepository.js";
@@ -115,6 +117,16 @@ export async function getCurrentRegistrationOpenTerm(): Promise<AcademicTermDeta
   return repoGetCurrentRegistrationOpenTerm();
 }
 
+export async function getPostedToDashboardTerm(): Promise<AcademicTermDetail | null> {
+  return repoGetPostedToDashboardTerm();
+}
+
+export async function postAcademicTermToDashboard(
+  id: string,
+): Promise<AcademicTermDetail | null> {
+  return repoPostAcademicTermToDashboard(id);
+}
+
 /** For response headers: whether `academic_terms` persists payment DDL / overdue-lock fields. */
 export async function academicTermPaymentPolicyColumnsAvailable(): Promise<boolean> {
   return (await academicTermSchemaCaps()).hasPaymentPolicyColumns;
@@ -154,6 +166,7 @@ export async function createAcademicTerm(
     lock_registration_if_overdue: input.lock_registration_if_overdue === true,
     status: input.status,
     is_visible: input.is_visible !== false,
+    is_posted_to_dashboard: false,
   });
   try {
     return await insertAcademicTerm(row);
@@ -248,6 +261,7 @@ export async function updateAcademicTerm(
         : existing.lock_registration_if_overdue,
     status,
     is_visible,
+    is_posted_to_dashboard: existing.is_posted_to_dashboard,
   });
 
   if (nextId !== currentId) {

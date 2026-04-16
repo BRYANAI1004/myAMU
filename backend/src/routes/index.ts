@@ -70,9 +70,11 @@ import {
 import {
   getAcademicTerms,
   getAcademicTermsCurrent,
+  getAcademicTermsCurrentPosted,
   getAcademicTermsRecent,
   patchAdminAcademicTerm,
   postAdminAcademicTerm,
+  postAdminAcademicTermPost,
 } from "../controllers/academicTermController.js";
 import { postAiAsk } from "../controllers/aiAskController.js";
 import {
@@ -126,6 +128,7 @@ apiRouter.get("/courses/:code/sections", getCourseSections);
 
 apiRouter.get("/academic-terms/recent", getAcademicTermsRecent);
 apiRouter.get("/academic-terms/current", getAcademicTermsCurrent);
+apiRouter.get("/academic-terms/current-posted", getAcademicTermsCurrentPosted);
 apiRouter.get("/academic-terms", getAcademicTerms);
 
 /** Course bin (per student); requires `student_course_bin` table when used. */
@@ -189,6 +192,7 @@ adminRouter.delete(
 adminRouter.get("/finance/:studentId/quarters", getAdminFinanceQuartersHandler);
 adminRouter.get("/finance/:studentId/ledger", getAdminFinanceLedgerHandler);
 adminRouter.post("/academic-terms", postAdminAcademicTerm);
+adminRouter.post("/academic-terms/:id/post", postAdminAcademicTermPost);
 adminRouter.patch("/academic-terms/:id", patchAdminAcademicTerm);
 adminRouter.get("/clinical/timetable", getAdminClinicalTimetableHandler);
 adminRouter.get("/clinical/slots", getAdminClinicalSlotsHandler);

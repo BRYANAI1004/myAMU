@@ -37,6 +37,7 @@ function academicTermStubForDeepLink(termId: string): AcademicTerm {
     lock_registration_if_overdue: false,
     status: 'planned',
     is_visible: true,
+    is_posted_to_dashboard: false,
   }
 }
 

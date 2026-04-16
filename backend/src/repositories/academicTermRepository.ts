@@ -53,6 +53,10 @@ function normalizeRow(row: RowDataPacket): AcademicTermDetail {
     row.lock_registration_if_overdue !== undefined
       ? asBool(row.lock_registration_if_overdue)
       : false;
+  const posted =
+    row.is_posted_to_dashboard !== undefined
+      ? asBool(row.is_posted_to_dashboard)
+      : false;
   return {
     id: String(row.id ?? ""),
     term_label: String(row.term_label ?? ""),
@@ -69,86 +73,99 @@ function normalizeRow(row: RowDataPacket): AcademicTermDetail {
     lock_registration_if_overdue: lockReg,
     status: row.status as AcademicTermStatus,
     is_visible: asBool(row.is_visible),
+    is_posted_to_dashboard: posted,
   };
 }
 
-/** Columns shared by legacy and current `academic_terms` schemas. */
-const TERM_SELECT_BASE = `
-  SELECT
-    id,
-    term_label,
-    year,
-    term_name,
-    quarter_index,
-    sequence_no,
-    start_date,
-    end_date,
-    registration_open,
-    registration_close,
-    withdraw_deadline,
-    status,
-    is_visible
-  FROM academic_terms
-`;
-
-const TERM_SELECT_WITH_PAYMENT_COLUMNS = `
-  SELECT
-    id,
-    term_label,
-    year,
-    term_name,
-    quarter_index,
-    sequence_no,
-    start_date,
-    end_date,
-    registration_open,
-    registration_close,
-    withdraw_deadline,
+function buildTermSelectSql(
+  hasPaymentPolicyColumns: boolean,
+  hasPostedToDashboardColumn: boolean,
+): string {
+  const paymentBlock = hasPaymentPolicyColumns
+    ? `    withdraw_deadline,
     payment_due_date,
     lock_registration_if_overdue,
-    status,
-    is_visible
+`
+    : `    withdraw_deadline,
+`;
+  const postedSuffix = hasPostedToDashboardColumn
+    ? ",\n    is_posted_to_dashboard"
+    : "";
+  return `
+  SELECT
+    id,
+    term_label,
+    year,
+    term_name,
+    quarter_index,
+    sequence_no,
+    start_date,
+    end_date,
+    registration_open,
+    registration_close,
+${paymentBlock}    status,
+    is_visible${postedSuffix}
   FROM academic_terms
 `;
+}
 
 export type AcademicTermSchemaCaps = {
   selectSql: string;
   /** True only when both optional columns exist (partial schemas use legacy paths). */
   hasPaymentPolicyColumns: boolean;
+  hasPostedToDashboardColumn: boolean;
 };
 
 let cachedSchemaCaps: AcademicTermSchemaCaps | null = null;
 
+function isMissingColumnError(e: unknown): boolean {
+  const err = e as { code?: string; errno?: number };
+  return err.code === "ER_BAD_FIELD_ERROR" || err.errno === 1054;
+}
+
 /**
- * Detects once per process whether `payment_due_date` and `lock_registration_if_overdue`
- * exist on `academic_terms`. Uses the same table resolution as app queries (not
- * information_schema), so capability matches actual SELECT/INSERT/UPDATE behavior.
+ * Detects once per process which optional `academic_terms` columns exist. Uses the same
+ * table resolution as app queries (not information_schema), so capability matches
+ * actual SELECT/INSERT/UPDATE behavior.
  */
 export async function academicTermSchemaCaps(): Promise<AcademicTermSchemaCaps> {
   if (cachedSchemaCaps !== null) {
     return cachedSchemaCaps;
   }
+  let hasPaymentPolicyColumns = false;
   try {
     await pool.query(
       `SELECT payment_due_date, lock_registration_if_overdue FROM academic_terms WHERE 1=0`,
     );
-    cachedSchemaCaps = {
-      selectSql: TERM_SELECT_WITH_PAYMENT_COLUMNS,
-      hasPaymentPolicyColumns: true,
-    };
+    hasPaymentPolicyColumns = true;
   } catch (e) {
-    const err = e as { code?: string; errno?: number };
-    const missingColumn =
-      err.code === "ER_BAD_FIELD_ERROR" || err.errno === 1054;
-    if (missingColumn) {
-      cachedSchemaCaps = {
-        selectSql: TERM_SELECT_BASE,
-        hasPaymentPolicyColumns: false,
-      };
+    if (isMissingColumnError(e)) {
+      hasPaymentPolicyColumns = false;
     } else {
       throw e;
     }
   }
+  let hasPostedToDashboardColumn = false;
+  try {
+    await pool.query(
+      `SELECT is_posted_to_dashboard FROM academic_terms WHERE 1=0`,
+    );
+    hasPostedToDashboardColumn = true;
+  } catch (e) {
+    if (isMissingColumnError(e)) {
+      hasPostedToDashboardColumn = false;
+    } else {
+      throw e;
+    }
+  }
+  cachedSchemaCaps = {
+    selectSql: buildTermSelectSql(
+      hasPaymentPolicyColumns,
+      hasPostedToDashboardColumn,
+    ),
+    hasPaymentPolicyColumns,
+    hasPostedToDashboardColumn,
+  };
   return cachedSchemaCaps;
 }
 
@@ -207,6 +224,57 @@ export async function getCurrentRegistrationOpenTerm(): Promise<AcademicTermDeta
   return row ? normalizeRow(row) : null;
 }
 
+export async function getPostedToDashboardTerm(): Promise<AcademicTermDetail | null> {
+  const { hasPostedToDashboardColumn } = await academicTermSchemaCaps();
+  if (!hasPostedToDashboardColumn) {
+    return null;
+  }
+  const sel = await termSelectSql();
+  const sql = `${sel} WHERE is_posted_to_dashboard = 1 ORDER BY sequence_no DESC LIMIT 1`;
+  const [rows] = await pool.query<RowDataPacket[]>(sql);
+  const row = rows[0];
+  return row ? normalizeRow(row) : null;
+}
+
+/**
+ * Clears all posted flags, then marks `id` as posted. Requires `is_posted_to_dashboard` column.
+ */
+export async function postAcademicTermToDashboard(
+  id: string,
+): Promise<AcademicTermDetail | null> {
+  const { hasPostedToDashboardColumn } = await academicTermSchemaCaps();
+  if (!hasPostedToDashboardColumn) {
+    throw new Error(
+      "Database schema is missing academic_terms.is_posted_to_dashboard. Apply backend/migrations/005_academic_terms_is_posted_to_dashboard.sql.",
+    );
+  }
+  const trimmed = id.trim();
+  const existing = await getAcademicTermById(trimmed);
+  if (!existing) {
+    return null;
+  }
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(`UPDATE academic_terms SET is_posted_to_dashboard = 0`);
+    const [res] = await conn.query<ResultSetHeader>(
+      `UPDATE academic_terms SET is_posted_to_dashboard = 1 WHERE id = ?`,
+      [trimmed],
+    );
+    if (res.affectedRows === 0) {
+      await conn.rollback();
+      return null;
+    }
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    throw e;
+  } finally {
+    conn.release();
+  }
+  return getAcademicTermById(trimmed);
+}
+
 export type AcademicTermInsertRow = Omit<
   AcademicTermDetail,
   "is_visible"
@@ -215,9 +283,14 @@ export type AcademicTermInsertRow = Omit<
 export async function insertAcademicTerm(
   row: AcademicTermInsertRow,
 ): Promise<AcademicTermDetail> {
-  const { hasPaymentPolicyColumns } = await academicTermSchemaCaps();
+  const { hasPaymentPolicyColumns, hasPostedToDashboardColumn } =
+    await academicTermSchemaCaps();
   assertPaymentPolicyWritable(hasPaymentPolicyColumns, row);
   if (hasPaymentPolicyColumns) {
+    const postedCols = hasPostedToDashboardColumn
+      ? ",\n      is_posted_to_dashboard"
+      : "";
+    const postedVals = hasPostedToDashboardColumn ? ", ?" : "";
     const sql = `
     INSERT INTO academic_terms (
       id,
@@ -234,10 +307,10 @@ export async function insertAcademicTerm(
       payment_due_date,
       lock_registration_if_overdue,
       status,
-      is_visible
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      is_visible${postedCols}
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
   `;
-    const params = [
+    const params: unknown[] = [
       row.id,
       row.term_label,
       row.year,
@@ -254,8 +327,15 @@ export async function insertAcademicTerm(
       row.status,
       row.is_visible ? 1 : 0,
     ];
+    if (hasPostedToDashboardColumn) {
+      params.push(row.is_posted_to_dashboard ? 1 : 0);
+    }
     await pool.query<ResultSetHeader>(sql, params);
   } else {
+    const postedCols = hasPostedToDashboardColumn
+      ? ",\n      is_posted_to_dashboard"
+      : "";
+    const postedVals = hasPostedToDashboardColumn ? ", ?" : "";
     const sql = `
     INSERT INTO academic_terms (
       id,
@@ -270,10 +350,10 @@ export async function insertAcademicTerm(
       registration_close,
       withdraw_deadline,
       status,
-      is_visible
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      is_visible${postedCols}
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${postedVals})
   `;
-    const params = [
+    const params: unknown[] = [
       row.id,
       row.term_label,
       row.year,
@@ -288,6 +368,9 @@ export async function insertAcademicTerm(
       row.status,
       row.is_visible ? 1 : 0,
     ];
+    if (hasPostedToDashboardColumn) {
+      params.push(row.is_posted_to_dashboard ? 1 : 0);
+    }
     await pool.query<ResultSetHeader>(sql, params);
   }
   const created = await getAcademicTermById(row.id);
@@ -306,8 +389,12 @@ export async function updateAcademicTermRow(
 ): Promise<AcademicTermDetail | null> {
   const existing = await getAcademicTermById(currentId);
   if (!existing) return null;
-  const { hasPaymentPolicyColumns } = await academicTermSchemaCaps();
+  const { hasPaymentPolicyColumns, hasPostedToDashboardColumn } =
+    await academicTermSchemaCaps();
   assertPaymentPolicyWritable(hasPaymentPolicyColumns, row);
+  const postedSet = hasPostedToDashboardColumn
+    ? ",\n      is_posted_to_dashboard = ?"
+    : "";
   if (hasPaymentPolicyColumns) {
     const sql = `
     UPDATE academic_terms SET
@@ -325,10 +412,10 @@ export async function updateAcademicTermRow(
       payment_due_date = ?,
       lock_registration_if_overdue = ?,
       status = ?,
-      is_visible = ?
+      is_visible = ?${postedSet}
     WHERE id = ?
   `;
-    const params = [
+    const params: unknown[] = [
       row.id,
       row.term_label,
       row.year,
@@ -344,8 +431,11 @@ export async function updateAcademicTermRow(
       row.lock_registration_if_overdue ? 1 : 0,
       row.status,
       row.is_visible ? 1 : 0,
-      currentId,
     ];
+    if (hasPostedToDashboardColumn) {
+      params.push(row.is_posted_to_dashboard ? 1 : 0);
+    }
+    params.push(currentId);
     await pool.query<ResultSetHeader>(sql, params);
   } else {
     const sql = `
@@ -362,10 +452,10 @@ export async function updateAcademicTermRow(
       registration_close = ?,
       withdraw_deadline = ?,
       status = ?,
-      is_visible = ?
+      is_visible = ?${postedSet}
     WHERE id = ?
   `;
-    const params = [
+    const params: unknown[] = [
       row.id,
       row.term_label,
       row.year,
@@ -379,8 +469,11 @@ export async function updateAcademicTermRow(
       row.withdraw_deadline,
       row.status,
       row.is_visible ? 1 : 0,
-      currentId,
     ];
+    if (hasPostedToDashboardColumn) {
+      params.push(row.is_posted_to_dashboard ? 1 : 0);
+    }
+    params.push(currentId);
     await pool.query<ResultSetHeader>(sql, params);
   }
   return getAcademicTermById(row.id);

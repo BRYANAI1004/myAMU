@@ -2830,6 +2830,8 @@ export type AcademicTerm = {
   lock_registration_if_overdue: boolean
   status: AcademicTermStatus
   is_visible: boolean
+  /** Registrar-published term shown on the student dashboard (at most one). */
+  is_posted_to_dashboard: boolean
 }
 
 const ACADEMIC_TERM_NAMES: AcademicTermName[] = [
@@ -2932,6 +2934,10 @@ function parseAcademicTermRow(row: Record<string, unknown>): AcademicTerm | null
         : false,
     status: status as AcademicTermStatus,
     is_visible: parseAcademicTermBool(row.is_visible),
+    is_posted_to_dashboard:
+      row.is_posted_to_dashboard !== undefined
+        ? parseAcademicTermBool(row.is_posted_to_dashboard)
+        : false,
   }
 }
 
@@ -2989,6 +2995,24 @@ export async function fetchCurrentAcademicTerm(options?: {
   const term = parseAcademicTermRow(data as Record<string, unknown>)
   if (!term) {
     throw new Error('Unexpected current academic term response')
+  }
+  return term
+}
+
+/** GET /api/academic-terms/current-posted — manually posted dashboard term, or `null`. */
+export async function fetchPostedCurrentAcademicTerm(options?: {
+  signal?: AbortSignal
+}): Promise<AcademicTerm | null> {
+  const data = (await fetchApiJson('/api/academic-terms/current-posted', {
+    signal: options?.signal,
+  })) as unknown
+  if (data === null) return null
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected posted academic term response')
+  }
+  const term = parseAcademicTermRow(data as Record<string, unknown>)
+  if (!term) {
+    throw new Error('Unexpected posted academic term response')
   }
   return term
 }
@@ -3062,6 +3086,27 @@ export async function updateAcademicTerm(
   const term = parseAcademicTermRow(data as Record<string, unknown>)
   if (!term) {
     throw new Error('Unexpected update academic term response')
+  }
+  return term
+}
+
+/** POST /api/admin/academic-terms/:id/post — publish this term on the student dashboard. */
+export async function postAcademicTermToDashboard(
+  id: string,
+  options?: { signal?: AbortSignal },
+): Promise<AcademicTerm> {
+  const path = `/api/admin/academic-terms/${encodeURIComponent(id)}/post`
+  const data = (await fetchApiJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: options?.signal,
+  })) as unknown
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected post academic term response')
+  }
+  const term = parseAcademicTermRow(data as Record<string, unknown>)
+  if (!term) {
+    throw new Error('Unexpected post academic term response')
   }
   return term
 }

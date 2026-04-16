@@ -10,10 +10,12 @@ import {
   academicTermPaymentPolicyColumnsAvailable,
   createAcademicTerm,
   getCurrentRegistrationOpenTerm,
+  getPostedToDashboardTerm,
   listAllAcademicTerms,
   listRecentVisibleTerms,
   isAcademicTermName,
   isAcademicTermStatus,
+  postAcademicTermToDashboard,
   updateAcademicTerm,
 } from "../services/academicTermService.js";
 
@@ -246,6 +248,23 @@ export async function getAcademicTermsCurrent(
   }
 }
 
+/** GET /api/academic-terms/current-posted — manually posted dashboard term, or `null`. */
+export async function getAcademicTermsCurrentPosted(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const term = await getPostedToDashboardTerm();
+    await setAcademicTermPaymentColumnsHeader(res);
+    res.json(term);
+  } catch (e) {
+    console.error("[academic-terms/current-posted] failed:", e);
+    res.status(500).json({
+      error: "Unable to load academic terms.",
+    });
+  }
+}
+
 export async function postAdminAcademicTerm(
   req: Request,
   res: Response,
@@ -275,6 +294,41 @@ export async function postAdminAcademicTerm(
     console.error("[admin/academic-terms] create failed:", e);
     const body: { error: string; message?: string } = {
       error: "Failed to create academic term",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+export async function postAdminAcademicTermPost(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = pathTermId(req);
+    if (!id) {
+      res.status(400).json({ error: "Invalid term id" });
+      return;
+    }
+    const term = await postAcademicTermToDashboard(id);
+    if (!term) {
+      res.status(404).json({ error: "Academic term not found" });
+      return;
+    }
+    await setAcademicTermPaymentColumnsHeader(res);
+    res.json(term);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("is_posted_to_dashboard")) {
+      res.status(503).json({
+        error:
+          "Posting is unavailable until the database migration for is_posted_to_dashboard is applied.",
+      });
+      return;
+    }
+    console.error("[admin/academic-terms/post] failed:", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to post academic term",
     };
     if (env.nodeEnv === "development") body.message = devMessage(e);
     res.status(500).json(body);

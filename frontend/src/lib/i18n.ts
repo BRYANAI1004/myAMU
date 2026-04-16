@@ -34,6 +34,16 @@ export const STUDENT_PORTAL_EN = {
   welcomePrefix: 'WELCOME,',
   welcomeLoading: '…',
 
+  currentAcademicTermTitle: 'Current Academic Term',
+  currentAcademicTermTermRow: 'Term',
+  currentAcademicTermRegistrationOpens: 'Registration Opens',
+  currentAcademicTermRegistrationCloses: 'Registration Closes',
+  currentAcademicTermWithdrawDeadline: 'Withdraw Deadline',
+  currentAcademicTermPaymentDeadline: 'Payment Deadline',
+  noCurrentAcademicTermPosted: 'No current academic term has been posted.',
+  loadingCurrentAcademicTerm: 'Loading current term…',
+  couldNotLoadCurrentAcademicTerm: 'Could not load current term.',
+
   // Dashboard services
   services: 'Services',
 
@@ -1164,6 +1174,16 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
 
   welcomePrefix: '歡迎，',
   welcomeLoading: '…',
+
+  currentAcademicTermTitle: '當前學期',
+  currentAcademicTermTermRow: '學期',
+  currentAcademicTermRegistrationOpens: '註冊開始',
+  currentAcademicTermRegistrationCloses: '註冊截止',
+  currentAcademicTermWithdrawDeadline: '退選截止',
+  currentAcademicTermPaymentDeadline: '繳費截止',
+  noCurrentAcademicTermPosted: '目前尚未發布當前學期。',
+  loadingCurrentAcademicTerm: '正在載入當前學期…',
+  couldNotLoadCurrentAcademicTerm: '無法載入當前學期。',
 
   services: '服務',
 
