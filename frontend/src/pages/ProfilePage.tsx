@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ChangeEventHandler } from 'react'
 import { BackToDashboardLink } from '../components/BackToDashboardLink'
 import { useAccount } from '../context/AccountContext'
 import { useStudentPortalT } from '../LanguageContext'
 import {
-  fetchStudentProfile,
+  fetchApiJson,
   type StudentProfileResponse,
 } from '../lib/api'
 
@@ -39,15 +39,156 @@ function displayCredits(n: number | null | undefined, dash: string): string {
   return String(n)
 }
 
+type EditableProfileFields = {
+  dob: string
+  ssn: string
+  visa: string
+  address: string
+  phone1: string
+  phone2: string
+  phone3: string
+  email: string
+  citizenship: string
+  race: string
+  marital: string
+}
+
+type StudentProfileWithSensitive = StudentProfileResponse & {
+  dob: string | null
+  ssn: string | null
+  visa: string | null
+  phone1: string | null
+  phone2: string | null
+  phone3: string | null
+  citizenship: string | null
+  marital: string | null
+}
+
+const EMPTY_EDITABLE_PROFILE: EditableProfileFields = {
+  dob: '',
+  ssn: '',
+  visa: '',
+  address: '',
+  phone1: '',
+  phone2: '',
+  phone3: '',
+  email: '',
+  citizenship: '',
+  race: '',
+  marital: '',
+}
+
+const RACE_OPTIONS = [
+  'Asian/Pacific Islander',
+  'White',
+  'Hispanic',
+  'African American',
+  'American Indian/Alaska Native',
+  'Other',
+] as const
+
+const CITIZENSHIP_OPTIONS = [
+  'US Citizen',
+  'Permanent Resident',
+  'International Student (F-1)',
+  'Work Visa (H1-B)',
+  'Other',
+] as const
+
+const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Other'] as const
+
+function nullableString(v: unknown): string | null {
+  if (typeof v !== 'string') return null
+  const trimmed = v.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function mapApiProfile(data: unknown): StudentProfileWithSensitive {
+  if (
+    data == null ||
+    typeof data !== 'object' ||
+    typeof (data as { studentId?: unknown }).studentId !== 'string' ||
+    typeof (data as { fullName?: unknown }).fullName !== 'string'
+  ) {
+    throw new Error('Unexpected student profile response')
+  }
+  const profile = data as Record<string, unknown>
+  return {
+    studentId: profile.studentId as string,
+    fullName: profile.fullName as string,
+    program: profile.program === 'DAHM' ? 'DAHM' : 'MAHM',
+    track: nullableString(profile.track),
+    gender: nullableString(profile.gender),
+    age: typeof profile.age === 'number' && Number.isFinite(profile.age) ? profile.age : null,
+    enrollmentDate: nullableString(profile.enrollmentDate),
+    background: nullableString(profile.background),
+    credits:
+      typeof profile.credits === 'number' && Number.isFinite(profile.credits)
+        ? profile.credits
+        : null,
+    highestDegree: nullableString(profile.highestDegree),
+    race: nullableString(profile.race),
+    address: nullableString(profile.address),
+    city: nullableString(profile.city),
+    state: nullableString(profile.state),
+    zip: nullableString(profile.zip),
+    email: nullableString(profile.email),
+    dob: nullableString(profile.dob),
+    ssn: nullableString(profile.ssn),
+    visa: nullableString(profile.visa),
+    phone1: nullableString(profile.phone1),
+    phone2: nullableString(profile.phone2),
+    phone3: nullableString(profile.phone3),
+    citizenship: nullableString(profile.citizenship),
+    marital: nullableString(profile.marital),
+  }
+}
+
+function toEditableState(profile: StudentProfileWithSensitive): EditableProfileFields {
+  return {
+    dob: profile.dob ?? '',
+    ssn: profile.ssn ?? '',
+    visa: profile.visa ?? '',
+    address: profile.address ?? '',
+    phone1: profile.phone1 ?? '',
+    phone2: profile.phone2 ?? '',
+    phone3: profile.phone3 ?? '',
+    email: profile.email ?? '',
+    citizenship: profile.citizenship ?? '',
+    race: profile.race ?? '',
+    marital: profile.marital ?? '',
+  }
+}
+
+function toPatchValue(v: string): string | null {
+  const trimmed = v.trim()
+  return trimmed.length > 0 ? trimmed : null
+}
+
+function maskedSsnDisplay(raw: string, dash: string): string {
+  const trimmed = raw.trim()
+  if (!trimmed) return dash
+  const digits = trimmed.replace(/\D/g, '')
+  if (digits.length < 4) return '***-**-****'
+  return `***-**-${digits.slice(-4)}`
+}
+
 export function ProfilePage() {
   const t = useStudentPortalT()
-  const { currentStudentId } = useAccount()
+  const { currentStudentId, authToken } = useAccount()
   const dash = t('dashEm')
 
-  const [profile, setProfile] = useState<StudentProfileResponse | null>(null)
+  const [profile, setProfile] = useState<StudentProfileWithSensitive | null>(null)
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
   const [profileReloadKey, setProfileReloadKey] = useState(0)
+  const [editable, setEditable] = useState<EditableProfileFields>(EMPTY_EDITABLE_PROFILE)
+  const [isEditing, setIsEditing] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [photoFilename, setPhotoFilename] = useState<string | null>(null)
 
   useEffect(() => {
     const id = currentStudentId?.trim()
@@ -65,13 +206,22 @@ export function ProfilePage() {
 
     ;(async () => {
       try {
-        const p = await fetchStudentProfile(id, { signal: ac.signal })
+        const p = mapApiProfile(
+          await fetchApiJson(`/api/students/${encodeURIComponent(id)}/profile`, {
+            signal: ac.signal,
+          }),
+        )
         if (ac.signal.aborted) return
         setProfile(p)
+        setEditable(toEditableState(p))
+        setIsEditing(false)
+        setSaveError(null)
+        setSaveSuccess(null)
         setProfileError(null)
       } catch (e) {
         if (ac.signal.aborted) return
         setProfile(null)
+        setEditable(EMPTY_EDITABLE_PROFILE)
         setProfileError(
           e instanceof Error ? e.message : t('couldNotLoadProfileFallback'),
         )
@@ -85,8 +235,97 @@ export function ProfilePage() {
     return () => ac.abort()
   }, [currentStudentId, profileReloadKey, t])
 
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl)
+      }
+    }
+  }, [photoPreviewUrl])
+
   const profileSectionLoading =
     profileLoading && profile === null && profileError === null
+
+  const setEditableField = (field: keyof EditableProfileFields, value: string) => {
+    setEditable((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleStartEdit = () => {
+    if (!profile) return
+    setEditable(toEditableState(profile))
+    setIsEditing(true)
+    setSaveError(null)
+    setSaveSuccess(null)
+  }
+
+  const handleCancelEdit = () => {
+    if (!profile) return
+    setEditable(toEditableState(profile))
+    setIsEditing(false)
+    setSaveError(null)
+    setSaveSuccess(null)
+  }
+
+  const handleSaveProfile = async () => {
+    if (!profile) return
+    setSaveLoading(true)
+    setSaveError(null)
+    setSaveSuccess(null)
+    try {
+      const patch = {
+        dob: toPatchValue(editable.dob),
+        ssn: toPatchValue(editable.ssn),
+        visa: toPatchValue(editable.visa),
+        address: toPatchValue(editable.address),
+        phone1: toPatchValue(editable.phone1),
+        phone2: toPatchValue(editable.phone2),
+        phone3: toPatchValue(editable.phone3),
+        email: toPatchValue(editable.email),
+        citizenship: toPatchValue(editable.citizenship),
+        race: toPatchValue(editable.race),
+        marital: toPatchValue(editable.marital),
+      }
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      }
+      if (authToken?.trim()) {
+        headers.Authorization = `Bearer ${authToken.trim()}`
+      }
+      const updated = mapApiProfile(
+        await fetchApiJson('/api/student/profile', {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify(patch),
+        }),
+      )
+      setProfile(updated)
+      setEditable(toEditableState(updated))
+      setIsEditing(false)
+      setSaveSuccess('Profile saved successfully.')
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : 'Unable to save profile right now.')
+    } finally {
+      setSaveLoading(false)
+    }
+  }
+
+  const handlePhotoSelect: ChangeEventHandler<HTMLInputElement> = (event) => {
+    const file = event.target.files?.[0] ?? null
+    if (!file) {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl)
+      }
+      setPhotoPreviewUrl(null)
+      setPhotoFilename(null)
+      return
+    }
+    const nextUrl = URL.createObjectURL(file)
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl)
+    }
+    setPhotoPreviewUrl(nextUrl)
+    setPhotoFilename(file.name)
+  }
 
   return (
     <main className="portal-page portal-module-page portal-profile-page">
@@ -179,11 +418,31 @@ export function ProfilePage() {
             </div>
             <div className="portal-row">
               <dt>{t('race')}</dt>
-              <dd>{dashText(profile.race ?? undefined, dash)}</dd>
+              <dd>
+                <select
+                  value={editable.race}
+                  onChange={(e) => setEditableField('race', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                >
+                  <option value="">{dash}</option>
+                  {RACE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </dd>
             </div>
             <div className="portal-row">
               <dt>{t('address')}</dt>
-              <dd>{dashText(profile.address ?? undefined, dash)}</dd>
+              <dd>
+                <input
+                  type="text"
+                  value={editable.address}
+                  onChange={(e) => setEditableField('address', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
             </div>
             <div className="portal-row">
               <dt>{t('city')}</dt>
@@ -199,9 +458,176 @@ export function ProfilePage() {
             </div>
             <div className="portal-row">
               <dt>{t('email')}</dt>
-              <dd>{dashText(profile.email ?? undefined, dash)}</dd>
+              <dd>
+                <input
+                  type="email"
+                  value={editable.email}
+                  onChange={(e) => setEditableField('email', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Date of Birth</dt>
+              <dd>
+                <input
+                  type="date"
+                  value={editable.dob}
+                  onChange={(e) => setEditableField('dob', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>SSN</dt>
+              <dd>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editable.ssn}
+                    onChange={(e) => setEditableField('ssn', e.target.value)}
+                    disabled={saveLoading}
+                    placeholder="000-00-0000"
+                  />
+                ) : (
+                  maskedSsnDisplay(editable.ssn, dash)
+                )}
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Visa</dt>
+              <dd>
+                <input
+                  type="text"
+                  value={editable.visa}
+                  onChange={(e) => setEditableField('visa', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Phone 1</dt>
+              <dd>
+                <input
+                  type="text"
+                  value={editable.phone1}
+                  onChange={(e) => setEditableField('phone1', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Phone 2</dt>
+              <dd>
+                <input
+                  type="text"
+                  value={editable.phone2}
+                  onChange={(e) => setEditableField('phone2', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Phone 3</dt>
+              <dd>
+                <input
+                  type="text"
+                  value={editable.phone3}
+                  onChange={(e) => setEditableField('phone3', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                />
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Citizenship</dt>
+              <dd>
+                <select
+                  value={editable.citizenship}
+                  onChange={(e) => setEditableField('citizenship', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                >
+                  <option value="">{dash}</option>
+                  {CITIZENSHIP_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+            <div className="portal-row">
+              <dt>Marital Status</dt>
+              <dd>
+                <select
+                  value={editable.marital}
+                  onChange={(e) => setEditableField('marital', e.target.value)}
+                  disabled={!isEditing || saveLoading}
+                >
+                  <option value="">{dash}</option>
+                  {MARITAL_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </dd>
             </div>
           </dl>
+          <div className="portal-actions">
+            {isEditing ? (
+              <>
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--primary"
+                  onClick={handleSaveProfile}
+                  disabled={saveLoading}
+                >
+                  {saveLoading ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--secondary"
+                  onClick={handleCancelEdit}
+                  disabled={saveLoading}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="portal-btn portal-btn--secondary"
+                onClick={handleStartEdit}
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          {saveSuccess ? (
+            <p role="status" aria-live="polite">
+              {saveSuccess}
+            </p>
+          ) : null}
+          {saveError ? (
+            <p role="alert" aria-live="assertive">
+              {saveError}
+            </p>
+          ) : null}
+          <section className="portal-stack" aria-labelledby="profile-id-photo-heading">
+            <h3 id="profile-id-photo-heading" className="portal-section-heading">
+              Upload ID Photo
+            </h3>
+            <input type="file" accept="image/*" onChange={handlePhotoSelect} />
+            <p>Upload not connected yet</p>
+            {photoFilename ? <p>{photoFilename}</p> : null}
+            {photoPreviewUrl ? (
+              <img
+                src={photoPreviewUrl}
+                alt="Selected ID preview"
+                style={{ maxWidth: '280px', borderRadius: '8px' }}
+              />
+            ) : null}
+          </section>
         </section>
       ) : null}
     </main>
