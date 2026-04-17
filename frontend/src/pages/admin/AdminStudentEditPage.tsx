@@ -1,4 +1,9 @@
-import { type FormEvent, useEffect, useState } from 'react'
+import {
+  type ChangeEventHandler,
+  type FormEvent,
+  useEffect,
+  useState,
+} from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   fetchAdminStudentDetail,
@@ -104,6 +109,16 @@ function formToPayload(f: Record<string, string>): AdminStudentUpdatePayload {
   }
 }
 
+function profileInitials(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return 'ID'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase()
+}
+
 export function AdminStudentEditPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>()
   const studentId = studentIdParam ?? ''
@@ -114,6 +129,8 @@ export function AdminStudentEditPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
+  const [photoFilename, setPhotoFilename] = useState<string | null>(null)
 
   useEffect(() => {
     if (!studentId.trim()) {
@@ -152,7 +169,33 @@ export function AdminStudentEditPage() {
     return () => ac.abort()
   }, [studentId, reloadKey])
 
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl)
+      }
+    }
+  }, [photoPreviewUrl])
+
   const sectionLoading = loading && form === null && error === null
+
+  const handlePhotoSelect: ChangeEventHandler<HTMLInputElement> = (event) => {
+    const file = event.target.files?.[0] ?? null
+    if (!file) {
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl)
+      }
+      setPhotoPreviewUrl(null)
+      setPhotoFilename(null)
+      return
+    }
+    const nextUrl = URL.createObjectURL(file)
+    if (photoPreviewUrl) {
+      URL.revokeObjectURL(photoPreviewUrl)
+    }
+    setPhotoPreviewUrl(nextUrl)
+    setPhotoFilename(file.name)
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -196,8 +239,7 @@ export function AdminStudentEditPage() {
           id={id}
           name={key}
           type={opts?.type ?? 'text'}
-          className="admin-input"
-          style={{ width: '100%', maxWidth: '100%' }}
+          className="admin-input admin-student-edit-control"
           value={form[key]}
           onChange={(ev) =>
             setForm((prev) =>
@@ -211,7 +253,7 @@ export function AdminStudentEditPage() {
   }
 
   return (
-    <main className="admin-page">
+    <main className="admin-page admin-student-edit-page">
       <div className="admin-page__toolbar">
         <div>
           <Link
@@ -270,8 +312,8 @@ export function AdminStudentEditPage() {
       {!sectionLoading && form ? (
         <form
           onSubmit={onSubmit}
-          className="portal-card portal-stack"
-          style={{ gap: '1.25rem', width: '100%', maxWidth: '100%' }}
+          className="portal-card portal-stack admin-student-edit-form"
+          style={{ gap: '1.25rem' }}
         >
           {error ? (
             <p
@@ -291,6 +333,45 @@ export function AdminStudentEditPage() {
             <legend className="portal-section-heading" style={{ padding: 0 }}>
               Profile fields
             </legend>
+            <section
+              className="portal-profile-photo-card admin-student-profile-photo-card"
+              aria-labelledby="admin-profile-photo-edit-heading"
+            >
+              <h2
+                id="admin-profile-photo-edit-heading"
+                className="portal-section-heading"
+              >
+                Profile Photo
+              </h2>
+              <div className="portal-profile-photo-frame">
+                {photoPreviewUrl ? (
+                  <img
+                    src={photoPreviewUrl}
+                    alt="Selected profile photo preview"
+                    className="portal-profile-photo-image"
+                  />
+                ) : (
+                  <span className="portal-profile-photo-placeholder portal-profile-photo-placeholder--initials">
+                    {profileInitials(form.name)}
+                  </span>
+                )}
+              </div>
+              <label className="portal-btn portal-btn--secondary portal-profile-photo-upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="portal-profile-photo-upload-input"
+                />
+                Choose photo
+              </label>
+              <p className="portal-card-note">Photo upload is not connected yet.</p>
+              {photoFilename ? (
+                <p className="portal-card-note portal-profile-photo-filename">
+                  Selected: {photoFilename}
+                </p>
+              ) : null}
+            </section>
             {field('name', 'Name *')}
             {form ? (
               <div className="portal-stack" style={{ gap: '0.35rem' }}>
@@ -303,8 +384,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-program"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.program}
                   onChange={(ev) =>
                     setForm((prev) =>
@@ -330,8 +410,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-gender"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.gender}
                   onChange={(ev) =>
                     setForm((prev) =>
@@ -366,8 +445,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-degree"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.highestDegree}
                   onChange={(ev) =>
                     setForm((prev) =>
@@ -420,8 +498,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-citizenship"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.citizenship}
                   onChange={(ev) =>
                     setForm((prev) =>
@@ -456,8 +533,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-race"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.race}
                   onChange={(ev) =>
                     setForm((prev) =>
@@ -489,8 +565,7 @@ export function AdminStudentEditPage() {
                 </label>
                 <select
                   id="admin-edit-marital"
-                  className="admin-input"
-                  style={{ width: '100%', maxWidth: '100%' }}
+                  className="admin-input admin-student-edit-control"
                   value={form.marital}
                   onChange={(ev) =>
                     setForm((prev) =>

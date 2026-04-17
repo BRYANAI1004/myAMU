@@ -160,6 +160,16 @@ function cellHistory(
   return s.length > 0 ? s : '—'
 }
 
+function profileInitials(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (words.length === 0) return 'ID'
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
+  return `${words[0][0] ?? ''}${words[1][0] ?? ''}`.toUpperCase()
+}
+
 export function AdminStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>()
   const studentId = studentIdParam ?? ''
@@ -970,7 +980,27 @@ export function AdminStudentDetailPage() {
                 <h2 id="admin-student-identity" className="portal-section-heading">
                   Identity
                 </h2>
-                <dl>
+                <div className="admin-student-profile-layout">
+                  <section
+                    className="portal-profile-photo-card admin-student-profile-photo-card"
+                    aria-labelledby="admin-profile-photo-heading"
+                  >
+                    <h3
+                      id="admin-profile-photo-heading"
+                      className="portal-section-heading"
+                    >
+                      Profile Photo
+                    </h3>
+                    <div className="portal-profile-photo-frame">
+                      <span className="portal-profile-photo-placeholder portal-profile-photo-placeholder--initials">
+                        {profileInitials(detail.name)}
+                      </span>
+                    </div>
+                    <p className="portal-card-note">
+                      Photo upload is not connected yet.
+                    </p>
+                  </section>
+                  <dl className="admin-student-profile-details">
                   <div className="portal-row">
                     <dt>Student ID</dt>
                     <dd>{dashText(detail.studentId)}</dd>
@@ -995,7 +1025,8 @@ export function AdminStudentDetailPage() {
                     <dt>Program</dt>
                     <dd>{detail.program}</dd>
                   </div>
-                </dl>
+                  </dl>
+                </div>
               </section>
 
               <section

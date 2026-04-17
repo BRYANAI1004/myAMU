@@ -1306,6 +1306,125 @@ button.portal-tab {
   margin-bottom: 0.5rem;
 }
 
+.portal-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 12rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem 1.25rem;
+}
+
+.portal-profile-photo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.portal-profile-photo-card > .portal-section-heading {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.portal-profile-photo-frame {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px dashed var(--portal-border);
+  border-radius: var(--portal-radius);
+  background: #f9fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.portal-profile-photo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portal-profile-photo-placeholder {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.portal-profile-photo-placeholder--initials {
+  font-size: 1rem;
+  color: var(--portal-text-muted);
+}
+
+.portal-profile-photo-upload {
+  width: 100%;
+}
+
+.portal-profile-photo-upload-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.portal-profile-photo-filename {
+  margin-top: -0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.portal-profile-details {
+  min-width: 0;
+}
+
+.portal-profile-details .portal-row dd {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.portal-profile-input {
+  height: 2.375rem;
+  min-width: min(100%, 20rem);
+  width: min(100%, 24rem);
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: var(--text-dark);
+  background: var(--amu-card);
+  border: 1px solid #cccccc;
+  border-radius: var(--portal-radius);
+  box-sizing: border-box;
+}
+
+select.portal-profile-input {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #687283 50%),
+    linear-gradient(135deg, #687283 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 52%,
+    calc(100% - 11px) 52%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+}
+
+.portal-profile-input:focus {
+  outline: none;
+  border-color: var(--amu-red);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+.portal-profile-input:disabled {
+  background: #f8f8f8;
+  color: var(--portal-text-muted);
+}
+
 .portal-profile-card .portal-profile-balance {
   font-size: var(--portal-body-font-size);
   font-weight: 600;
@@ -1314,6 +1433,23 @@ button.portal-tab {
 }
 
 @media (max-width: 768px) {
+  .portal-profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-profile-photo-card {
+    max-width: 13rem;
+  }
+
+  .portal-profile-details .portal-row dd {
+    justify-content: flex-start;
+  }
+
+  .portal-profile-input {
+    min-width: 0;
+    width: 100%;
+  }
+
   .portal-profile-page .portal-profile-state {
     min-height: 8.5rem;
     padding: 1.5rem 1rem;
@@ -8041,6 +8177,56 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .admin-loa-editor__error {
   margin: 0;
   color: #a4000f;
+}
+
+.admin-student-profile-layout {
+  display: grid;
+  grid-template-columns: minmax(11rem, 12rem) minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem 1.25rem;
+}
+
+.admin-student-profile-photo-card {
+  margin: 0;
+}
+
+.admin-student-profile-details {
+  min-width: 0;
+}
+
+.admin-student-edit-form {
+  width: 100%;
+  max-width: 100%;
+}
+
+.admin-student-edit-control {
+  width: 100%;
+  max-width: 100%;
+}
+
+select.admin-student-edit-control {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #687283 50%),
+    linear-gradient(135deg, #687283 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) 52%,
+    calc(100% - 11px) 52%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+}
+
+@media (max-width: 768px) {
+  .admin-student-profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-student-profile-photo-card {
+    max-width: 13rem;
+  }
 }
 
 .admin-registration-history-table th,

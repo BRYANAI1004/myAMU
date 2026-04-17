@@ -97,6 +97,8 @@ const CITIZENSHIP_OPTIONS = [
 
 const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Other'] as const
 
+const PHOTO_UPLOAD_HELPER_TEXT = 'Photo upload is not connected yet.'
+
 function nullableString(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const trimmed = v.trim()
@@ -250,6 +252,11 @@ export function ProfilePage() {
     setEditable((prev) => ({ ...prev, [field]: value }))
   }
 
+  const normalizedSaveError =
+    saveError && /(authentication required|http 401|401)/i.test(saveError)
+      ? 'Please sign in again to update profile details.'
+      : saveError
+
   const handleStartEdit = () => {
     if (!profile) return
     setEditable(toEditableState(profile))
@@ -375,7 +382,43 @@ export function ProfilePage() {
           <h2 id="profile-student-heading" className="portal-section-heading">
             {t('studentProfile')}
           </h2>
-          <dl>
+          <div className="portal-profile-layout">
+            <section
+              className="portal-profile-photo-card"
+              aria-labelledby="profile-photo-heading"
+            >
+              <h3 id="profile-photo-heading" className="portal-section-heading">
+                Profile Photo
+              </h3>
+              <div className="portal-profile-photo-frame" aria-live="polite">
+                {photoPreviewUrl ? (
+                  <img
+                    src={photoPreviewUrl}
+                    alt="Selected profile photo preview"
+                    className="portal-profile-photo-image"
+                  />
+                ) : (
+                  <span className="portal-profile-photo-placeholder">No photo</span>
+                )}
+              </div>
+              <label className="portal-btn portal-btn--secondary portal-profile-photo-upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="portal-profile-photo-upload-input"
+                />
+                Choose photo
+              </label>
+              <p className="portal-card-note">{PHOTO_UPLOAD_HELPER_TEXT}</p>
+              {photoFilename ? (
+                <p className="portal-card-note portal-profile-photo-filename">
+                  Selected: {photoFilename}
+                </p>
+              ) : null}
+            </section>
+
+            <dl className="portal-profile-details">
             <div className="portal-row">
               <dt>{t('fullName')}</dt>
               <dd>{dashText(profile.fullName, dash)}</dd>
@@ -420,6 +463,7 @@ export function ProfilePage() {
               <dt>{t('race')}</dt>
               <dd>
                 <select
+                  className="portal-profile-input"
                   value={editable.race}
                   onChange={(e) => setEditableField('race', e.target.value)}
                   disabled={!isEditing || saveLoading}
@@ -437,6 +481,7 @@ export function ProfilePage() {
               <dt>{t('address')}</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="text"
                   value={editable.address}
                   onChange={(e) => setEditableField('address', e.target.value)}
@@ -460,6 +505,7 @@ export function ProfilePage() {
               <dt>{t('email')}</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="email"
                   value={editable.email}
                   onChange={(e) => setEditableField('email', e.target.value)}
@@ -471,6 +517,7 @@ export function ProfilePage() {
               <dt>Date of Birth</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="date"
                   value={editable.dob}
                   onChange={(e) => setEditableField('dob', e.target.value)}
@@ -483,6 +530,7 @@ export function ProfilePage() {
               <dd>
                 {isEditing ? (
                   <input
+                    className="portal-profile-input"
                     type="text"
                     value={editable.ssn}
                     onChange={(e) => setEditableField('ssn', e.target.value)}
@@ -498,6 +546,7 @@ export function ProfilePage() {
               <dt>Visa</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="text"
                   value={editable.visa}
                   onChange={(e) => setEditableField('visa', e.target.value)}
@@ -509,6 +558,7 @@ export function ProfilePage() {
               <dt>Phone 1</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="text"
                   value={editable.phone1}
                   onChange={(e) => setEditableField('phone1', e.target.value)}
@@ -520,6 +570,7 @@ export function ProfilePage() {
               <dt>Phone 2</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="text"
                   value={editable.phone2}
                   onChange={(e) => setEditableField('phone2', e.target.value)}
@@ -531,6 +582,7 @@ export function ProfilePage() {
               <dt>Phone 3</dt>
               <dd>
                 <input
+                  className="portal-profile-input"
                   type="text"
                   value={editable.phone3}
                   onChange={(e) => setEditableField('phone3', e.target.value)}
@@ -542,6 +594,7 @@ export function ProfilePage() {
               <dt>Citizenship</dt>
               <dd>
                 <select
+                  className="portal-profile-input"
                   value={editable.citizenship}
                   onChange={(e) => setEditableField('citizenship', e.target.value)}
                   disabled={!isEditing || saveLoading}
@@ -559,6 +612,7 @@ export function ProfilePage() {
               <dt>Marital Status</dt>
               <dd>
                 <select
+                  className="portal-profile-input"
                   value={editable.marital}
                   onChange={(e) => setEditableField('marital', e.target.value)}
                   disabled={!isEditing || saveLoading}
@@ -572,7 +626,8 @@ export function ProfilePage() {
                 </select>
               </dd>
             </div>
-          </dl>
+            </dl>
+          </div>
           <div className="portal-actions">
             {isEditing ? (
               <>
@@ -610,24 +665,9 @@ export function ProfilePage() {
           ) : null}
           {saveError ? (
             <p role="alert" aria-live="assertive">
-              {saveError}
+              {normalizedSaveError}
             </p>
           ) : null}
-          <section className="portal-stack" aria-labelledby="profile-id-photo-heading">
-            <h3 id="profile-id-photo-heading" className="portal-section-heading">
-              Upload ID Photo
-            </h3>
-            <input type="file" accept="image/*" onChange={handlePhotoSelect} />
-            <p>Upload not connected yet</p>
-            {photoFilename ? <p>{photoFilename}</p> : null}
-            {photoPreviewUrl ? (
-              <img
-                src={photoPreviewUrl}
-                alt="Selected ID preview"
-                style={{ maxWidth: '280px', borderRadius: '8px' }}
-              />
-            ) : null}
-          </section>
         </section>
       ) : null}
     </main>
