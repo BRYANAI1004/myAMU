@@ -8199,6 +8199,20 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   max-width: 100%;
 }
 
+.admin-student-edit-form .admin-student-profile-photo-card {
+  width: 12rem;
+  max-width: min(100%, 12rem);
+  align-self: flex-start;
+  flex: 0 0 auto;
+}
+
+.admin-student-edit-form .admin-student-profile-photo-card .portal-profile-photo-frame {
+  width: 100%;
+  min-height: 12rem;
+  max-height: 12rem;
+  overflow: hidden;
+}
+
 .admin-student-edit-control {
   width: 100%;
   max-width: 100%;
