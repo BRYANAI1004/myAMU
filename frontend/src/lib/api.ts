@@ -2156,6 +2156,69 @@ export async function deleteAdminClinicalSlot(
   return { ok: true }
 }
 
+/** GET /api/admin/clinical/slots/:timetableId/roster */
+export type AdminClinicalSlotRosterRow = {
+  enrollmentId: number
+  studentId: string
+  studentName: string
+  email: string | null
+  status: string
+  createdAt: string
+}
+
+function isAdminClinicalSlotRosterRow(x: unknown): x is AdminClinicalSlotRosterRow {
+  if (x == null || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  return (
+    typeof o.enrollmentId === 'number' &&
+    typeof o.studentId === 'string' &&
+    typeof o.studentName === 'string' &&
+    (o.email === null || typeof o.email === 'string') &&
+    typeof o.status === 'string' &&
+    typeof o.createdAt === 'string'
+  )
+}
+
+export async function fetchAdminClinicalSlotRoster(
+  timetableId: number,
+  options?: { signal?: AbortSignal },
+): Promise<AdminClinicalSlotRosterRow[]> {
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(timetableId))}/roster`
+  const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected clinical slot roster response')
+  }
+  for (const row of data) {
+    if (!isAdminClinicalSlotRosterRow(row)) {
+      throw new Error('Unexpected clinical slot roster response')
+    }
+  }
+  return data
+}
+
+export async function deleteAdminClinicalSlotEnrollment(
+  timetableId: number,
+  enrollmentId: number,
+  studentId: string,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: true }> {
+  const params = new URLSearchParams()
+  params.set('studentId', studentId.trim())
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(timetableId))}/enrollments/${encodeURIComponent(String(enrollmentId))}?${params.toString()}`
+  const data = (await fetchApiJson(path, {
+    method: 'DELETE',
+    signal: options?.signal,
+  })) as unknown
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected clinical slot enrollment delete response')
+  }
+  const o = data as Record<string, unknown>
+  if (o.ok !== true) {
+    throw new Error('Unexpected clinical slot enrollment delete response')
+  }
+  return { ok: true }
+}
+
 /** GET /api/students/:studentId/clinical-requests */
 export type StudentClinicalRequestItem = {
   id: number

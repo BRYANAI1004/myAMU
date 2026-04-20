@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom'
 import {
   createAdminClinicalSlot,
   deleteAdminClinicalSlot,
+  deleteAdminClinicalSlotEnrollment,
   fetchAcademicTerms,
   fetchAdminClinicalRequests,
   fetchAdminClinicalSlots,
+  fetchAdminClinicalSlotRoster,
   fetchAdminStudents,
   postApproveClinicalRequest,
   postRejectClinicalRequest,
   updateAdminClinicalSlot,
   type AcademicTerm,
   type AdminClinicalSlot,
+  type AdminClinicalSlotRosterRow,
   type AdminPendingClinicalRequestItem,
   type AdminStudentClinicalProgressSummary,
   type AdminStudentListItem,
@@ -89,6 +92,11 @@ function clinicalReadinessLabel(
   return readiness === 'ready' ? 'Ready' : 'Not ready'
 }
 
+function formatClinicalRosterBookedAt(iso: string): string {
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
+}
+
 export function AdminClinicalPage() {
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
   const [q, setQ] = useState('')
@@ -122,6 +130,14 @@ export function AdminClinicalPage() {
   const [slotFormError, setSlotFormError] = useState<string | null>(null)
   const [slotSaving, setSlotSaving] = useState(false)
   const [deletingSlotId, setDeletingSlotId] = useState<number | null>(null)
+
+  const [rosterSlot, setRosterSlot] = useState<AdminClinicalSlot | null>(null)
+  const [rosterRows, setRosterRows] = useState<AdminClinicalSlotRosterRow[] | null>(
+    null,
+  )
+  const [rosterLoading, setRosterLoading] = useState(false)
+  const [rosterError, setRosterError] = useState<string | null>(null)
+  const [rosterRemovingKey, setRosterRemovingKey] = useState<string | null>(null)
 
   const debouncedSearchPrev = useRef<string | null>(null)
   useEffect(() => {
@@ -242,6 +258,44 @@ export function AdminClinicalPage() {
     })()
     return () => ac.abort()
   }, [tab, slotsTermId, slotsReloadKey])
+
+  useEffect(() => {
+    if (tab !== 'slots') {
+      setRosterSlot(null)
+    }
+  }, [tab])
+
+  useEffect(() => {
+    if (rosterSlot == null) {
+      setRosterRows(null)
+      setRosterError(null)
+      setRosterLoading(false)
+      return
+    }
+    const ac = new AbortController()
+    setRosterLoading(true)
+    setRosterError(null)
+    setRosterRows(null)
+    ;(async () => {
+      try {
+        const list = await fetchAdminClinicalSlotRoster(rosterSlot.id, {
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) return
+        setRosterRows(list)
+        setRosterError(null)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setRosterRows(null)
+        setRosterError(
+          e instanceof Error ? e.message : 'Could not load slot roster.',
+        )
+      } finally {
+        if (!ac.signal.aborted) setRosterLoading(false)
+      }
+    })()
+    return () => ac.abort()
+  }, [rosterSlot])
 
   const items = rows ?? []
   const sectionLoading = loading && rows === null && error === null
@@ -794,6 +848,20 @@ export function AdminClinicalPage() {
                                 }}
                                 disabled={busy}
                                 onClick={() => {
+                                  setRosterSlot(s)
+                                }}
+                              >
+                                View Roster
+                              </button>
+                              <button
+                                type="button"
+                                className="portal-btn portal-btn--secondary"
+                                style={{
+                                  padding: '0.35rem 0.65rem',
+                                  fontSize: '0.8125rem',
+                                }}
+                                disabled={busy}
+                                onClick={() => {
                                   setEditingSlotId(s.id)
                                   setSlotForm(
                                     slotRowToForm(s, slotsTermId.trim()),
@@ -1196,6 +1264,176 @@ export function AdminClinicalPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          ) : null}
+
+          {rosterSlot != null ? (
+            <div
+              className="admin-section-detail-backdrop"
+              role="presentation"
+              onMouseDown={(ev) => {
+                if (ev.target === ev.currentTarget && rosterRemovingKey == null) {
+                  setRosterSlot(null)
+                }
+              }}
+            >
+              <div
+                className="admin-section-detail-modal admin-section-detail-modal--form-wide"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="admin-clinical-slot-roster-title"
+              >
+                <h2
+                  id="admin-clinical-slot-roster-title"
+                  className="admin-section-detail-modal__title"
+                >
+                  Slot roster
+                </h2>
+                <p className="admin-section-detail-modal__meta">
+                  Slot #{rosterSlot.id} · {rosterSlot.weekday}{' '}
+                  {rosterSlot.timeFrom}–{rosterSlot.timeTo} · {rosterSlot.slot}
+                  {rosterSlot.instructor ? ` · ${rosterSlot.instructor}` : ''}
+                </p>
+                {rosterLoading && rosterRows === null ? (
+                  <p className="portal-card-note" aria-live="polite">
+                    Loading roster…
+                  </p>
+                ) : null}
+                {rosterError ? (
+                  <p className="portal-page-lede" role="alert">
+                    {rosterError}
+                  </p>
+                ) : null}
+                {!rosterLoading && rosterRows != null && rosterRows.length === 0 ? (
+                  <p className="portal-card-note">
+                    No students with a non-dropped enrollment for this slot.
+                  </p>
+                ) : null}
+                {rosterRows != null && rosterRows.length > 0 ? (
+                  <div
+                    className="portal-table-wrap admin-table-wrap"
+                    style={{ marginTop: '0.75rem', maxHeight: '50vh', overflow: 'auto' }}
+                  >
+                    <table className="portal-table portal-data-table admin-students-table--center">
+                      <thead>
+                        <tr>
+                          <th scope="col">Student ID</th>
+                          <th scope="col">Name</th>
+                          <th scope="col">Email</th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Booked at</th>
+                          <th scope="col">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rosterRows.map((r) => {
+                          const removeKey = `${r.enrollmentId}:${r.studentId}`
+                          const removing = rosterRemovingKey === removeKey
+                          const canRemove =
+                            r.status.trim().toLowerCase() === 'enrolled'
+                          return (
+                            <tr key={removeKey}>
+                              <td>{r.studentId}</td>
+                              <td
+                                style={{
+                                  maxWidth: '12rem',
+                                  textAlign: 'left',
+                                  whiteSpace: 'normal',
+                                }}
+                              >
+                                {r.studentName}
+                              </td>
+                              <td
+                                style={{
+                                  maxWidth: '14rem',
+                                  textAlign: 'left',
+                                  whiteSpace: 'normal',
+                                }}
+                              >
+                                {r.email ?? '—'}
+                              </td>
+                              <td>{r.status}</td>
+                              <td style={{ whiteSpace: 'nowrap' }}>
+                                {formatClinicalRosterBookedAt(r.createdAt)}
+                              </td>
+                              <td>
+                                {canRemove ? (
+                                  <button
+                                    type="button"
+                                    className="portal-btn portal-btn--secondary"
+                                    style={{
+                                      padding: '0.35rem 0.65rem',
+                                      fontSize: '0.8125rem',
+                                    }}
+                                    disabled={removing}
+                                    onClick={() => {
+                                      if (
+                                        !window.confirm(
+                                          `Remove ${r.studentName} (${r.studentId}) from this slot? Their enrollment will be marked dropped.`,
+                                        )
+                                      ) {
+                                        return
+                                      }
+                                      setRosterRemovingKey(removeKey)
+                                      ;(async () => {
+                                        try {
+                                          await deleteAdminClinicalSlotEnrollment(
+                                            rosterSlot.id,
+                                            r.enrollmentId,
+                                            r.studentId,
+                                          )
+                                          setRosterRows((prev) =>
+                                            prev == null
+                                              ? prev
+                                              : prev.filter(
+                                                  (x) =>
+                                                    x.enrollmentId !== r.enrollmentId,
+                                                ),
+                                          )
+                                        } catch (e) {
+                                          window.alert(
+                                            e instanceof Error
+                                              ? e.message
+                                              : 'Remove failed.',
+                                          )
+                                        } finally {
+                                          setRosterRemovingKey(null)
+                                        }
+                                      })()
+                                    }}
+                                  >
+                                    {removing ? '…' : 'Remove'}
+                                  </button>
+                                ) : (
+                                  <span
+                                    className="portal-card-note"
+                                    title="Only enrolled rows can be removed here."
+                                  >
+                                    —
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
+                <div
+                  className="portal-actions"
+                  style={{ marginTop: '1rem', justifyContent: 'flex-end' }}
+                >
+                  <button
+                    type="button"
+                    className="portal-btn portal-btn--secondary"
+                    disabled={rosterRemovingKey != null}
+                    onClick={() => setRosterSlot(null)}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           ) : null}

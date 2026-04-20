@@ -2,11 +2,14 @@ import { getClinicTimetableById } from "../repositories/clinicalTimetableReposit
 import {
   createClinicalEnrollment,
   dropClinicalEnrollment,
+  getClinicalEnrollmentSlotBinding,
+  listActiveClinicalRosterForTimetable,
   listAvailableClinicalEnrollmentSlots,
   listStudentClinicalEnrollments,
   totalClinicTimetableCapacityCaps,
   type ClinicalEnrollmentSlotRow,
   type ClinicalEnrollmentStudentRow,
+  type ClinicalSlotRosterAdminRow,
 } from "../repositories/clinicalEnrollmentRepository.js";
 import { insertClinicalAssignment } from "../repositories/clinicalScheduleRepository.js";
 import {
@@ -131,6 +134,55 @@ export async function enrollStudentInClinicalSlot(
     enrollmentId: result.enrollmentId,
     assignmentId: result.assignmentId,
   };
+}
+
+export async function listAdminClinicalSlotRoster(
+  timetableId: number,
+): Promise<ClinicalSlotRosterAdminRow[]> {
+  if (!Number.isFinite(timetableId) || timetableId <= 0) {
+    return [];
+  }
+  return listActiveClinicalRosterForTimetable(timetableId);
+}
+
+/**
+ * Admin removes a student from a slot: same non-destructive drop as student self-serve.
+ * Verifies the enrollment belongs to the given timetable row.
+ */
+export async function adminDropClinicalEnrollmentForSlot(
+  timetableId: number,
+  studentId: string,
+  enrollmentId: number,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const tid = Number(timetableId);
+  if (!Number.isFinite(tid) || tid <= 0) {
+    return { ok: false, error: "Invalid timetable id", status: 400 };
+  }
+  const sid = String(studentId ?? "").trim();
+  if (sid === "") {
+    return { ok: false, error: "Student id is required", status: 400 };
+  }
+  if (!Number.isFinite(enrollmentId) || enrollmentId <= 0) {
+    return { ok: false, error: "Invalid enrollment id", status: 400 };
+  }
+
+  const binding = await getClinicalEnrollmentSlotBinding(enrollmentId, sid);
+  if (binding == null || binding.timetableId !== tid) {
+    return {
+      ok: false,
+      error: "Enrollment not found for this slot.",
+      status: 404,
+    };
+  }
+  if (binding.status !== "enrolled") {
+    return {
+      ok: false,
+      error: "This enrollment is not active.",
+      status: 400,
+    };
+  }
+
+  return dropStudentClinicalEnrollment(sid, enrollmentId);
 }
 
 export async function dropStudentClinicalEnrollment(

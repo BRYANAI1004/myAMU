@@ -59,6 +59,16 @@ export type ClinicalEnrollmentStudentRow = {
   createdAt: string;
 };
 
+/** Slot roster row for admin (active = not `dropped`; remove uses student drop when `enrolled`). */
+export type ClinicalSlotRosterAdminRow = {
+  enrollmentId: number;
+  studentId: string;
+  studentName: string;
+  email: string | null;
+  status: string;
+  createdAt: string;
+};
+
 function slotLabelFromTimetableFields(r: {
   weekday: string;
   time_from: unknown;
@@ -238,6 +248,82 @@ export async function listStudentClinicalEnrollments(
       createdAt,
     };
   });
+}
+
+/**
+ * Students with a non-dropped enrollment on this timetable slot (admin roster).
+ * Joins legacy `students` for display name and email.
+ */
+export async function listActiveClinicalRosterForTimetable(
+  timetableId: number,
+): Promise<ClinicalSlotRosterAdminRow[]> {
+  if (!Number.isFinite(timetableId) || timetableId <= 0) {
+    return [];
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+        ce.id AS enrollment_id,
+        TRIM(ce.student_id) AS student_id,
+        TRIM(ce.status) AS status,
+        ce.created_at,
+        TRIM(s.name) AS student_name,
+        TRIM(s.email) AS student_email
+     FROM clinical_enrollments ce
+     LEFT JOIN students s ON TRIM(s.id) = TRIM(ce.student_id)
+    WHERE ce.timetable_id = ?
+      AND LOWER(TRIM(ce.status)) <> 'dropped'
+    ORDER BY ce.created_at ASC, ce.id ASC`,
+    [timetableId],
+  );
+
+  return rows.map((raw) => {
+    const row = raw as Record<string, unknown>;
+    const sid = String(row.student_id ?? "").trim();
+    const nameRaw = String(row.student_name ?? "").trim();
+    const name = nameRaw !== "" ? nameRaw : sid;
+    const emailRaw = String(row.student_email ?? "").trim();
+    const email = emailRaw !== "" ? emailRaw : null;
+    const ca = row.created_at;
+    let createdAt: string;
+    if (ca instanceof Date) {
+      createdAt = ca.toISOString();
+    } else {
+      createdAt = String(ca ?? "");
+    }
+    return {
+      enrollmentId: Number(row.enrollment_id),
+      studentId: sid,
+      studentName: name,
+      email,
+      status: String(row.status ?? "").trim(),
+      createdAt,
+    };
+  });
+}
+
+export async function getClinicalEnrollmentSlotBinding(
+  enrollmentId: number,
+  studentId: string,
+): Promise<{ timetableId: number; status: string } | null> {
+  if (!Number.isFinite(enrollmentId) || enrollmentId <= 0) {
+    return null;
+  }
+  const sid = studentId.trim();
+  if (sid === "") return null;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT ce.timetable_id, TRIM(ce.status) AS status
+       FROM clinical_enrollments ce
+      WHERE ce.id = ?
+        AND TRIM(ce.student_id) = TRIM(?)
+      LIMIT 1`,
+    [enrollmentId, sid],
+  );
+  if (rows.length === 0) return null;
+  const r = rows[0] as Record<string, unknown>;
+  return {
+    timetableId: Number(r.timetable_id),
+    status: String(r.status ?? "").trim().toLowerCase(),
+  };
 }
 
 export type ClinicalEnrollmentLockRow = {
