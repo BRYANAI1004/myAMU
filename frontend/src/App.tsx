@@ -1,4 +1,10 @@
-import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
+import {
+  Routes,
+  Route,
+  Navigate,
+  Outlet,
+  useLocation,
+} from 'react-router-dom'
 import { LanguageProvider } from '@/LanguageContext'
 import { AccountProvider, useAccount } from './context/AccountContext'
 import { useAdminAuth } from './context/AdminAuthContext'
@@ -35,7 +41,8 @@ import { TranscriptPage } from './pages/academics/TranscriptPage'
 import { GpaPage } from './pages/academics/GpaPage'
 import { AcademicProgressPage } from './pages/academics/AcademicProgressPage'
 import { EnrollmentVerificationPage } from './pages/academics/EnrollmentVerificationPage'
-import { ClinicalLayout } from './pages/clinical/ClinicalLayout'
+import { ClinicalModuleShell } from './pages/clinical/ClinicalModuleShell'
+import { ClinicalHomePage } from './pages/clinical/ClinicalHomePage'
 import { ClinicalSchedulePage } from './pages/clinical/ClinicalSchedulePage'
 import { ClinicalAddDropPage } from './pages/clinical/ClinicalAddDropPage'
 import { ClinicalExamPracticePage } from './pages/clinical/ClinicalExamPracticePage'
@@ -99,7 +106,21 @@ function AdminIndexRedirect() {
 
 function RegistrationIndexRedirect() {
   const { search } = useLocation()
+  const params = new URLSearchParams(search)
+  if (params.get('section') === 'clinical') {
+    const qs = params.toString()
+    return <Navigate to={`clinical/schedule${qs ? `?${qs}` : ''}`} replace />
+  }
   return <Navigate to={{ pathname: 'search', search }} replace />
+}
+
+function ClinicalStudentLegacyRedirect() {
+  const { pathname, search } = useLocation()
+  const tail = pathname.replace(/^\/clinical\/?/, '').trim() || 'schedule'
+  const next = new URLSearchParams(search)
+  next.set('section', 'clinical')
+  const qs = next.toString()
+  return <Navigate to={`/registration/clinical/${tail}${qs ? `?${qs}` : ''}`} replace />
 }
 
 /** Student portal + login only; admin routes stay outside so student account APIs never run on `/admin`. */
@@ -171,6 +192,15 @@ export default function App() {
               <Route path="add-drop" element={<AddDropPage />} />
               <Route path="schedule" element={<SchedulePage />} />
               <Route path="offered-timetable" element={<OfferedTimetablePage />} />
+              <Route path="clinical" element={<ClinicalModuleShell />}>
+                <Route index element={<ClinicalHomePage />} />
+                <Route path="schedule" element={<ClinicalSchedulePage />} />
+                <Route path="add-drop" element={<ClinicalAddDropPage />} />
+                <Route path="exam-practice" element={<ClinicalExamPracticePage />} />
+                <Route path="evaluation" element={<ClinicalEvaluationPage />} />
+                <Route path="required-hours" element={<ClinicalRequiredHoursPage />} />
+                <Route path="compliance" element={<ClinicalCompliancePage />} />
+              </Route>
             </Route>
             <Route path="/finances" element={<FinancesLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
@@ -188,15 +218,7 @@ export default function App() {
               <Route path="progress" element={<AcademicProgressPage />} />
               <Route path="enrollment-verification" element={<EnrollmentVerificationPage />} />
             </Route>
-            <Route path="/clinical" element={<ClinicalLayout />}>
-              <Route index element={<Navigate to="schedule" replace />} />
-              <Route path="schedule" element={<ClinicalSchedulePage />} />
-              <Route path="add-drop" element={<ClinicalAddDropPage />} />
-              <Route path="exam-practice" element={<ClinicalExamPracticePage />} />
-              <Route path="evaluation" element={<ClinicalEvaluationPage />} />
-              <Route path="required-hours" element={<ClinicalRequiredHoursPage />} />
-              <Route path="compliance" element={<ClinicalCompliancePage />} />
-            </Route>
+            <Route path="/clinical/*" element={<ClinicalStudentLegacyRedirect />} />
             <Route path="/documents" element={<DocumentsLayout />}>
               <Route index element={<DocumentsHomePage />} />
               <Route path="policies" element={<Navigate to="/documents" replace />} />

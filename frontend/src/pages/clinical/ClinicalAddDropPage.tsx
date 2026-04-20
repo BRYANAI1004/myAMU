@@ -197,7 +197,7 @@ export function ClinicalAddDropPage() {
       <h2 className="portal-section-heading">{t('clinicalAddDropHeading')}</h2>
       <p className="portal-page-lede">
         {t('clinicalAddDropPageLedeBefore')}
-        <Link to="/clinical/schedule">{t('clinicalAddDropLedeLink')}</Link>
+        <Link to="/registration/clinical/schedule?section=clinical">{t('clinicalAddDropLedeLink')}</Link>
         {t('clinicalAddDropPageLedeAfter')}
       </p>
 

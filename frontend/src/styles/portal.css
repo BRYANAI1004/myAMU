@@ -1489,6 +1489,69 @@ select.portal-profile-input {
   margin-bottom: 1.25rem;
 }
 
+/* Registration: primary section switcher (Course vs Clinical) */
+.portal-registration-section-nav {
+  margin: 0.35rem 0 1.25rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--portal-border-subtle, #d8dce3);
+}
+
+.portal-section-tab-group {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem 0.75rem;
+}
+
+.portal-section-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.625rem;
+  padding: 0.5rem 1.125rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  border-radius: var(--portal-radius);
+  border: 1px solid var(--portal-border-subtle);
+  background: #f4f5f7;
+  color: var(--portal-text);
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.portal-section-tab:hover {
+  background: #eceef2;
+  border-color: var(--portal-border);
+  color: var(--portal-text);
+}
+
+.portal-section-tab:focus-visible {
+  outline: 2px solid var(--portal-accent);
+  outline-offset: 2px;
+}
+
+.portal-section-tab--active {
+  background: var(--amu-card, #fff);
+  border-color: var(--portal-accent, #c41e3a);
+  color: var(--portal-accent-hover, #a01830);
+  box-shadow: 0 1px 0 rgba(28, 35, 51, 0.06);
+}
+
+.portal-section-tab--active:hover {
+  background: var(--amu-card, #fff);
+  border-color: var(--portal-accent, #c41e3a);
+  color: var(--portal-accent-hover, #a01830);
+}
+
 /* Registration module: compact term selector above tab nav */
 .portal-registration-layout-term {
   margin: 0 0 1rem;

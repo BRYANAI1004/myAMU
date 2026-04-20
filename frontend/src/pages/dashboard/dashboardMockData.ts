@@ -9,7 +9,7 @@ export const DASHBOARD_SERVICES: DashboardService[] = [
   { to: '/registration', icon: 'registration' },
   { to: '/finances', icon: 'finances' },
   { to: '/academics', icon: 'academics' },
-  { to: '/clinical', icon: 'clinical' },
+  { to: '/registration/clinical/schedule?section=clinical', icon: 'clinical' },
   { to: '/documents', icon: 'documents' },
   { to: '/profile', icon: 'account' },
 ]

@@ -20,7 +20,7 @@ export function ClinicalNav() {
     <nav className="portal-clinical-nav" aria-label={t('clinicalNavAria')}>
       <ul className="portal-tab-group">
         <li>
-          <NavLink to="/clinical" end className={({ isActive }) => linkClass(isActive)}>
+          <NavLink to="." end className={({ isActive }) => linkClass(isActive)}>
             {t('navOverview')}
           </NavLink>
         </li>

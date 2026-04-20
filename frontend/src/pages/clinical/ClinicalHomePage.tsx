@@ -166,7 +166,7 @@ export function ClinicalHomePage() {
           </ul>
         )}
         <p className="portal-academics-progress-caption portal-inline-note portal-inline-note--flush">
-          <Link to="/clinical/schedule" className="portal-text-link">
+          <Link to="schedule" className="portal-text-link">
             {t('clinicalOpenFullSchedule')}
           </Link>
         </p>

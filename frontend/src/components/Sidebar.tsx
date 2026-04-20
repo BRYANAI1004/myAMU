@@ -4,7 +4,6 @@ import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
 import {
   IconAcademics,
-  IconClinical,
   IconDocument,
   IconFinance,
   IconMyAccount,
@@ -25,7 +24,6 @@ const MAIN_NAV_ITEMS: readonly {
   { to: '/registration', labelKey: 'registrationModule', icon: IconRegistration },
   { to: '/finances', labelKey: 'finances', icon: IconFinance },
   { to: '/academics', labelKey: 'academics', icon: IconAcademics },
-  { to: '/clinical', labelKey: 'clinicalModule', icon: IconClinical },
   { to: '/documents', labelKey: 'documents', icon: IconDocument },
   { to: '/profile', labelKey: 'myAccount', icon: IconMyAccount },
 ]

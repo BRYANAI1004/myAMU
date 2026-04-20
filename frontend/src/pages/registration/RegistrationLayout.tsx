@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useSearchParams } from 'react-router-dom'
+import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { BackToDashboardLink } from '../../components/BackToDashboardLink'
 import {
@@ -10,6 +10,7 @@ import {
 } from '../../lib/api'
 import { CourseBinProvider } from './CourseBinContext'
 import { RegistrationNav } from './RegistrationNav'
+import { RegistrationSectionNav } from './RegistrationSectionNav'
 import {
   mergeTermOptions,
   readRegistrationTermIdFromSearch,
@@ -44,7 +45,9 @@ function academicTermStubForDeepLink(termId: string): AcademicTerm {
 
 export function RegistrationLayout() {
   const t = useStudentPortalT()
+  const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
+  const isClinicalSection = pathname.startsWith('/registration/clinical')
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
   const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -138,6 +141,33 @@ export function RegistrationLayout() {
     }
   }, [loadState, options, currentTerm, searchParams, setSearchParams])
 
+  useEffect(() => {
+    const section = searchParams.get('section')
+    if (isClinicalSection) {
+      if (section !== 'clinical') {
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.set('section', 'clinical')
+            return next
+          },
+          { replace: true },
+        )
+      }
+      return
+    }
+    if (section === 'clinical') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('section')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }, [isClinicalSection, searchParams, setSearchParams])
+
   const urlTerm = readRegistrationTermIdFromSearch(searchParams)
   const selectedTermId = resolveSelectedRegistrationTermId(
     urlTerm,
@@ -158,66 +188,70 @@ export function RegistrationLayout() {
           <h1 className="portal-page-title">{t('registrationModule')}</h1>
         </header>
 
-        <div
-          className="portal-registration-layout-term"
-          aria-labelledby="registration-layout-term-label"
-        >
-          <div className="portal-registration-layout-term__row">
-            <span id="registration-layout-term-label" className="portal-registration-layout-term__title">
-              {t('selectTerm')}
-            </span>
-            {loadState === 'loading' ? (
-              <p className="portal-text-muted portal-registration-layout-term__status" role="status">
-                {t('loadingTerms')}
-              </p>
-            ) : null}
-            {loadState === 'error' ? (
-              <p className="portal-text-muted portal-registration-layout-term__status" role="alert">
-                {loadError === REGISTRATION_TERMS_LOAD_ERROR
-                  ? t('registrationTermsLoadError')
-                  : (loadError ?? t('couldNotLoadTerms'))}
-              </p>
-            ) : null}
-            {loadState === 'ready' && options.length === 0 ? (
-              <p className="portal-text-muted portal-registration-layout-term__status" role="status">
-                {t('noAcademicTermsAvailable')}
-              </p>
-            ) : null}
+        <RegistrationSectionNav />
+
+        {!isClinicalSection ? (
+          <div
+            className="portal-registration-layout-term"
+            aria-labelledby="registration-layout-term-label"
+          >
+            <div className="portal-registration-layout-term__row">
+              <span id="registration-layout-term-label" className="portal-registration-layout-term__title">
+                {t('selectTerm')}
+              </span>
+              {loadState === 'loading' ? (
+                <p className="portal-text-muted portal-registration-layout-term__status" role="status">
+                  {t('loadingTerms')}
+                </p>
+              ) : null}
+              {loadState === 'error' ? (
+                <p className="portal-text-muted portal-registration-layout-term__status" role="alert">
+                  {loadError === REGISTRATION_TERMS_LOAD_ERROR
+                    ? t('registrationTermsLoadError')
+                    : (loadError ?? t('couldNotLoadTerms'))}
+                </p>
+              ) : null}
+              {loadState === 'ready' && options.length === 0 ? (
+                <p className="portal-text-muted portal-registration-layout-term__status" role="status">
+                  {t('noAcademicTermsAvailable')}
+                </p>
+              ) : null}
+              {loadState === 'ready' && options.length > 0 ? (
+                <select
+                  id="registration-layout-term-select"
+                  className="portal-account-ledger__select portal-registration-layout-term__select"
+                  aria-labelledby="registration-layout-term-label"
+                  value={options.some((t) => t.id === selectedTermId) ? selectedTermId : ''}
+                  onChange={(e) => {
+                    const next = e.target.value.trim()
+                    if (next === '') return
+                    setSearchParams(
+                      (prev) => {
+                        const p = new URLSearchParams(prev)
+                        p.set('term', next)
+                        return p
+                      },
+                      { replace: false },
+                    )
+                  }}
+                >
+                  {options.map((term) => (
+                    <option key={term.id} value={term.id}>
+                      {term.term_label}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+            </div>
             {loadState === 'ready' && options.length > 0 ? (
-              <select
-                id="registration-layout-term-select"
-                className="portal-account-ledger__select portal-registration-layout-term__select"
-                aria-labelledby="registration-layout-term-label"
-                value={options.some((t) => t.id === selectedTermId) ? selectedTermId : ''}
-                onChange={(e) => {
-                  const next = e.target.value.trim()
-                  if (next === '') return
-                  setSearchParams(
-                    (prev) => {
-                      const p = new URLSearchParams(prev)
-                      p.set('term', next)
-                      return p
-                    },
-                    { replace: false },
-                  )
-                }}
-              >
-                {options.map((term) => (
-                  <option key={term.id} value={term.id}>
-                    {term.term_label}
-                  </option>
-                ))}
-              </select>
+              <p className="portal-text-muted portal-registration-layout-term__hint">
+                {t('registrationRecentTermsHint')}
+              </p>
             ) : null}
           </div>
-          {loadState === 'ready' && options.length > 0 ? (
-            <p className="portal-text-muted portal-registration-layout-term__hint">
-              {t('registrationRecentTermsHint')}
-            </p>
-          ) : null}
-        </div>
+        ) : null}
 
-        <RegistrationNav termLinkSearch={termLinkSearch} />
+        {!isClinicalSection ? <RegistrationNav termLinkSearch={termLinkSearch} /> : null}
         <div className="portal-registration-outlet">
           <Outlet />
         </div>
