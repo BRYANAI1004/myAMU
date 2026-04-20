@@ -2,6 +2,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { pool } from "../lib/db.js";
 import {
   clinicalBookingPaymentHoldsTableExists,
+  getUrgentActiveClinicalBookingHoldForStudentPortal,
   listActiveClinicalBookingPaymentHoldsForStudent,
   listDueActiveClinicalBookingPaymentHoldIds,
   lockClinicalBookingPaymentHoldById,
@@ -9,6 +10,11 @@ import {
   updateClinicalBookingPaymentHoldStatus,
   voidSystemClinicalBillingAdjustmentByIdInConn,
 } from "../repositories/clinicalBookingPaymentHoldRepository.js";
+import { getClinicTimetableById } from "../repositories/clinicalTimetableRepository.js";
+import {
+  buildClinicTimetableSlotLabel,
+  formatClinicTimeHm,
+} from "./clinicalScheduleService.js";
 import { dropClinicalEnrollmentInConn } from "../repositories/clinicalEnrollmentRepository.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
 
@@ -32,6 +38,51 @@ export function isClinicalBookingHoldFinanciallySatisfied(
       ? balanceBeforeCharge
       : balanceBeforeCharge + chargeAmount;
   return currentBalance <= thr + 0.009;
+}
+
+export type StudentPortalClinicalBookingHoldDto = {
+  holdExpiresAt: string;
+  remainingSeconds: number;
+  holdStatus: "active" | "expired";
+  clinicalEnrollmentId: number;
+  timetableId: number;
+  slotLabel: string;
+};
+
+/**
+ * Summarizes the student's most urgent open clinical booking payment hold for the student portal.
+ * DB row must be `active` and tied to an `enrolled` clinical enrollment.
+ */
+export async function getStudentPortalClinicalBookingHold(
+  studentId: string,
+): Promise<StudentPortalClinicalBookingHoldDto | null> {
+  if (!(await clinicalBookingPaymentHoldsTableExists())) return null;
+  const row = await getUrgentActiveClinicalBookingHoldForStudentPortal(studentId);
+  if (row == null) return null;
+  const tt = await getClinicTimetableById(row.timetableId);
+  const slotLabel =
+    tt != null
+      ? buildClinicTimetableSlotLabel({
+          weekday: tt.weekday,
+          timeFrom: formatClinicTimeHm(tt.time_from),
+          timeTo: formatClinicTimeHm(tt.time_to),
+          slot: tt.slot,
+          instructor: tt.instructor?.trim() ? tt.instructor.trim() : null,
+        })
+      : "Clinical slot";
+  const nowMs = Date.now();
+  const endMs = row.holdExpiresAt.getTime();
+  const diffSec = Math.floor((endMs - nowMs) / 1000);
+  const remainingSeconds = Math.max(0, diffSec);
+  const holdStatus: "active" | "expired" = endMs > nowMs ? "active" : "expired";
+  return {
+    holdExpiresAt: row.holdExpiresAt.toISOString(),
+    remainingSeconds,
+    holdStatus,
+    clinicalEnrollmentId: row.clinicalEnrollmentId,
+    timetableId: row.timetableId,
+    slotLabel,
+  };
 }
 
 export async function reconcilePaidClinicalBookingPaymentHoldsForStudent(

@@ -10,6 +10,7 @@ import {
   postStudentClinicalEnrollment,
   type AdminClinicalTimetableSlot,
   type ClinicalScheduleSession,
+  type StudentActiveClinicalBookingHold,
   type StudentClinicalEnrollmentRow,
 } from '../../lib/api'
 
@@ -78,15 +79,14 @@ function isTimetableSlotInSchedule(
   )
 }
 
-function formatPaymentHoldCountdown(iso: string, nowMs: number): string {
-  const end = new Date(iso).getTime()
-  if (!Number.isFinite(end)) return '—'
-  const ms = Math.max(0, end - nowMs)
-  const totalM = Math.floor(ms / 60000)
-  const h = Math.floor(totalM / 60)
-  const m = totalM % 60
-  if (h <= 0) return `${m}m`
-  return `${h}h ${m}m`
+function formatRemainingHhMmSs(remainingMs: number): string {
+  const ms = Math.max(0, remainingMs)
+  const totalSec = Math.floor(ms / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(h)}:${pad(m)}:${pad(s)}`
 }
 
 function activeEnrollmentForTimetable(
@@ -137,11 +137,13 @@ export function ClinicalSchedulePage() {
   const [filterTerm, setFilterTerm] = useState('')
   const [selectedSlotId, setSelectedSlotId] = useState('')
   const [enrollments, setEnrollments] = useState<StudentClinicalEnrollmentRow[]>([])
+  const [activeClinicalBookingHold, setActiveClinicalBookingHold] =
+    useState<StudentActiveClinicalBookingHold | null>(null)
   const [bookingSubmitting, setBookingSubmitting] = useState(false)
   const [bookingMessage, setBookingMessage] = useState<string | null>(null)
   const [bookingError, setBookingError] = useState<string | null>(null)
   const [dataReloadKey, setDataReloadKey] = useState(0)
-  const [paymentHoldNowMs, setPaymentHoldNowMs] = useState(() => Date.now())
+  const [clinicalHoldTickMs, setClinicalHoldTickMs] = useState(() => Date.now())
 
   const rows = useMemo<TableRow[]>(
     () =>
@@ -187,6 +189,7 @@ export function ClinicalSchedulePage() {
     if (!id) {
       setSessions([])
       setEnrollments([])
+      setActiveClinicalBookingHold(null)
       setLoading(false)
       setError(null)
       return
@@ -199,18 +202,20 @@ export function ClinicalSchedulePage() {
 
     ;(async () => {
       try {
-        const [sess, enr] = await Promise.all([
+        const [sess, enrBundle] = await Promise.all([
           fetchStudentClinicalSchedule(id, { signal: ac.signal }),
           fetchStudentClinicalEnrollments(id, { signal: ac.signal }),
         ])
         if (ac.signal.aborted) return
         setSessions(sess)
-        setEnrollments(enr)
+        setEnrollments(enrBundle.enrollments)
+        setActiveClinicalBookingHold(enrBundle.activeClinicalBookingHold)
         setError(null)
       } catch (e) {
         if (ac.signal.aborted) return
         setSessions([])
         setEnrollments([])
+        setActiveClinicalBookingHold(null)
         setError(
           e instanceof Error ? e.message : t('couldNotLoadClinicSchedule'),
         )
@@ -270,22 +275,36 @@ export function ClinicalSchedulePage() {
     selectedSlot != null &&
     (selectedInSchedule || selectedActiveEnrollment != null)
 
-  const selectedPaymentHoldIso = selectedActiveEnrollment?.paymentHoldExpiresAt
-  const selectedPaymentHoldActive = (() => {
-    if (selectedPaymentHoldIso == null || selectedPaymentHoldIso.trim() === '') {
-      return false
-    }
-    const end = new Date(selectedPaymentHoldIso).getTime()
-    return Number.isFinite(end) && end > paymentHoldNowMs
-  })()
+  const clinicalHoldEndMs = activeClinicalBookingHold
+    ? new Date(activeClinicalBookingHold.holdExpiresAt).getTime()
+    : NaN
+  const clinicalHoldRemainingMs = Number.isFinite(clinicalHoldEndMs)
+    ? clinicalHoldEndMs - clinicalHoldTickMs
+    : 0
+  const clinicalHoldExpired =
+    activeClinicalBookingHold != null &&
+    (!Number.isFinite(clinicalHoldEndMs) || clinicalHoldRemainingMs <= 0)
 
   useEffect(() => {
-    if (!selectedPaymentHoldActive) return
-    const tick = window.setInterval(() => {
-      setPaymentHoldNowMs(Date.now())
-    }, 30_000)
-    return () => clearInterval(tick)
-  }, [selectedPaymentHoldActive])
+    const h = activeClinicalBookingHold
+    if (!h) return
+    const endMs = new Date(h.holdExpiresAt).getTime()
+    if (!Number.isFinite(endMs)) return
+    let id: ReturnType<typeof window.setInterval> | undefined
+    const tick = () => {
+      const now = Date.now()
+      setClinicalHoldTickMs(now)
+      if (now >= endMs && id != null) {
+        window.clearInterval(id)
+        id = undefined
+      }
+    }
+    tick()
+    id = window.setInterval(tick, 1000)
+    return () => {
+      if (id != null) window.clearInterval(id)
+    }
+  }, [activeClinicalBookingHold?.clinicalEnrollmentId, activeClinicalBookingHold?.holdExpiresAt])
 
   async function handleBookSlot() {
     const id = currentStudentId?.trim()
@@ -445,33 +464,6 @@ export function ClinicalSchedulePage() {
               {t('clinicalApprovedSlotMessage')}
             </p>
           ) : null}
-          {selectedSlot && selectedPaymentHoldActive && selectedActiveEnrollment ? (
-            <div
-              className="portal-registration-form-hint portal-registration-form-hint--warn portal-stack"
-              style={{ margin: '0 0 0.75rem' }}
-              role="status"
-              aria-live="polite"
-            >
-              <strong>{t('clinicalPaymentHoldReminderTitle')}</strong>
-              <p className="portal-inline-note portal-inline-note--flush" style={{ marginTop: '0.35rem' }}>
-                {t('clinicalPaymentHoldReminderBody')}
-              </p>
-              <p className="portal-card-note" style={{ margin: '0.5rem 0 0' }}>
-                {selectedActiveEnrollment.slotLabel}
-                {' · '}
-                {t('clinicalPaymentHoldTimeRemaining')}:{' '}
-                {formatPaymentHoldCountdown(
-                  selectedActiveEnrollment.paymentHoldExpiresAt!,
-                  paymentHoldNowMs,
-                )}
-              </p>
-              <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
-                <Link className="portal-link" to="/finances/overview">
-                  {t('clinicalPaymentHoldFinancesLink')}
-                </Link>
-              </p>
-            </div>
-          ) : null}
           {bookingError ? (
             <p className="portal-page-lede" role="alert">
               {bookingError}
@@ -482,6 +474,54 @@ export function ClinicalSchedulePage() {
               {bookingMessage}
             </p>
           ) : null}
+        </section>
+      ) : null}
+
+      {!showEmptyAccount && activeClinicalBookingHold ? (
+        <section
+          className="portal-module-panel portal-stack"
+          aria-label={t('clinicalPaymentHoldReminderTitle')}
+          style={{ marginBottom: '1rem' }}
+        >
+          <div
+            className="portal-registration-form-hint portal-registration-form-hint--warn portal-stack"
+            role="status"
+            aria-live="polite"
+          >
+            <strong>
+              {clinicalHoldExpired
+                ? t('clinicalPaymentHoldExpiredTitle')
+                : t('clinicalPaymentHoldReminderTitle')}
+            </strong>
+            {clinicalHoldExpired ? (
+              <p className="portal-inline-note portal-inline-note--flush" style={{ marginTop: '0.35rem' }}>
+                {t('clinicalPaymentHoldExpiredBody')}
+              </p>
+            ) : (
+              <>
+                <p className="portal-card-note" style={{ margin: '0.5rem 0 0' }}>
+                  {activeClinicalBookingHold.slotLabel}
+                </p>
+                <p className="portal-page-lede" style={{ margin: '0.35rem 0 0' }}>
+                  {t('clinicalPaymentHoldDuePrefix')}{' '}
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {formatRemainingHhMmSs(clinicalHoldRemainingMs)}
+                  </span>
+                </p>
+                <p className="portal-inline-note portal-inline-note--flush" style={{ marginTop: '0.25rem' }}>
+                  {t('clinicalPaymentHoldPayInFinancesShort')}
+                </p>
+                <p className="portal-inline-note portal-inline-note--flush" style={{ marginTop: '0.35rem' }}>
+                  {t('clinicalPaymentHoldReminderBody')}
+                </p>
+              </>
+            )}
+            <p style={{ marginTop: '0.5rem', marginBottom: 0 }}>
+              <Link className="portal-link" to="/finances/overview">
+                {t('clinicalPaymentHoldFinancesLink')}
+              </Link>
+            </p>
+          </div>
         </section>
       ) : null}
 

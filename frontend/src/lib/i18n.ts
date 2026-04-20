@@ -851,6 +851,12 @@ export const STUDENT_PORTAL_EN = {
   clinicalPaymentHoldReminderBody:
     'Payment required within 12 hours to keep this clinical slot. Go to Finances (Student Ledger) for this term and complete the clinical booking charge.',
   clinicalPaymentHoldTimeRemaining: 'Time remaining',
+  clinicalPaymentHoldDuePrefix: 'Payment due in',
+  clinicalPaymentHoldPayInFinancesShort:
+    'Please complete payment in Finances to keep this slot.',
+  clinicalPaymentHoldExpiredTitle: 'Clinical booking payment window has expired',
+  clinicalPaymentHoldExpiredBody:
+    'The 12-hour deadline to pay for this clinical booking has passed. If your slot was released, complete any amount due in Finances and book again, or contact the office.',
   clinicalPaymentHoldFinancesLink: 'Open Finances / Ledger',
 
   documentsPoliciesHeading: 'Policies',
@@ -1937,6 +1943,12 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   clinicalPaymentHoldReminderBody:
     '為保留此臨床時段，請於選課後 12 小時內至「帳務／學生帳本」完成臨床時段費用繳納。',
   clinicalPaymentHoldTimeRemaining: '剩餘時間',
+  clinicalPaymentHoldDuePrefix: '繳費截止倒數',
+  clinicalPaymentHoldPayInFinancesShort:
+    '請至「帳務」完成繳費以保留此臨床時段。',
+  clinicalPaymentHoldExpiredTitle: '臨床選課繳費期限已過',
+  clinicalPaymentHoldExpiredBody:
+    '此筆臨床選課的 12 小時繳費期限已過。若時段已被釋出，請先於「帳務」處理應繳款項後再重新選課，或聯絡辦公室。',
   clinicalPaymentHoldFinancesLink: '前往帳務／帳本',
 
   documentsPoliciesHeading: '政策',

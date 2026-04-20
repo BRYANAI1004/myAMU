@@ -81,13 +81,13 @@ export function ClinicalAddDropPage() {
           yearRaw !== '' && Number.isFinite(Number(yearRaw))
             ? Number(yearRaw)
             : undefined
-        const [open, mine] = await Promise.all([
+        const [open, mineBundle] = await Promise.all([
           fetchStudentOpenClinicalEnrollmentSlots(sid, { term, year }),
           fetchStudentClinicalEnrollments(sid, { term, year }),
         ])
         if (cancelled) return
         setOpenSlots(open)
-        setEnrollments(mine)
+        setEnrollments(mineBundle.enrollments)
       } catch (e) {
         if (cancelled) return
         setOpenSlots([])
@@ -147,12 +147,12 @@ export function ClinicalAddDropPage() {
         yearRaw !== '' && Number.isFinite(Number(yearRaw))
           ? Number(yearRaw)
           : undefined
-      const [open, mine] = await Promise.all([
+      const [open, mineBundle] = await Promise.all([
         fetchStudentOpenClinicalEnrollmentSlots(sid, { term, year }),
         fetchStudentClinicalEnrollments(sid, { term, year }),
       ])
       setOpenSlots(open)
-      setEnrollments(mine)
+      setEnrollments(mineBundle.enrollments)
     } catch (e) {
       setActionError(
         e instanceof Error ? e.message : t('clinicalCouldNotCompleteEnrollment'),
@@ -176,12 +176,12 @@ export function ClinicalAddDropPage() {
         yearRaw !== '' && Number.isFinite(Number(yearRaw))
           ? Number(yearRaw)
           : undefined
-      const [open, mine] = await Promise.all([
+      const [open, mineBundle] = await Promise.all([
         fetchStudentOpenClinicalEnrollmentSlots(sid, { term, year }),
         fetchStudentClinicalEnrollments(sid, { term, year }),
       ])
       setOpenSlots(open)
-      setEnrollments(mine)
+      setEnrollments(mineBundle.enrollments)
     } catch (e) {
       setActionError(e instanceof Error ? e.message : t('clinicalCouldNotDropEnrollment'))
     } finally {

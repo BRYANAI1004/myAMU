@@ -1836,6 +1836,36 @@ export type StudentClinicalEnrollmentRow = {
   paymentHoldExpiresAt: string | null
 }
 
+/** Primary open clinical booking payment hold for the student portal (from holds table + enrolled enrollment). */
+export type StudentActiveClinicalBookingHold = {
+  holdExpiresAt: string
+  remainingSeconds: number
+  holdStatus: 'active' | 'expired'
+  clinicalEnrollmentId: number
+  timetableId: number
+  slotLabel: string
+}
+
+export type StudentClinicalEnrollmentsResponse = {
+  enrollments: StudentClinicalEnrollmentRow[]
+  activeClinicalBookingHold: StudentActiveClinicalBookingHold | null
+}
+
+function isStudentActiveClinicalBookingHold(
+  x: unknown,
+): x is StudentActiveClinicalBookingHold {
+  if (x == null || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  return (
+    typeof o.holdExpiresAt === 'string' &&
+    typeof o.remainingSeconds === 'number' &&
+    (o.holdStatus === 'active' || o.holdStatus === 'expired') &&
+    typeof o.clinicalEnrollmentId === 'number' &&
+    typeof o.timetableId === 'number' &&
+    typeof o.slotLabel === 'string'
+  )
+}
+
 function isStudentClinicalEnrollmentRow(x: unknown): x is StudentClinicalEnrollmentRow {
   if (x == null || typeof x !== 'object') return false
   const o = x as Record<string, unknown>
@@ -1857,7 +1887,7 @@ function isStudentClinicalEnrollmentRow(x: unknown): x is StudentClinicalEnrollm
 export async function fetchStudentClinicalEnrollments(
   studentId: string,
   options?: { term?: string; year?: number; signal?: AbortSignal },
-): Promise<StudentClinicalEnrollmentRow[]> {
+): Promise<StudentClinicalEnrollmentsResponse> {
   const params = new URLSearchParams()
   if (options?.term != null && options.term.trim() !== '') {
     params.set('term', options.term.trim())
@@ -1871,15 +1901,31 @@ export async function fetchStudentClinicalEnrollments(
       ? `/api/students/${encodeURIComponent(studentId)}/clinical-enrollments?${q}`
       : `/api/students/${encodeURIComponent(studentId)}/clinical-enrollments`
   const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
-  if (!Array.isArray(data)) {
+  if (data == null || typeof data !== 'object') {
     throw new Error('Unexpected student clinical enrollments response')
   }
-  for (const row of data) {
+  const o = data as Record<string, unknown>
+  if (!('enrollments' in o) || !('activeClinicalBookingHold' in o)) {
+    throw new Error('Unexpected student clinical enrollments response')
+  }
+  const enr = o.enrollments
+  const holdRaw = o.activeClinicalBookingHold
+  if (!Array.isArray(enr)) {
+    throw new Error('Unexpected student clinical enrollments response')
+  }
+  for (const row of enr) {
     if (!isStudentClinicalEnrollmentRow(row)) {
       throw new Error('Unexpected student clinical enrollments response')
     }
   }
-  return data
+  if (holdRaw !== null && holdRaw !== undefined && !isStudentActiveClinicalBookingHold(holdRaw)) {
+    throw new Error('Unexpected student clinical enrollments response')
+  }
+  const activeClinicalBookingHold =
+    holdRaw === null || holdRaw === undefined
+      ? null
+      : (holdRaw as StudentActiveClinicalBookingHold)
+  return { enrollments: enr, activeClinicalBookingHold }
 }
 
 /** POST /api/students/:studentId/clinical-enrollments — 201 { ok, enrollmentId, assignmentId, billingChargePosted? } */

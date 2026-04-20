@@ -9,6 +9,7 @@ import {
   listStudentClinicalEnrollmentRows,
 } from "../services/clinicalEnrollmentService.js";
 import {
+  getStudentPortalClinicalBookingHold,
   reconcilePaidClinicalBookingPaymentHoldsForStudent,
   runClinicalBookingPaymentHoldCleanup,
 } from "../services/clinicalBookingPaymentHoldService.js";
@@ -169,7 +170,8 @@ export async function getStudentClinicalEnrollmentsHandler(
     const year = parseOptYearQuery(req);
     await reconcilePaidClinicalBookingPaymentHoldsForStudent(sid);
     const rows = await listStudentClinicalEnrollmentRows(sid, { term, year });
-    res.json(rows);
+    const activeClinicalBookingHold = await getStudentPortalClinicalBookingHold(sid);
+    res.json({ enrollments: rows, activeClinicalBookingHold });
   } catch (e) {
     if (e instanceof ClinicalScheduleValidationError) {
       res.status(400).json({ error: e.message });

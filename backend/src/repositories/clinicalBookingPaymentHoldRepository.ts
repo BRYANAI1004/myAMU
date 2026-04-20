@@ -358,3 +358,47 @@ export async function listActiveClinicalBookingPaymentHoldsForStudent(
     year: Math.trunc(Number((r as { year?: unknown }).year)),
   }));
 }
+
+/**
+ * Active DB hold tied to an enrolled clinical enrollment (excludes orphaned holds).
+ * When multiple exist, returns the soonest deadline.
+ */
+export async function getUrgentActiveClinicalBookingHoldForStudentPortal(
+  studentId: string,
+): Promise<{
+  clinicalEnrollmentId: number;
+  timetableId: number;
+  holdExpiresAt: Date;
+} | null> {
+  if (!(await clinicalBookingPaymentHoldsTableExists())) return null;
+  const sid = studentId.trim();
+  if (sid === "") return null;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT h.clinical_enrollment_id AS clinicalEnrollmentId,
+            ce.timetable_id AS timetableId,
+            h.hold_expires_at AS holdExpiresAt
+       FROM clinical_booking_payment_holds h
+      INNER JOIN clinical_enrollments ce
+         ON ce.id = h.clinical_enrollment_id
+        AND TRIM(ce.student_id) = TRIM(h.student_id)
+      WHERE TRIM(h.student_id) = TRIM(?)
+        AND h.status = 'active'
+        AND LOWER(TRIM(ce.status)) = 'enrolled'
+      ORDER BY h.hold_expires_at ASC, h.id ASC
+      LIMIT 1`,
+    [sid],
+  );
+  if (rows.length === 0) return null;
+  const r = rows[0] as Record<string, unknown>;
+  const he = r.holdExpiresAt;
+  const exp =
+    he instanceof Date
+      ? he
+      : new Date(typeof he === "string" || typeof he === "number" ? he : String(he ?? ""));
+  if (Number.isNaN(exp.getTime())) return null;
+  return {
+    clinicalEnrollmentId: Math.trunc(Number(r.clinicalEnrollmentId)),
+    timetableId: Math.trunc(Number(r.timetableId)),
+    holdExpiresAt: exp,
+  };
+}
