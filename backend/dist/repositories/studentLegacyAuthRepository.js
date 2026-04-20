@@ -12,7 +12,7 @@ export async function findLegacyStudentById(pool, studentId) {
     };
 }
 /**
- * Stored `password` from legacy `password_stu` (typically MD5 hex; may be plain in edge cases).
+ * Stored `password` from legacy `password_stu` (MD5 hex, 32 chars; login rejects non-hex rows).
  */
 export async function findLegacyStudentPasswordStored(pool, studentId) {
     const [rows] = await pool.query("SELECT TRIM(password) AS pw FROM password_stu WHERE TRIM(id) = ? LIMIT 1", [studentId.trim()]);
