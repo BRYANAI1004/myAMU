@@ -202,7 +202,23 @@ export async function enrollStudentInClinicalSlot(
         clinicalEnrollmentId: result.enrollmentId,
       });
       billingChargePosted = true;
-      if (await clinicalBookingPaymentHoldsTableExists()) {
+      const holdsTableOk = await clinicalBookingPaymentHoldsTableExists();
+      if (!holdsTableOk) {
+        console.log(
+          "[clinical enrollment] insertClinicalBookingPaymentHold skipped: table missing per information_schema",
+        );
+      }
+      if (holdsTableOk) {
+        console.log(
+          "[clinical enrollment] before insertClinicalBookingPaymentHold",
+          {
+            clinicalEnrollmentId: result.enrollmentId,
+            billingAdjustmentId: adjustmentId,
+            studentId: sid,
+            term,
+            year,
+          },
+        );
         try {
           await insertClinicalBookingPaymentHold({
             clinicalEnrollmentId: result.enrollmentId,

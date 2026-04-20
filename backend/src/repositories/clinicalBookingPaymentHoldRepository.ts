@@ -22,12 +22,7 @@ export type ClinicalBookingPaymentHoldRow = {
   status: ClinicalBookingPaymentHoldStatus;
 };
 
-let holdsTableExistsCache: boolean | null = null;
-
 export async function clinicalBookingPaymentHoldsTableExists(): Promise<boolean> {
-  // Only cache positive discovery: if the table was missing at first check (e.g. before
-  // migrations) we must not remember `false` forever after the table is created.
-  if (holdsTableExistsCache === true) return true;
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT 1 AS ok
        FROM information_schema.TABLES
@@ -36,7 +31,10 @@ export async function clinicalBookingPaymentHoldsTableExists(): Promise<boolean>
       LIMIT 1`,
   );
   const exists = rows.length > 0;
-  if (exists) holdsTableExistsCache = true;
+  console.log(
+    "[clinical_booking_payment_holds] clinicalBookingPaymentHoldsTableExists:",
+    exists,
+  );
   return exists;
 }
 
@@ -49,9 +47,20 @@ export async function insertClinicalBookingPaymentHold(params: {
   chargeAmount: number;
   balanceBeforeCharge: number;
 }): Promise<number> {
+  console.log(
+    "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: entered",
+    {
+      clinicalEnrollmentId: params.clinicalEnrollmentId,
+      billingAdjustmentId: params.billingAdjustmentId,
+      studentId: params.studentId,
+      term: params.term,
+      year: params.year,
+    },
+  );
   const eid = Math.trunc(params.clinicalEnrollmentId);
-  const [res] = await pool.execute<ResultSetHeader>(
-    `INSERT INTO clinical_booking_payment_holds
+  try {
+    const [res] = await pool.execute<ResultSetHeader>(
+      `INSERT INTO clinical_booking_payment_holds
       (clinical_enrollment_id, student_id, billing_adjustment_id, term, year,
        charge_amount, balance_before_charge, hold_expires_at, status)
      SELECT ?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 12 HOUR), 'active'
@@ -62,18 +71,33 @@ export async function insertClinicalBookingPaymentHold(params: {
          WHERE cbph.clinical_enrollment_id = ?
            AND cbph.status = 'active'
       )`,
-    [
-      eid,
-      params.studentId.trim(),
-      Math.trunc(params.billingAdjustmentId),
-      params.term.trim(),
-      Math.trunc(params.year),
-      params.chargeAmount,
-      params.balanceBeforeCharge,
-      eid,
-    ],
-  );
-  return Math.trunc(Number(res.insertId));
+      [
+        eid,
+        params.studentId.trim(),
+        Math.trunc(params.billingAdjustmentId),
+        params.term.trim(),
+        Math.trunc(params.year),
+        params.chargeAmount,
+        params.balanceBeforeCharge,
+        eid,
+      ],
+    );
+    console.log(
+      "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: SQL result",
+      {
+        affectedRows: res.affectedRows,
+        insertId: res.insertId,
+        warningStatus: res.warningStatus,
+      },
+    );
+    return Math.trunc(Number(res.insertId));
+  } catch (err) {
+    console.error(
+      "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: SQL error",
+      err,
+    );
+    throw err;
+  }
 }
 
 export async function cancelActiveClinicalBookingPaymentHoldsForEnrollment(
