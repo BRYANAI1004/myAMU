@@ -215,6 +215,7 @@ export async function postStudentClinicalEnrollmentHandler(
       ok: true,
       enrollmentId: result.enrollmentId,
       assignmentId: result.assignmentId,
+      billingChargePosted: result.billingChargePosted,
     });
   } catch (e) {
     console.error("[clinical-enrollments POST] failed:", e);

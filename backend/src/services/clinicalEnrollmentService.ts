@@ -1,4 +1,9 @@
-import { getClinicTimetableById } from "../repositories/clinicalTimetableRepository.js";
+import { pool } from "../lib/db.js";
+import { insertPortalBillingAdjustment } from "../repositories/adminFinanceRepository.js";
+import {
+  getClinicTimetableById,
+  type ClinicTimetableDbRow,
+} from "../repositories/clinicalTimetableRepository.js";
 import {
   createClinicalEnrollment,
   dropClinicalEnrollment,
@@ -13,9 +18,35 @@ import {
 } from "../repositories/clinicalEnrollmentRepository.js";
 import { insertClinicalAssignment } from "../repositories/clinicalScheduleRepository.js";
 import {
+  buildClinicTimetableSlotLabel,
   buildTimetableClinicalAssignmentPayload,
   ClinicalScheduleValidationError,
+  formatClinicTimeHm,
 } from "./clinicalScheduleService.js";
+
+/**
+ * Phase 2: flat fee for a new clinical timetable slot booking until per-slot pricing exists.
+ * Single source for this placeholder amount (replace when `clinic_timetable` carries price).
+ */
+const CLINICAL_SLOT_BOOKING_CHARGE_USD = 150;
+
+function roundClinicalBookingMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function clinicalSlotBookingLedgerDescription(tt: ClinicTimetableDbRow): string {
+  const slotLabel = buildClinicTimetableSlotLabel({
+    weekday: tt.weekday,
+    timeFrom: formatClinicTimeHm(tt.time_from),
+    timeTo: formatClinicTimeHm(tt.time_to),
+    slot: tt.slot,
+    instructor: tt.instructor?.trim() ? tt.instructor.trim() : null,
+  });
+  const term = tt.term.trim();
+  const y = tt.year;
+  const raw = `Clinical booking — ${term} ${y} · ${slotLabel}`;
+  return raw.length <= 255 ? raw : raw.slice(0, 252) + "...";
+}
 
 export type OpenClinicalSlotForStudentDto = ClinicalEnrollmentSlotRow & {
   alreadyEnrolled: boolean;
@@ -86,7 +117,13 @@ export async function enrollStudentInClinicalSlot(
   studentId: string,
   timetableId: number,
 ): Promise<
-  | { ok: true; enrollmentId: number; assignmentId: number }
+  | {
+      ok: true;
+      enrollmentId: number;
+      assignmentId: number;
+      /** True when a new `portal_billing_adjustments` clinical charge was posted for this booking. */
+      billingChargePosted: boolean;
+    }
   | { ok: false; error: string; status: number }
 > {
   const sid = String(studentId ?? "").trim();
@@ -129,10 +166,49 @@ export async function enrollStudentInClinicalSlot(
   if (!result.ok) {
     return { ok: false, error: result.error, status: 400 };
   }
+
+  let billingChargePosted = false;
+  if (result.isNewEnrollmentRow) {
+    const desc = clinicalSlotBookingLedgerDescription(tt);
+    const amount = roundClinicalBookingMoney(CLINICAL_SLOT_BOOKING_CHARGE_USD);
+    try {
+      await insertPortalBillingAdjustment(pool, {
+        studentExternalId: sid,
+        term,
+        year,
+        description: desc,
+        amount,
+        category: "clinical",
+        adjustmentSource: "system_clinical",
+      });
+      billingChargePosted = true;
+    } catch (e) {
+      console.error(
+        "[clinical enrollment] portal billing adjustment failed after enroll:",
+        e,
+      );
+      const dropped = await dropClinicalEnrollment(sid, result.enrollmentId);
+      if (!dropped.ok) {
+        console.error(
+          "[clinical enrollment] billing failure and enrollment rollback failed",
+          { studentId: sid, enrollmentId: result.enrollmentId },
+        );
+        throw e instanceof Error ? e : new Error(String(e));
+      }
+      return {
+        ok: false,
+        error:
+          "Your spot could not be billed, so the booking was cancelled. Please try again or contact the office.",
+        status: 503,
+      };
+    }
+  }
+
   return {
     ok: true,
     enrollmentId: result.enrollmentId,
     assignmentId: result.assignmentId,
+    billingChargePosted,
   };
 }
 

@@ -434,7 +434,7 @@ export async function insertPortalBillingAdjustment(
     description: string;
     amount: number;
     category: PortalBillingCategory;
-    adjustmentSource?: "manual" | "system_late_fee";
+    adjustmentSource?: "manual" | "system_late_fee" | "system_clinical";
   },
 ): Promise<void> {
   const src = params.adjustmentSource ?? "manual";

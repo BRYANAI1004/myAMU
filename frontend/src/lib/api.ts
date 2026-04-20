@@ -1872,12 +1872,17 @@ export async function fetchStudentClinicalEnrollments(
   return data
 }
 
-/** POST /api/students/:studentId/clinical-enrollments — 201 { ok, enrollmentId, assignmentId } */
+/** POST /api/students/:studentId/clinical-enrollments — 201 { ok, enrollmentId, assignmentId, billingChargePosted? } */
 export async function postStudentClinicalEnrollment(
   studentId: string,
   body: { timetableId: number },
   options?: { signal?: AbortSignal },
-): Promise<{ ok: boolean; enrollmentId: number; assignmentId: number }> {
+): Promise<{
+  ok: boolean
+  enrollmentId: number
+  assignmentId: number
+  billingChargePosted: boolean
+}> {
   const path = `/api/students/${encodeURIComponent(studentId)}/clinical-enrollments`
   const data = (await fetchApiJson(path, {
     method: 'POST',
@@ -1900,6 +1905,7 @@ export async function postStudentClinicalEnrollment(
     ok: true,
     enrollmentId: o.enrollmentId,
     assignmentId: o.assignmentId,
+    billingChargePosted: o.billingChargePosted === true,
   }
 }
 

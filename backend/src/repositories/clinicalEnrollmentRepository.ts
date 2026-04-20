@@ -175,6 +175,37 @@ export async function listAvailableClinicalEnrollmentSlots(options?: {
   });
 }
 
+/**
+ * Distinct term/year pairs for any `clinical_enrollments` row for this student (any status).
+ * Used so the Finance quarter picker includes terms where a clinical slot charge may exist.
+ */
+export async function listClinicalFinanceQuarterHintsForStudent(
+  studentId: string,
+): Promise<{ term: string; year: number }[]> {
+  const sid = studentId.trim();
+  if (sid === "") {
+    return [];
+  }
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT DISTINCT TRIM(term) AS term, year
+       FROM clinical_enrollments
+      WHERE TRIM(student_id) = TRIM(?)
+      ORDER BY year DESC,
+        CASE UPPER(TRIM(term))
+          WHEN 'FALL' THEN 4
+          WHEN 'SUMMER' THEN 3
+          WHEN 'SPRING' THEN 2
+          WHEN 'WINTER' THEN 1
+          ELSE 0
+        END DESC`,
+    [sid],
+  );
+  return rows.map((r) => ({
+    term: String(r.term ?? "").trim(),
+    year: Number(r.year),
+  }));
+}
+
 export async function listStudentClinicalEnrollments(
   studentId: string,
   options?: { term?: string | null; year?: number | null },
@@ -488,7 +519,13 @@ export async function createClinicalEnrollment(
   slotCapacity: number,
   insertAssignment: (conn: PoolConnection) => Promise<number>,
 ): Promise<
-  | { ok: true; enrollmentId: number; assignmentId: number }
+  | {
+      ok: true;
+      enrollmentId: number;
+      assignmentId: number;
+      /** `true` only when a new `clinical_enrollments` row was inserted (not a dropped→enrolled reactivation). */
+      isNewEnrollmentRow: boolean;
+    }
   | { ok: false; error: string }
 > {
   const sid = studentId.trim();
@@ -540,6 +577,7 @@ export async function createClinicalEnrollment(
     }
 
     let enrollmentId: number;
+    let isNewEnrollmentRow: boolean;
     if (existing == null) {
       try {
         enrollmentId = await insertClinicalEnrollmentRow(conn, {
@@ -549,6 +587,7 @@ export async function createClinicalEnrollment(
           year,
           status: "enrolled",
         });
+        isNewEnrollmentRow = true;
       } catch (e: unknown) {
         if (isMysqlDupEntry(e)) {
           await conn.rollback();
@@ -571,12 +610,13 @@ export async function createClinicalEnrollment(
         return { ok: false, error: "Could not update enrollment." };
       }
       enrollmentId = existing.id;
+      isNewEnrollmentRow = false;
     }
 
     const assignmentId = await insertAssignment(conn);
 
     await conn.commit();
-    return { ok: true, enrollmentId, assignmentId };
+    return { ok: true, enrollmentId, assignmentId, isNewEnrollmentRow };
   } catch (e) {
     await conn.rollback();
     throw e;

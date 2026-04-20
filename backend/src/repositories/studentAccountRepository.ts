@@ -22,7 +22,7 @@ import type {
  * portal_student_term_prefs (student_external_id, term, year, use_installment_plan,
  *   tuition_paid_in_full_at_reg, installment_count, registration_period_ends)
  * portal_payments (student_external_id, term, year, amount, paid_at, method, description)
- * portal_billing_adjustments (..., adjustment_source manual|system_late_fee)
+ * portal_billing_adjustments (..., adjustment_source manual|system_late_fee|system_clinical)
  */
 
 function formatSqlDate(value: unknown): string {
@@ -59,6 +59,7 @@ function asBillingCategory(raw: unknown): BillingCategory {
 function asAdjustmentSource(raw: unknown): BillingAdjustmentSource {
   const s = String(raw ?? "").trim().toLowerCase();
   if (s === "system_late_fee") return "system_late_fee";
+  if (s === "system_clinical") return "system_clinical";
   return "manual";
 }
 
@@ -155,6 +156,45 @@ export async function listPortalScheduleTermsForStudent(
   }));
 }
 
+/**
+ * `portal_billing_adjustments` for one student + quarter (no dependency on portal course rows).
+ * Used when merging portal-side charges into the student ledger alongside legacy `accounting`.
+ */
+export async function loadPortalBillingAdjustmentsForQuarter(
+  pool: Pool,
+  studentId: string,
+  term: string,
+  year: number,
+): Promise<BillingAdjustmentRecord[]> {
+  const adjustmentsSelectHasSource =
+    await hasPortalBillingAdjustmentsAdjustmentSourceColumn(pool);
+  const adjustmentsSql = adjustmentsSelectHasSource
+    ? `SELECT id, description, amount, category, adjustment_source AS adjustmentSource
+       FROM portal_billing_adjustments
+       WHERE student_external_id = ? AND term = ? AND year = ?`
+    : `SELECT id, description, amount, category
+       FROM portal_billing_adjustments
+       WHERE student_external_id = ? AND term = ? AND year = ?`;
+
+  const [adjQ] = await pool.query<RowDataPacket[]>(adjustmentsSql, [
+    studentId,
+    term,
+    year,
+  ]);
+  const adjustmentRowList = adjQ as RowDataPacket[];
+  return adjustmentRowList.map((r) => ({
+    id: r.id != null ? Number(r.id) : undefined,
+    description: String(r.description),
+    amount: Number(r.amount),
+    category: asBillingCategory(r.category),
+    adjustmentSource: adjustmentsSelectHasSource
+      ? asAdjustmentSource(
+          (r as { adjustmentSource?: unknown }).adjustmentSource,
+        )
+      : "manual",
+  }));
+}
+
 async function loadPortalTermBillingContextCore(
   pool: Pool,
   studentId: string,
@@ -193,17 +233,6 @@ async function loadPortalTermBillingContextCore(
   const placeholders =
     courseIds.length > 0 ? courseIds.map(() => "?").join(",") : "";
 
-  const adjustmentsSelectHasSource = await hasPortalBillingAdjustmentsAdjustmentSourceColumn(
-    pool,
-  );
-  const adjustmentsSql = adjustmentsSelectHasSource
-    ? `SELECT id, description, amount, category, adjustment_source AS adjustmentSource
-       FROM portal_billing_adjustments
-       WHERE student_external_id = ? AND term = ? AND year = ?`
-    : `SELECT id, description, amount, category
-       FROM portal_billing_adjustments
-       WHERE student_external_id = ? AND term = ? AND year = ?`;
-
   const coursesSql =
     courseIds.length > 0
       ? `SELECT course_id AS courseId, course_code AS courseCode, title, type,
@@ -215,7 +244,7 @@ async function loadPortalTermBillingContextCore(
          FROM portal_courses
          WHERE 1 = 0`;
 
-  const [coursesQ, prefsQ, paymentsQ, adjQ] = await Promise.all([
+  const [coursesQ, prefsQ, paymentsQ, adjustments] = await Promise.all([
     pool.query<RowDataPacket[]>(
       coursesSql,
       courseIds.length > 0 ? courseIds : [],
@@ -237,13 +266,12 @@ async function loadPortalTermBillingContextCore(
        ORDER BY paid_at ASC, id ASC`,
       [studentId, term, year],
     ),
-    pool.query<RowDataPacket[]>(adjustmentsSql, [studentId, term, year]),
+    loadPortalBillingAdjustmentsForQuarter(pool, studentId, term, year),
   ]);
 
   const courseRowList = coursesQ[0] as RowDataPacket[];
   const prefRowList = prefsQ[0] as RowDataPacket[];
   const paymentRowList = paymentsQ[0] as RowDataPacket[];
-  const adjustmentRowList = adjQ[0] as RowDataPacket[];
 
   const courses: CourseRecord[] = courseRowList.map((r) => ({
     courseId: String(r.courseId),
@@ -276,20 +304,6 @@ async function loadPortalTermBillingContextCore(
     method: String(r.method),
     description: r.description != null ? String(r.description) : undefined,
   }));
-
-  const adjustments: BillingAdjustmentRecord[] = adjustmentRowList.map(
-    (r) => ({
-      id: r.id != null ? Number(r.id) : undefined,
-      description: String(r.description),
-      amount: Number(r.amount),
-      category: asBillingCategory(r.category),
-      adjustmentSource: adjustmentsSelectHasSource
-        ? asAdjustmentSource(
-            (r as { adjustmentSource?: unknown }).adjustmentSource,
-          )
-        : "manual",
-    }),
-  );
 
   return {
     studentId,

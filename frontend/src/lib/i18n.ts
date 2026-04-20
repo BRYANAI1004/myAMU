@@ -837,6 +837,8 @@ export const STUDENT_PORTAL_EN = {
     'Dropped enrollments stay on file for records but are hidden from this table.',
   clinicalEnrollmentSuccessSlot:
     'You are enrolled in that clinic slot. It will appear on your clinic schedule.',
+  clinicalEnrollmentFinanceChargeNote:
+    'A clinical booking charge was added to your Finance ledger for this term.',
   clinicalDropSuccessMessage: 'Clinic enrollment dropped.',
   clinicalCouldNotLoadEnrollmentData: 'Could not load clinic enrollment data.',
   clinicalCouldNotCompleteEnrollment: 'Could not complete enrollment.',
@@ -1915,6 +1917,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   clinicalDroppingEllipsis: '退選中…',
   clinicalDroppedEnrollmentsNote: '已退選紀錄仍保留於檔案，但不在此表顯示。',
   clinicalEnrollmentSuccessSlot: '您已成功選上該臨床時段，將顯示於臨床課表。',
+  clinicalEnrollmentFinanceChargeNote: '本學期帳務已新增一筆臨床時段費用，請至「帳務／帳本」查看。',
   clinicalDropSuccessMessage: '已辦理臨床退選。',
   clinicalCouldNotLoadEnrollmentData: '無法載入臨床選課資料。',
   clinicalCouldNotCompleteEnrollment: '無法完成選課。',

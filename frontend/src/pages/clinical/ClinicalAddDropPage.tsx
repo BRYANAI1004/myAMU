@@ -104,8 +104,12 @@ export function ClinicalAddDropPage() {
     setActionError(null)
     setBusyTimetableId(timetableId)
     try {
-      await postStudentClinicalEnrollment(sid, { timetableId })
-      setActionMessage(t('clinicalEnrollmentSuccessSlot'))
+      const created = await postStudentClinicalEnrollment(sid, { timetableId })
+      setActionMessage(
+        created.billingChargePosted
+          ? `${t('clinicalEnrollmentSuccessSlot')} ${t('clinicalEnrollmentFinanceChargeNote')}`
+          : t('clinicalEnrollmentSuccessSlot'),
+      )
       const term = filterTerm.trim() !== '' ? filterTerm.trim() : undefined
       const yearRaw = filterYear.trim()
       const year =
