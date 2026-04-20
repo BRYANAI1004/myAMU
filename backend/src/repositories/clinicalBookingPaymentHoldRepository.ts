@@ -47,14 +47,22 @@ export async function insertClinicalBookingPaymentHold(params: {
   chargeAmount: number;
   balanceBeforeCharge: number;
 }): Promise<number> {
+  console.log("[HOLD_DEBUG] insertClinicalBookingPaymentHold: entered");
+  const tableExistsForInsert = await clinicalBookingPaymentHoldsTableExists();
   console.log(
-    "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: entered",
+    "[HOLD_DEBUG] insertClinicalBookingPaymentHold: table-exists guard (information_schema)",
+    tableExistsForInsert,
+  );
+  console.log(
+    "[HOLD_DEBUG] insertClinicalBookingPaymentHold: exact params received",
     {
       clinicalEnrollmentId: params.clinicalEnrollmentId,
-      billingAdjustmentId: params.billingAdjustmentId,
       studentId: params.studentId,
+      billingAdjustmentId: params.billingAdjustmentId,
       term: params.term,
       year: params.year,
+      chargeAmount: params.chargeAmount,
+      balanceBeforeCharge: params.balanceBeforeCharge,
     },
   );
   const eid = Math.trunc(params.clinicalEnrollmentId);
@@ -82,18 +90,21 @@ export async function insertClinicalBookingPaymentHold(params: {
         eid,
       ],
     );
-    console.log(
-      "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: SQL result",
-      {
-        affectedRows: res.affectedRows,
-        insertId: res.insertId,
-        warningStatus: res.warningStatus,
-      },
-    );
+    console.log("[HOLD_DEBUG] insertClinicalBookingPaymentHold: SQL execute result", {
+      affectedRows: res.affectedRows,
+      insertId: res.insertId,
+      warningStatus: res.warningStatus,
+    });
+    if (Math.trunc(Number(res.affectedRows ?? 0)) === 0) {
+      console.log(
+        "[HOLD_DEBUG] insertClinicalBookingPaymentHold: INSERT selected 0 rows (likely NOT EXISTS blocked duplicate active hold for this clinical_enrollment_id)",
+        { clinicalEnrollmentId: eid },
+      );
+    }
     return Math.trunc(Number(res.insertId));
   } catch (err) {
     console.error(
-      "[clinical_booking_payment_holds] insertClinicalBookingPaymentHold: SQL error",
+      "[HOLD_DEBUG] insertClinicalBookingPaymentHold: caught SQL error",
       err,
     );
     throw err;
