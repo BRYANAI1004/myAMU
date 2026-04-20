@@ -25,7 +25,7 @@ export async function findLegacyStudentById(
 }
 
 /**
- * Stored `password` from legacy `password_stu` (typically MD5 hex; may be plain in edge cases).
+ * Stored `password` from legacy `password_stu` (MD5 hex, 32 chars; login rejects non-hex rows).
  */
 export async function findLegacyStudentPasswordStored(
   pool: Pool,

@@ -34,8 +34,8 @@ export async function postStudentLogin(
   try {
     const result = await authenticateLegacyStudent(pool, studentId, password);
     if (!result) {
-      // TEMP(verify rollout): no derived-password path; failures are missing/wrong `password_stu` only.
-      console.info("[auth] student login failed", {
+      // TEMP(verify rollout): single runtime path — `students` row + `password_stu` MD5 hex only (see service logs).
+      console.info("[auth] TEMP student login response: failed", {
         studentId: idTrim,
         verifiedVia: null,
       });
@@ -43,10 +43,10 @@ export async function postStudentLogin(
       res.status(401).json({ error: "Invalid student ID or password" });
       return;
     }
-    // TEMP(verify rollout): success always means `password_stu` matched (MD5 hex or stored plain edge case).
-    console.info("[auth] student login ok", {
+    // TEMP(verify rollout): success only after `password_stu` MD5-hex check in authenticateLegacyStudent.
+    console.info("[auth] TEMP student login response: ok", {
       studentId: idTrim,
-      verifiedVia: "password_stu",
+      verifiedVia: "password_stu_md5_hex",
     });
     res.status(200).json({
       studentId: result.studentId,
