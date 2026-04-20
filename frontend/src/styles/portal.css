@@ -5646,14 +5646,14 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-dashboard-current-term-card__dl--two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.35rem 1.25rem;
+  gap: 0.5rem 1.35rem;
   align-items: start;
 }
 
 .portal-dashboard-current-term-card__column {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.5rem;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -5670,7 +5670,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #6e1622;
+  color: var(--amu-red-dark);
 }
 
 .portal-dashboard-current-term-card__dl {
@@ -5682,16 +5682,16 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 .portal-dashboard-current-term-card__row {
   display: grid;
   grid-template-columns: minmax(7rem, 11rem) minmax(0, 1fr);
-  gap: 0.5rem 1rem;
+  gap: 0.45rem 0.85rem;
   align-items: baseline;
   font-size: 0.875rem;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .portal-dashboard-current-term-card__row dt {
   margin: 0;
   font-weight: 600;
-  color: #4b5563;
+  color: var(--amu-red-dark);
 }
 
 .portal-dashboard-current-term-card__row dd {
