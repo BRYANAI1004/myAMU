@@ -18,7 +18,7 @@ export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) 
   const t = useStudentPortalT()
   return (
     <nav className="portal-registration-nav" aria-label={t('registrationNavAria')}>
-      <ul className="portal-tab-group">
+      <ul className="portal-tab-group portal-tab-group--registration-sub">
         {ITEMS.map((item) => (
           <li key={item.to}>
             <NavLink

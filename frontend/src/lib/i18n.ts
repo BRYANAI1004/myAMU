@@ -48,6 +48,15 @@ export const STUDENT_PORTAL_EN = {
   // Dashboard services
   services: 'Services',
 
+  // PWA / offline (student shell)
+  pwaInstallInstallMyAmu: 'Install myAMU',
+  pwaInstallAndroidLede: 'Add myAMU to your home screen for faster access.',
+  pwaInstallIosHint:
+    'To install myAMU on iPhone, tap Share (□↑) and choose Add to Home Screen.',
+  pwaInstallDismiss: 'Dismiss',
+  offlineRibbonMessage:
+    'You appear to be offline. Pages may open, but live data may not refresh until you reconnect.',
+
   // Dashboard calendar widget
   myCalendar: 'My Calendar',
   termForWeekView: 'Term for week view',
@@ -1207,6 +1216,12 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   couldNotLoadCurrentAcademicTerm: '無法載入當前學期。',
 
   services: '服務',
+
+  pwaInstallInstallMyAmu: '安裝 myAMU',
+  pwaInstallAndroidLede: '將 myAMU 加入主畫面，方便快速開啟。',
+  pwaInstallIosHint: '若要在 iPhone 安裝 myAMU：點選分享（□↑），再選「加入主畫面」。',
+  pwaInstallDismiss: '關閉',
+  offlineRibbonMessage: '目前似乎離線。畫面仍可瀏覽，但資料可能無法更新，請待連線恢復後重新整理。',
 
   myCalendar: '我的課表',
   termForWeekView: '週檢視學期',

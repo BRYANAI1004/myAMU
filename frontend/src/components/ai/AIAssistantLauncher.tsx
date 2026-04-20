@@ -65,18 +65,13 @@ export function AIAssistantLauncher() {
     onDockPointerMove,
     onDockPointerUp,
     onDockPointerCancel,
-  } = useAIAssistantDockPosition(dockRef, dragEnabled, openPanel, {
-    isMobile: layout.isMobile,
-    /* Viewport-fixed FAB (bottom-right); header anchors hid the dock on dense headers / small viewports */
-    mobileAnchorEl: null,
-  })
+  } = useAIAssistantDockPosition(dockRef, dragEnabled, openPanel)
 
   const dockClassNames = [
     'portal-ai-assistant-dock',
     dragEnabled && 'portal-ai-assistant-dock--draggable',
     catHidden && 'portal-ai-assistant-dock--cat-hidden',
     layout.isMobile && 'portal-ai-assistant-dock--compact',
-    layout.isMobile && !dockStyle && 'portal-ai-assistant-dock--mobile-fallback',
   ]
     .filter(Boolean)
     .join(' ')

@@ -3,6 +3,7 @@ import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { DashboardCoursesWidget } from './dashboard/DashboardCoursesWidget'
 import { DashboardCurrentPostedTerm } from './dashboard/DashboardCurrentPostedTerm'
 import { DashboardServiceLauncher } from './dashboard/DashboardServiceLauncher'
+import { PwaInstallCard } from '../components/PwaInstallCard'
 
 /** Prefer given name when legacy uses "Last, First"; otherwise first token of the display name. */
 function welcomeNameFromDisplay(name: string): string {
@@ -47,6 +48,7 @@ export function DashboardPage() {
         <time className="portal-dashboard-hero-date" dateTime={dateIso}>
           {dateLabel}
         </time>
+        <PwaInstallCard />
       </header>
 
       <div className="portal-dashboard-current-term-slot">

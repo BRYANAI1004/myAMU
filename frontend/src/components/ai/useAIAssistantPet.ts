@@ -1,31 +1,47 @@
 import { useCallback, useEffect, useState } from 'react'
 import { AI_ASSISTANT_MOBILE_MEDIA } from './aiAssistantGeometry'
 
+/** @deprecated Legacy keys; cleared on load — dock position uses `AI_DOCK_OFFSET_*` only. */
 export const AI_CAT_STORAGE_X = 'amu-ai-cat-x'
+/** @deprecated Legacy keys; cleared on load — dock position uses `AI_DOCK_OFFSET_*` only. */
 export const AI_CAT_STORAGE_Y = 'amu-ai-cat-y'
+
+/** Drag offset from the fixed bottom-right dock anchor (px). */
+export const AI_DOCK_OFFSET_X = 'amu-ai-dock-offset-x'
+export const AI_DOCK_OFFSET_Y = 'amu-ai-dock-offset-y'
 /** Stored as the string `"true"` when hidden. */
 export const AI_CAT_HIDDEN_KEY = 'amu-ai-cat-hidden'
 
-export function readStoredCatPosition(): { left: number; top: number } | null {
+export function readStoredDockOffset(): { dx: number; dy: number } | null {
   try {
-    const xs = localStorage.getItem(AI_CAT_STORAGE_X)
-    const ys = localStorage.getItem(AI_CAT_STORAGE_Y)
+    const xs = localStorage.getItem(AI_DOCK_OFFSET_X)
+    const ys = localStorage.getItem(AI_DOCK_OFFSET_Y)
     if (xs == null || ys == null) return null
-    const left = Number(xs)
-    const top = Number(ys)
-    if (!Number.isFinite(left) || !Number.isFinite(top)) return null
-    return { left, top }
+    const dx = Number(xs)
+    const dy = Number(ys)
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null
+    return { dx, dy }
   } catch {
     return null
   }
 }
 
-export function persistCatPosition(left: number, top: number): void {
+export function persistDockOffset(dx: number, dy: number): void {
   try {
-    localStorage.setItem(AI_CAT_STORAGE_X, String(Math.round(left)))
-    localStorage.setItem(AI_CAT_STORAGE_Y, String(Math.round(top)))
+    localStorage.setItem(AI_DOCK_OFFSET_X, String(Math.round(dx)))
+    localStorage.setItem(AI_DOCK_OFFSET_Y, String(Math.round(dy)))
   } catch {
     /* ignore quota / private mode */
+  }
+}
+
+/** Clears legacy dock keys that stored absolute `left`/`top` and hid the dock on desktop. */
+export function clearLegacyCatDockPositionKeys(): void {
+  try {
+    localStorage.removeItem(AI_CAT_STORAGE_X)
+    localStorage.removeItem(AI_CAT_STORAGE_Y)
+  } catch {
+    /* ignore */
   }
 }
 

@@ -120,6 +120,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
   background: var(--amu-card);
   border-bottom: 1px solid var(--border-gray);
 }
@@ -548,7 +549,7 @@
 .portal-main {
   flex: 1;
   margin-left: var(--portal-sidebar-width);
-  padding-top: var(--portal-header-height);
+  padding-top: calc(var(--portal-header-height) + env(safe-area-inset-top, 0px));
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
@@ -8567,5 +8568,401 @@ select.admin-student-edit-control {
 
   .admin-input--search {
     width: 100%;
+  }
+}
+
+/* =============================================================================
+   PWA phase 2: install affordance, offline ribbon, ledger cards, mobile polish
+   ============================================================================= */
+
+.portal-offline-ribbon {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--portal-radius);
+  border: 1px solid #d6b88a;
+  background: #fff8e6;
+  color: #5c4518;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.portal-pwa-install {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 36rem;
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--portal-radius);
+  border: 1px solid var(--portal-border-subtle);
+  background: linear-gradient(180deg, #fffdfb 0%, #faf7f2 100%);
+}
+
+.portal-pwa-install--android {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.portal-pwa-install__lede {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--portal-text-muted);
+}
+
+.portal-pwa-install__btn {
+  min-height: 2.5rem;
+  width: 100%;
+  max-width: 16rem;
+}
+
+.portal-pwa-install--ios {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.portal-pwa-install__text {
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--portal-text);
+}
+
+.portal-pwa-install__dismiss {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--portal-accent-hover);
+  background: transparent;
+  border: 1px solid rgba(140, 29, 44, 0.35);
+  border-radius: var(--portal-radius-sm, 6px);
+  cursor: pointer;
+}
+
+.portal-pwa-install__dismiss:hover {
+  background: var(--portal-accent-soft);
+}
+
+.portal-pwa-install__dismiss:focus-visible {
+  outline: 2px solid var(--portal-accent);
+  outline-offset: 2px;
+}
+
+/* Finances ledger: readable stacked cards on narrow viewports (see AccountingLedgerSection) */
+.portal-account-ledger-cards {
+  margin-bottom: var(--portal-space-section);
+}
+
+.portal-account-ledger-cards__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.portal-account-ledger-card {
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+  padding: 0.75rem 0.875rem;
+}
+
+.portal-account-ledger-card__dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.portal-account-ledger-card__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 7.5rem) minmax(0, 1fr);
+  gap: 0.25rem 0.65rem;
+  align-items: baseline;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.portal-account-ledger-card__row--block {
+  align-items: start;
+}
+
+.portal-account-ledger-card__row--money dd {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  text-align: right;
+}
+
+.portal-account-ledger-card__row dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.portal-account-ledger-card__row dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  color: var(--portal-text);
+}
+
+.portal-account-ledger-cards__footer {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--portal-radius);
+  border: 1px solid var(--portal-border-subtle);
+  background: #f8f9fb;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.portal-account-ledger-cards__footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--portal-text);
+}
+
+.portal-account-ledger-cards__footer-row--strong {
+  font-weight: 700;
+  padding-top: 0.35rem;
+  margin-top: 0.15rem;
+  border-top: 1px solid var(--portal-border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+  .portal-account-ledger__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portal-account-ledger__toolbar-actions {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .portal-account-ledger__pay-btn {
+    width: 100%;
+    min-height: 2.5rem;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .portal-account-ledger__quarter-label,
+  .portal-account-ledger__select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .portal-account-ledger__select {
+    min-height: 2.5rem;
+    padding: 0.45rem 2rem 0.45rem 0.65rem;
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  /* Registration secondary tabs: horizontal scroll, stable row (no ragged wrap) */
+  .portal-registration-nav .portal-tab-group--registration-sub {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    gap: 0.5rem;
+    padding-bottom: 0.15rem;
+    margin-right: -0.25rem;
+    scrollbar-width: thin;
+  }
+
+  .portal-registration-nav .portal-tab-group--registration-sub > li {
+    flex: 0 0 auto;
+  }
+
+  .portal-registration-nav .portal-tab-group--registration-sub .portal-tab {
+    min-height: 2.5rem;
+    white-space: nowrap;
+  }
+
+  .portal-registration-section-nav .portal-section-tab-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .portal-registration-section-nav .portal-section-tab {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .portal-registration-layout-term__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portal-registration-layout-term__select {
+    width: 100%;
+    max-width: none;
+    min-height: 2.5rem;
+    font-size: 1rem;
+  }
+
+  .portal-registration-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portal-registration-search-input {
+    width: 100%;
+    min-height: 2.5rem;
+    font-size: 1rem;
+  }
+
+  .portal-registration-search .portal-btn {
+    width: 100%;
+    min-height: 2.5rem;
+  }
+
+  .portal-course-catalog-group-header {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
+  }
+
+  .portal-course-catalog-group-titles {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.15rem;
+  }
+
+  .portal-course-catalog-group-count {
+    justify-self: end;
+    text-align: right;
+    max-width: 44%;
+    line-height: 1.25;
+  }
+
+  .portal-dashboard-card-panel-head {
+    height: auto;
+    min-height: 3.25rem;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    row-gap: 0.5rem;
+  }
+
+  .portal-dashboard-courses-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portal-dashboard-courses-head-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .portal-dashboard-courses-head-term,
+  .portal-dashboard-courses-head-term-select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .portal-dashboard-courses-head-term-select {
+    min-height: 2.5rem;
+    font-size: 1rem;
+  }
+
+  .portal-dashboard-gcal-add-all {
+    width: 100%;
+    min-height: 2.5rem;
+    justify-content: center;
+  }
+
+  .portal-dashboard-courses-timetable-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  .portal-dashboard-courses-timetable--grid {
+    min-width: 34rem;
+  }
+
+  .portal-dashboard-hero {
+    margin-bottom: 1rem;
+    padding-bottom: 0.65rem;
+  }
+
+  .portal-dashboard-hero-title {
+    font-size: clamp(1.2rem, 5vw, 1.5rem);
+  }
+
+  .portal-dashboard-current-term-card {
+    max-width: none;
+    padding: 0.85rem 1rem;
+  }
+
+  .portal-dashboard-service-tile {
+    min-height: 3.25rem;
+    align-items: center;
+  }
+
+  .portal-main-content {
+    padding-left: max(0.875rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.875rem, env(safe-area-inset-right, 0px));
+  }
+
+  .portal-shell--internal-module .portal-main-content {
+    padding-left: max(0.875rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.875rem, env(safe-area-inset-right, 0px));
+  }
+
+  .portal-main-body {
+    padding-bottom: max(var(--portal-space-main-bottom), calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
+  }
+
+  .portal-shell--dashboard-home .portal-main-body {
+    padding-bottom: max(1.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem));
+  }
+
+  .portal-branding-bar-inner {
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+
+  .portal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .portal-actions .portal-btn {
+    width: 100%;
+    min-height: 2.5rem;
+    white-space: normal;
   }
 }

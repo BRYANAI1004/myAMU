@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { AI_ASSISTANT_MOBILE_MEDIA } from './aiAssistantGeometry'
-import { persistCatPosition, readStoredCatPosition } from './useAIAssistantPet'
+import {
+  clearLegacyCatDockPositionKeys,
+  persistDockOffset,
+  readStoredDockOffset,
+} from './useAIAssistantPet'
 
-export { AI_CAT_STORAGE_X, AI_CAT_STORAGE_Y } from './useAIAssistantPet'
+export { AI_CAT_STORAGE_X, AI_CAT_STORAGE_Y, AI_DOCK_OFFSET_X, AI_DOCK_OFFSET_Y } from './useAIAssistantPet'
 
 const DRAG_THRESHOLD_PX = 8
 const MIN_VISIBLE = 56
@@ -23,124 +27,86 @@ type DragSession = {
   pointerId: number
   startClientX: number
   startClientY: number
-  originLeft: number
-  originTop: number
+  originDx: number
+  originDy: number
+  baseLeft: number
+  baseTop: number
   dragging: boolean
 }
 
-export type UseAIAssistantDockPositionOptions = {
-  isMobile: boolean
-  mobileAnchorEl: HTMLElement | null
+function initialDockOffset(): { dx: number; dy: number } {
+  if (typeof window === 'undefined') return { dx: 0, dy: 0 }
+  const mobile = window.matchMedia(AI_ASSISTANT_MOBILE_MEDIA).matches
+  if (mobile) return { dx: 0, dy: 0 }
+  clearLegacyCatDockPositionKeys()
+  return readStoredDockOffset() ?? { dx: 0, dy: 0 }
 }
 
 export function useAIAssistantDockPosition(
   dockRef: RefObject<HTMLDivElement | null>,
   dragEnabled: boolean,
   onActivate: () => void,
-  opts: UseAIAssistantDockPositionOptions,
 ) {
-  const { isMobile, mobileAnchorEl } = opts
-
-  const [customPos, setCustomPos] = useState<{ left: number; top: number } | null>(() =>
-    dragEnabled ? readStoredCatPosition() : null,
-  )
-
-  const [anchoredPos, setAnchoredPos] = useState<{ left: number; top: number } | null>(null)
-
+  const [dockOffset, setDockOffset] = useState(initialDockOffset)
+  const latestOffsetRef = useRef(dockOffset)
   const dragRef = useRef<DragSession | null>(null)
-  const latestPosRef = useRef<{ left: number; top: number } | null>(null)
 
   useEffect(() => {
-    if (customPos) latestPosRef.current = customPos
-  }, [customPos])
+    latestOffsetRef.current = dockOffset
+  }, [dockOffset])
 
   useEffect(() => {
     if (!dragEnabled) {
-      setCustomPos(null)
+      setDockOffset({ dx: 0, dy: 0 })
       return
     }
-    const stored = readStoredCatPosition()
-    setCustomPos(stored)
+    clearLegacyCatDockPositionKeys()
+    setDockOffset(readStoredDockOffset() ?? { dx: 0, dy: 0 })
   }, [dragEnabled])
 
-  const clampAndSet = useCallback(
-    (left: number, top: number) => {
+  const clampOffset = useCallback(
+    (nextDx: number, nextDy: number, session?: Pick<DragSession, 'baseLeft' | 'baseTop'>) => {
       const el = dockRef.current
       const vw = window.innerWidth
       const vh = window.innerHeight
-      const w = el?.offsetWidth ?? 160
-      const h = el?.offsetHeight ?? 72
-      const next = clampDock(left, top, w, h, vw, vh)
-      latestPosRef.current = next
-      setCustomPos(next)
+      if (!el) {
+        latestOffsetRef.current = { dx: nextDx, dy: nextDy }
+        return { dx: nextDx, dy: nextDy }
+      }
+      const w = el.offsetWidth || 160
+      const h = el.offsetHeight || 72
+      const rect = el.getBoundingClientRect()
+      const cur = latestOffsetRef.current
+      const baseLeft = session?.baseLeft ?? rect.left - cur.dx
+      const baseTop = session?.baseTop ?? rect.top - cur.dy
+      const wantLeft = baseLeft + nextDx
+      const wantTop = baseTop + nextDy
+      const c = clampDock(wantLeft, wantTop, w, h, vw, vh)
+      const next = { dx: c.left - baseLeft, dy: c.top - baseTop }
+      latestOffsetRef.current = next
       return next
     },
     [dockRef],
   )
 
+  useLayoutEffect(() => {
+    if (!dragEnabled) return
+    setDockOffset((prev) => clampOffset(prev.dx, prev.dy))
+  }, [dragEnabled, clampOffset])
+
   useEffect(() => {
     if (!dragEnabled) return
     const onResize = () => {
-      setCustomPos((prev) => {
-        if (!prev) return prev
-        return clampAndSet(prev.left, prev.top)
-      })
+      setDockOffset((prev) => clampOffset(prev.dx, prev.dy))
     }
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [dragEnabled, clampAndSet])
-
-  useLayoutEffect(() => {
-    if (!isMobile || !mobileAnchorEl) {
-      setAnchoredPos(null)
-      return
-    }
-
-    const update = () => {
-      const dock = dockRef.current
-      if (!dock) return
-      const dockW = dock.offsetWidth
-      const dockH = dock.offsetHeight
-      const ar = mobileAnchorEl.getBoundingClientRect()
-      const left = ar.right - dockW
-      const top = ar.top + (ar.height - dockH) / 2
-      const next = clampDock(left, top, dockW, dockH, window.innerWidth, window.innerHeight)
-      setAnchoredPos((p) => (p && p.left === next.left && p.top === next.top ? p : next))
-    }
-
-    update()
-    const ro = new ResizeObserver(update)
-    ro.observe(mobileAnchorEl)
-    const dockEl = dockRef.current
-    if (dockEl) ro.observe(dockEl)
-    window.addEventListener('scroll', update, true)
-    window.addEventListener('resize', update)
-    return () => {
-      ro.disconnect()
-      window.removeEventListener('scroll', update, true)
-      window.removeEventListener('resize', update)
-    }
-  }, [isMobile, mobileAnchorEl, dockRef])
+  }, [dragEnabled, clampOffset])
 
   const dockStyle = useMemo(() => {
-    if (isMobile && mobileAnchorEl && anchoredPos) {
-      return {
-        left: anchoredPos.left,
-        top: anchoredPos.top,
-        right: 'auto' as const,
-        bottom: 'auto' as const,
-      }
-    }
-    if (dragEnabled && customPos) {
-      return {
-        left: customPos.left,
-        top: customPos.top,
-        right: 'auto' as const,
-        bottom: 'auto' as const,
-      }
-    }
-    return undefined
-  }, [isMobile, mobileAnchorEl, anchoredPos, dragEnabled, customPos])
+    if (!dockOffset.dx && !dockOffset.dy) return undefined
+    return { transform: `translate3d(${dockOffset.dx}px, ${dockOffset.dy}px, 0)` }
+  }, [dockOffset.dx, dockOffset.dy])
 
   const onDockPointerDown = useCallback(
     (e: React.PointerEvent) => {
@@ -149,19 +115,22 @@ export function useAIAssistantDockPosition(
       const el = dockRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const originLeft = customPos?.left ?? rect.left
-      const originTop = customPos?.top ?? rect.top
+      const o = latestOffsetRef.current
+      const baseLeft = rect.left - o.dx
+      const baseTop = rect.top - o.dy
       dragRef.current = {
         pointerId: e.pointerId,
         startClientX: e.clientX,
         startClientY: e.clientY,
-        originLeft,
-        originTop,
+        originDx: o.dx,
+        originDy: o.dy,
+        baseLeft,
+        baseTop,
         dragging: false,
       }
       e.currentTarget.setPointerCapture(e.pointerId)
     },
-    [dragEnabled, customPos, dockRef],
+    [dragEnabled, dockRef],
   )
 
   const onDockPointerMove = useCallback(
@@ -174,9 +143,12 @@ export function useAIAssistantDockPosition(
         if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return
         d.dragging = true
       }
-      clampAndSet(d.originLeft + dx, d.originTop + dy)
+      const nextDx = d.originDx + dx
+      const nextDy = d.originDy + dy
+      const clamped = clampOffset(nextDx, nextDy, { baseLeft: d.baseLeft, baseTop: d.baseTop })
+      setDockOffset(clamped)
     },
-    [dragEnabled, clampAndSet],
+    [dragEnabled, clampOffset],
   )
 
   const onDockPointerUp = useCallback(
@@ -191,8 +163,8 @@ export function useAIAssistantDockPosition(
         /* already released */
       }
       if (wasDragging) {
-        const p = latestPosRef.current
-        if (p) persistCatPosition(p.left, p.top)
+        const p = latestOffsetRef.current
+        persistDockOffset(p.dx, p.dy)
       } else {
         onActivate()
       }
@@ -211,7 +183,6 @@ export function useAIAssistantDockPosition(
 
   return {
     dockStyle,
-    /** Shared drag/click handles for the cat hit-area and the red launcher button. */
     onDockPointerDown,
     onDockPointerMove,
     onDockPointerUp,

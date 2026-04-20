@@ -12,6 +12,7 @@ import {
 } from '../../lib/api'
 import type { StudentPortalKey } from '../../lib/i18n'
 import { formatMoney } from '../../lib/formatMoney'
+import { useIsNarrowMobile } from '../../hooks/useMatchMedia'
 
 function dashText(value: string): string {
   return value.trim() !== '' ? value : '—'
@@ -93,9 +94,76 @@ function ClinicalBookingPaymentHoldCountdown({
 /**
  * Quarter selector + legacy `accounting` detail table (real students only; hidden when no quarters).
  */
+function AccountingLedgerMobileCards({
+  ledger,
+  dateLocale,
+  t,
+}: {
+  ledger: AccountingLedgerResponse
+  dateLocale: string
+  t: (key: StudentPortalKey) => string
+}) {
+  return (
+    <div className="portal-account-ledger-cards" aria-label={t('accountingLedgerByQuarter')}>
+      <ul className="portal-account-ledger-cards__list">
+        {ledger.rows.map((row: AccountingLedgerRow, index) => (
+          <li key={`${row.date}-${index}-${row.memo}`} className="portal-account-ledger-card">
+            <dl className="portal-account-ledger-card__dl">
+              <div className="portal-account-ledger-card__row">
+                <dt>{t('date')}</dt>
+                <dd>{formatLedgerDate(row.date, dateLocale)}</dd>
+              </div>
+              <div className="portal-account-ledger-card__row">
+                <dt>{t('type')}</dt>
+                <dd className="portal-table-cell-capitalize">{dashText(row.type)}</dd>
+              </div>
+              <div className="portal-account-ledger-card__row">
+                <dt>{t('code')}</dt>
+                <dd>{dashText(row.code)}</dd>
+              </div>
+              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--block">
+                <dt>{t('description')}</dt>
+                <dd>
+                  <div>{dashText(row.memo)}</div>
+                  {row.clinicalBookingPaymentHold != null ? (
+                    <ClinicalBookingPaymentHoldCountdown hold={row.clinicalBookingPaymentHold} t={t} />
+                  ) : null}
+                </dd>
+              </div>
+              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
+                <dt>{t('charge')}</dt>
+                <dd>{ledgerChargeCell(row.debit)}</dd>
+              </div>
+              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
+                <dt>{t('payment')}</dt>
+                <dd>{ledgerPaymentCell(row.credit)}</dd>
+              </div>
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <div className="portal-account-ledger-cards__footer">
+        <div className="portal-account-ledger-cards__footer-row">
+          <span>{t('totalCharges')}</span>
+          <span>{formatMoney(ledger.summary.totalCharges)}</span>
+        </div>
+        <div className="portal-account-ledger-cards__footer-row">
+          <span>{t('totalPayments')}</span>
+          <span>{formatMoney(ledger.summary.totalPayments)}</span>
+        </div>
+        <div className="portal-account-ledger-cards__footer-row portal-account-ledger-cards__footer-row--strong">
+          <span>{t('balance')}</span>
+          <span>{formatMoney(ledger.summary.balance)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function AccountingLedgerSection() {
   const { locale } = useLanguage()
   const t = useStudentPortalT()
+  const narrowMobile = useIsNarrowMobile()
   const dateLocale = locale === 'zh' ? 'zh-TW' : 'en-US'
   const { currentStudentId, isAuthenticated } = useAccount()
   const [quarters, setQuarters] = useState<AccountingQuarterOption[]>([])
@@ -265,65 +333,69 @@ export function AccountingLedgerSection() {
         </p>
       ) : ledger ? (
         <>
-          <div className="portal-table-wrap">
-            <table className="portal-table portal-table--courses">
-              <caption className="visually-hidden">
-                {t('ledgerCaptionPrefix')} {ledger.term} {ledger.year}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">{t('date')}</th>
-                  <th scope="col">{t('type')}</th>
-                  <th scope="col">{t('code')}</th>
-                  <th scope="col">{t('description')}</th>
-                  <th scope="col">{t('charge')}</th>
-                  <th scope="col">{t('payment')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledger.rows.map((row: AccountingLedgerRow, index) => (
-                  <tr key={`${row.date}-${index}-${row.memo}`}>
-                    <td>{formatLedgerDate(row.date, dateLocale)}</td>
-                    <td className="portal-table-cell-capitalize">{dashText(row.type)}</td>
-                    <td>{dashText(row.code)}</td>
-                    <td>
-                      <div>{dashText(row.memo)}</div>
-                      {row.clinicalBookingPaymentHold != null ? (
-                        <ClinicalBookingPaymentHoldCountdown
-                          hold={row.clinicalBookingPaymentHold}
-                          t={t}
-                        />
-                      ) : null}
-                    </td>
-                    <td>{ledgerChargeCell(row.debit)}</td>
-                    <td>{ledgerPaymentCell(row.credit)}</td>
+          {narrowMobile ? (
+            <AccountingLedgerMobileCards ledger={ledger} dateLocale={dateLocale} t={t} />
+          ) : (
+            <div className="portal-table-wrap">
+              <table className="portal-table portal-table--courses">
+                <caption className="visually-hidden">
+                  {t('ledgerCaptionPrefix')} {ledger.term} {ledger.year}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{t('date')}</th>
+                    <th scope="col">{t('type')}</th>
+                    <th scope="col">{t('code')}</th>
+                    <th scope="col">{t('description')}</th>
+                    <th scope="col">{t('charge')}</th>
+                    <th scope="col">{t('payment')}</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th scope="row" colSpan={4}>
-                    {t('totalCharges')}
-                  </th>
-                  <td>{formatMoney(ledger.summary.totalCharges)}</td>
-                  <td>—</td>
-                </tr>
-                <tr>
-                  <th scope="row" colSpan={4}>
-                    {t('totalPayments')}
-                  </th>
-                  <td>—</td>
-                  <td>{formatMoney(ledger.summary.totalPayments)}</td>
-                </tr>
-                <tr>
-                  <th scope="row" colSpan={4}>
-                    {t('balance')}
-                  </th>
-                  <td colSpan={2}>{formatMoney(ledger.summary.balance)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {ledger.rows.map((row: AccountingLedgerRow, index) => (
+                    <tr key={`${row.date}-${index}-${row.memo}`}>
+                      <td>{formatLedgerDate(row.date, dateLocale)}</td>
+                      <td className="portal-table-cell-capitalize">{dashText(row.type)}</td>
+                      <td>{dashText(row.code)}</td>
+                      <td>
+                        <div>{dashText(row.memo)}</div>
+                        {row.clinicalBookingPaymentHold != null ? (
+                          <ClinicalBookingPaymentHoldCountdown
+                            hold={row.clinicalBookingPaymentHold}
+                            t={t}
+                          />
+                        ) : null}
+                      </td>
+                      <td>{ledgerChargeCell(row.debit)}</td>
+                      <td>{ledgerPaymentCell(row.credit)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={4}>
+                      {t('totalCharges')}
+                    </th>
+                    <td>{formatMoney(ledger.summary.totalCharges)}</td>
+                    <td>—</td>
+                  </tr>
+                  <tr>
+                    <th scope="row" colSpan={4}>
+                      {t('totalPayments')}
+                    </th>
+                    <td>—</td>
+                    <td>{formatMoney(ledger.summary.totalPayments)}</td>
+                  </tr>
+                  <tr>
+                    <th scope="row" colSpan={4}>
+                      {t('balance')}
+                    </th>
+                    <td colSpan={2}>{formatMoney(ledger.summary.balance)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </>
       ) : null}
     </section>

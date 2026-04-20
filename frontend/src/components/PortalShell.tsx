@@ -3,6 +3,7 @@ import { PORTAL_MOBILE_DRAWER_CLOSE_ID, PortalMobileNavDrawer } from './PortalSi
 import { Sidebar, SidebarNavList, type SidebarNavVariant } from './Sidebar'
 import { TopBar } from './TopBar'
 import { PortalStudentInfoBar } from './PortalStudentInfoBar'
+import { OfflineRibbon } from './OfflineRibbon'
 
 type PortalShellProps = {
   children: ReactNode
@@ -93,6 +94,7 @@ export function PortalShell({
       <div className="portal-main">
         <div className="portal-main-content">
           {showStudentBar ? <PortalStudentInfoBar /> : null}
+          <OfflineRibbon />
           <div className="portal-main-body">{children}</div>
         </div>
       </div>
