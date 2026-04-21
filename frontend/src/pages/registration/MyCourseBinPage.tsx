@@ -135,6 +135,16 @@ export function MyCourseBinPage() {
   }, [loadRegisteredWorkspace])
 
   useEffect(() => {
+    const onEnrollmentChanged = () => {
+      void loadRegisteredWorkspace()
+    }
+    window.addEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    return () => {
+      window.removeEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    }
+  }, [loadRegisteredWorkspace])
+
+  useEffect(() => {
     if (dropTarget == null) return
     const onKey = (ev: KeyboardEvent) => {
       if (ev.key === 'Escape') setDropTarget(null)

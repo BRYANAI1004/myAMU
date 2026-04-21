@@ -4,6 +4,7 @@ import type { StudentPortalKey } from '@/lib/i18n'
 import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import { useAccount } from '../../context/AccountContext'
 import { fetchStudentEnrolledSections } from '../../lib/api'
+import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { getPreferredCourseTitle } from '../../lib/courseDisplayName'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeHmsForDisplay } from '../../lib/formatScheduleTime'
@@ -41,6 +42,7 @@ export function SchedulePage() {
   const { items } = useCourseBin()
   const [enrolledItems, setEnrolledItems] = useState<CourseBinItem[]>([])
   const [enrolledError, setEnrolledError] = useState<string | null>(null)
+  const [enrolledRefreshKey, setEnrolledRefreshKey] = useState(0)
 
   const termKey = registrationTermId?.trim() ?? ''
   const studentKey = currentStudentId?.trim() ?? ''
@@ -69,7 +71,17 @@ export function SchedulePage() {
       }
     })()
     return () => ac.abort()
-  }, [termKey, studentKey, isAuthenticated, t])
+  }, [termKey, studentKey, isAuthenticated, t, enrolledRefreshKey])
+
+  useEffect(() => {
+    const onEnrollmentChanged = () => {
+      setEnrolledRefreshKey((k) => k + 1)
+    }
+    window.addEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    return () => {
+      window.removeEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    }
+  }, [])
 
   const displayItems = useMemo(() => {
     const map = new Map<string, CourseBinItem>()

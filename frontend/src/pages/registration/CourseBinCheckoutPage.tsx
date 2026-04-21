@@ -3,13 +3,15 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import { postStudentEnroll } from '../../lib/api'
+import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { useCourseBin } from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 export function CourseBinCheckoutPage() {
   const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
-  const { currentStudentId, isAuthenticated } = useAccount()
+  const { currentStudentId, isAuthenticated, reload: reloadStudentAccount } =
+    useAccount()
   const { items, clearCourseBin } = useCourseBin()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
@@ -61,9 +63,15 @@ export function CourseBinCheckoutPage() {
           ? t('checkoutSuccessAlreadyEnrolled')
           : t('checkoutSuccessAddedCount').replace('{n}', String(res.insertedCount))
       setSuccess(msg)
+      reloadStudentAccount()
+      window.dispatchEvent(new Event(PORTAL_STUDENT_ENROLLMENT_CHANGED))
+      const termQs =
+        registrationTermId != null && registrationTermId.trim() !== ''
+          ? `?term=${encodeURIComponent(registrationTermId.trim())}`
+          : ''
       window.setTimeout(() => {
-        navigate('/dashboard')
-      }, 1800)
+        navigate({ pathname: '/registration/course-bin', search: termQs }, { replace: true })
+      }, 1200)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('registrationFailedGeneric'))
     } finally {
@@ -75,6 +83,7 @@ export function CourseBinCheckoutPage() {
     items,
     navigate,
     registrationTermId,
+    reloadStudentAccount,
     termMissing,
     t,
   ])
