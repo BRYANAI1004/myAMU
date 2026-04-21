@@ -207,7 +207,6 @@ export async function deleteClinicTimetableSlot(seqNum) {
 /**
  * Status-aware dependency counts for a timetable slot.
  * - Active dependencies should block delete because they are still operationally referenced.
- * - Historical dropped/decided dependencies may also block delete to preserve audit/history links.
  */
 export async function countClinicTimetableReferences(seqNum) {
     if (!Number.isFinite(seqNum) || seqNum <= 0) {
@@ -266,6 +265,61 @@ export async function countClinicTimetableReferences(seqNum) {
         activeAssignments: Math.max(0, Math.trunc(Number(r?.active_assignments ?? 0))),
         historicalDroppedAssignments: Math.max(0, Math.trunc(Number(r?.historical_dropped_assignments ?? 0))),
     };
+}
+/**
+ * Removes or detaches historical references before slot deletion.
+ * This keeps active flows intact while preventing dangling timetable links.
+ */
+export async function cleanupHistoricalClinicTimetableReferences(seqNum) {
+    if (!Number.isFinite(seqNum) || seqNum <= 0) {
+        return {
+            deletedDroppedEnrollments: 0,
+            deletedDecidedRequests: 0,
+            detachedDroppedAssignments: 0,
+        };
+    }
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const [enrollmentRes] = await conn.query(`DELETE FROM clinical_enrollments
+        WHERE timetable_id = ?
+          AND LOWER(TRIM(IFNULL(status, ''))) = 'dropped'`, [seqNum]);
+        let deletedDecidedRequests = 0;
+        const [requestTableRows] = await conn.query(`SELECT 1 AS ok
+         FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'clinical_requests'
+        LIMIT 1`);
+        const hasClinicalRequestsTable = requestTableRows.length > 0;
+        if (hasClinicalRequestsTable) {
+            const [requestRes] = await conn.query(`DELETE FROM clinical_requests
+          WHERE timetable_id = ?
+            AND LOWER(TRIM(IFNULL(status, ''))) <> 'pending'`, [seqNum]);
+            deletedDecidedRequests = requestRes.affectedRows;
+        }
+        const [assignmentRes] = await conn.query(`UPDATE clinical_assignments
+          SET timetable_id = NULL
+        WHERE timetable_id = ?
+          AND LOWER(TRIM(IFNULL(status, ''))) IN ('dropped', 'cancelled')`, [seqNum]);
+        await conn.commit();
+        return {
+            deletedDroppedEnrollments: enrollmentRes.affectedRows,
+            deletedDecidedRequests,
+            detachedDroppedAssignments: assignmentRes.affectedRows,
+        };
+    }
+    catch (error) {
+        try {
+            await conn.rollback();
+        }
+        catch {
+            // best effort rollback
+        }
+        throw error;
+    }
+    finally {
+        conn.release();
+    }
 }
 /** Legacy caps summed (same semantics as enrollment repository). */
 function sumClinicTimetableCaps(row) {

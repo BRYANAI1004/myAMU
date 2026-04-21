@@ -67,9 +67,18 @@ export type ClinicTimetableReferenceCounts = {
 /**
  * Status-aware dependency counts for a timetable slot.
  * - Active dependencies should block delete because they are still operationally referenced.
- * - Historical dropped/decided dependencies may also block delete to preserve audit/history links.
  */
 export declare function countClinicTimetableReferences(seqNum: number): Promise<ClinicTimetableReferenceCounts>;
+export type HistoricalClinicTimetableReferenceCleanupResult = {
+    deletedDroppedEnrollments: number;
+    deletedDecidedRequests: number;
+    detachedDroppedAssignments: number;
+};
+/**
+ * Removes or detaches historical references before slot deletion.
+ * This keeps active flows intact while preventing dangling timetable links.
+ */
+export declare function cleanupHistoricalClinicTimetableReferences(seqNum: number): Promise<HistoricalClinicTimetableReferenceCleanupResult>;
 /** `clinic_timetable` + enrolled counts for the portal offered timetable (no dependency on enrollment service). */
 export type ClinicalOfferedTimetableDetailRow = {
     timetableId: number;

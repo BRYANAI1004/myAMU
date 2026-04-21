@@ -1,5 +1,5 @@
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
-import { countClinicTimetableReferences, createClinicTimetableSlot, deleteClinicTimetableSlot, getClinicTimetableById, listClinicTimetableSlotsForAdmin, updateClinicTimetableSlot, } from "../repositories/clinicalTimetableRepository.js";
+import { cleanupHistoricalClinicTimetableReferences, countClinicTimetableReferences, createClinicTimetableSlot, deleteClinicTimetableSlot, getClinicTimetableById, listClinicTimetableSlotsForAdmin, updateClinicTimetableSlot, } from "../repositories/clinicalTimetableRepository.js";
 import { formatClinicTimeHm } from "./clinicalScheduleService.js";
 const WEEKDAYS = new Set([
     "Monday",
@@ -361,15 +361,16 @@ export async function deleteAdminClinicalSlot(seqNum) {
             error: `This slot cannot be deleted because it still has active references (${refs.activeEnrollments} active enrollment(s), ${refs.activePendingRequests} pending clinical request(s), ${refs.activeAssignments} active assignment(s)). Remove or reassign those records first.`,
         };
     }
-    const historicalTotal = refs.historicalDroppedEnrollments +
-        refs.historicalDecidedRequests +
-        refs.historicalDroppedAssignments;
-    if (historicalTotal > 0) {
-        return {
-            ok: false,
-            // Historical rows are retained for audit/history, so hard delete stays blocked even when active counts are zero.
-            error: `This slot cannot be deleted because it has historical references (${refs.historicalDroppedEnrollments} dropped enrollment(s), ${refs.historicalDecidedRequests} decided clinical request(s), ${refs.historicalDroppedAssignments} dropped/cancelled assignment(s)).`,
-        };
+    const historicalCleanup = await cleanupHistoricalClinicTimetableReferences(seqNum);
+    if (historicalCleanup.deletedDroppedEnrollments > 0 ||
+        historicalCleanup.deletedDecidedRequests > 0 ||
+        historicalCleanup.detachedDroppedAssignments > 0) {
+        console.info("[admin/clinical/slots] historical references cleaned before delete", {
+            slotId: seqNum,
+            droppedEnrollmentsDeleted: historicalCleanup.deletedDroppedEnrollments,
+            decidedRequestsDeleted: historicalCleanup.deletedDecidedRequests,
+            droppedAssignmentsDetached: historicalCleanup.detachedDroppedAssignments,
+        });
     }
     const deleted = await deleteClinicTimetableSlot(seqNum);
     if (!deleted) {
