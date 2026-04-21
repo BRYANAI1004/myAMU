@@ -27,4 +27,6 @@ export type StudentProfilePayload = {
   phone3: string | null;
   citizenship: string | null;
   marital: string | null;
+  /** From portal R2 avatar when configured (`avatar_object_key` + `R2_PUBLIC_BASE_URL`). */
+  avatarUrl: string | null;
 };

@@ -57,6 +57,8 @@ export type MahmAccountMock = {
     studentId: string
     term: string
     year: number
+    /** Public URL when backend sets `student.avatarUrl` (R2 + `R2_PUBLIC_BASE_URL`). */
+    avatarUrl?: string | null
   }
   currentTerm: MahmCurrentTerm
   registration: MahmRegistration

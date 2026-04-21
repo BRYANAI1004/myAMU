@@ -55,6 +55,21 @@ export async function postStudentLogin(
     });
   } catch (e) {
     console.error("[auth] login database error:", e);
+    const err = e as NodeJS.ErrnoException & { code?: string };
+    const msg = e instanceof Error ? e.message : String(e);
+    const code = typeof err?.code === "string" ? err.code : "";
+    if (
+      code === "ECONNREFUSED" ||
+      code === "ENOTFOUND" ||
+      code === "ETIMEDOUT" ||
+      /ECONNREFUSED|connect.*refused|getaddrinfo/i.test(msg)
+    ) {
+      res.status(503).json({
+        error:
+          "Database is not reachable (login requires MySQL). Start the database server and verify DB_HOST / DB_PORT in .env.",
+      });
+      return;
+    }
     res.status(500).json({ error: "Login failed" });
   }
 }

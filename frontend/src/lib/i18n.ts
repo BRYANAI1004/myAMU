@@ -399,6 +399,16 @@ export const STUDENT_PORTAL_EN = {
 
   // Portal student bar / profile
   studentInfoBarBalance: 'Balance',
+  studentAvatarChangePhotoAria: 'Change profile photo',
+  profilePhotoSectionTitle: 'Profile Photo',
+  profilePhotoChooseButton: 'Choose photo',
+  profilePhotoUploadHint:
+    'Saves to your account automatically. Use JPEG, PNG, WebP, or GIF.',
+  profilePhotoNoServer: 'No photo on file',
+  studentAvatarInvalidType: 'Please choose a JPEG, PNG, WebP, or GIF file.',
+  studentAvatarNoAuth: 'Please sign in again to upload a photo.',
+  studentAvatarUploadFailed: 'Upload failed.',
+  studentAvatarUploading: 'Uploading…',
 
   // Academics portal (combined page)
   academicsSectionsAria: 'Academics sections',
@@ -1546,6 +1556,16 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   includesInProgress: '含進行中之課程（若適用）。',
 
   studentInfoBarBalance: '餘額',
+  studentAvatarChangePhotoAria: '更換大頭照',
+  profilePhotoSectionTitle: '大頭照',
+  profilePhotoChooseButton: '選擇照片',
+  profilePhotoUploadHint:
+    '選檔後會自動上傳並儲存。請使用 JPEG、PNG、WebP 或 GIF。',
+  profilePhotoNoServer: '尚無照片',
+  studentAvatarInvalidType: '請選擇 JPEG、PNG、WebP 或 GIF 檔。',
+  studentAvatarNoAuth: '請重新登入後再上傳照片。',
+  studentAvatarUploadFailed: '上傳失敗。',
+  studentAvatarUploading: '上傳中…',
 
   academicsSectionsAria: '學業區塊',
   tabRegistrationHistory: '註冊紀錄',

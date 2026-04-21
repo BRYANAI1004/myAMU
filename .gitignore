@@ -1,3 +1,9 @@
 # Environment and secrets (never commit)
 .env
 backend/.env
+
+# Dependencies (install locally: npm install)
+node_modules/
+
+# Compiled backend (TypeScript → dist); build in CI or locally
+backend/dist/

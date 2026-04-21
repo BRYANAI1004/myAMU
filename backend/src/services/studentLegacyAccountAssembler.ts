@@ -24,6 +24,7 @@ import {
   buildAccountCurrentTerm,
   deriveAccountRegistration,
 } from "./studentAccountDashboard.js";
+import { resolveStudentAvatarPublicUrl } from "./studentImageService.js";
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -60,6 +61,8 @@ export type AssembleLegacyStudentAccountOptions = {
    * marks (portal wins on duplicate course code). Withdrawn portal rows stay out of the timetable.
    */
   portalEnrollmentRows?: PortalEnrollmentAcademicRow[];
+  /** From `portal_students.avatar_object_key` when the column exists. */
+  portalStudentAvatarObjectKey?: string | null;
 };
 
 function mergeBrowseTermScheduleRecords(
@@ -150,7 +153,12 @@ export function assembleLegacyStudentAccountPayload(
   }
 
   const browseTerm = { term: snap.term, year: snap.year };
-  const { portalActiveTerm, availableScheduleTerms, clinicalProgress } = options;
+  const {
+    portalActiveTerm,
+    availableScheduleTerms,
+    clinicalProgress,
+    portalStudentAvatarObjectKey,
+  } = options;
   const portalRows = options.portalEnrollmentRows ?? [];
 
   const marksRowsForBrowse = allMarksRows.filter(
@@ -244,6 +252,7 @@ export function assembleLegacyStudentAccountPayload(
       studentId: snap.studentId,
       term: snap.term,
       year: snap.year,
+      avatarUrl: resolveStudentAvatarPublicUrl(portalStudentAvatarObjectKey),
     },
     preference: null,
     lineItems: [],

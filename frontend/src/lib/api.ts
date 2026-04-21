@@ -209,6 +209,8 @@ export type StudentProfileResponse = {
   state: string | null
   zip: string | null
   email: string | null
+  /** R2 public URL when configured (`avatar_object_key` + `R2_PUBLIC_BASE_URL`). */
+  avatarUrl?: string | null
 }
 
 /** GET /api/admin/students — legacy `students` roster (admin UI). */
@@ -318,6 +320,8 @@ export type AdminStudentDetail = {
   marital: string | null
   latestRegistrationTerm: string | null
   loaSummary: AdminStudentLoaSummary
+  /** Public avatar URL when stored and `R2_PUBLIC_BASE_URL` is set on the server. */
+  avatarUrl: string | null
   clinicalProgress?: ClinicalProgress
   /** When present, drives quarter-based registration history on the admin detail page. */
   registrationHistory?: AdminStudentRegistrationHistoryTerm[]
@@ -682,6 +686,7 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
     marital: parseNullableString(o.marital),
     latestRegistrationTerm: parseNullableString(o.latestRegistrationTerm),
     loaSummary,
+    avatarUrl: parseNullableString(o.avatarUrl ?? o.avatar_url),
     ...(clinicalProgress != null ? { clinicalProgress } : {}),
     ...(registrationHistory != null ? { registrationHistory } : {}),
   }
@@ -1096,6 +1101,7 @@ export async function fetchStudentProfile(
       state: parseNullableString(profile.state),
       zip: parseNullableString(profile.zip),
       email: parseNullableString(profile.email),
+      avatarUrl: parseNullableString(profile.avatarUrl),
     }
   }
   throw new Error('Unexpected student profile response')

@@ -15,7 +15,9 @@
     "build": "tsc",
     "seed": "node legacy/seed/seed.js",
     "db:bootstrap-portal": "node scripts/applyPortalAccountBootstrap.mjs",
+    "db:apply-009": "tsx scripts/applyMigration009.ts",
     "test:openai": "tsx scripts/testOpenAI.ts",
+    "test:student-image": "tsx scripts/testStudentImageDirectUpload.ts",
     "test:rag-answer": "tsx scripts/testRagAnswer.ts",
     "build:knowledge": "tsx scripts/buildKnowledgeBase.ts",
     "pw:generate-initial": "tsx scripts/generate-initial-passwords.ts",
@@ -24,21 +26,29 @@
     "job:clinical-hold-cleanup": "tsx scripts/runClinicalPaymentHoldCleanup.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1033.0",
+    "@aws-sdk/s3-request-presigner": "^3.1033.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.1",
+    "form-data": "^4.0.5",
     "mongoose": "^8.9.3",
+    "multer": "^2.1.1",
     "mysql2": "^3.12.0",
+    "node-fetch": "^2.7.0",
     "openai": "^4.77.0",
     "pdf-parse": "^2.4.5",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.10.5",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/node": "^22.19.17",
     "concurrently": "^9.2.1",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.3"
+    "typescript": "^5.9.3"
   }
 }

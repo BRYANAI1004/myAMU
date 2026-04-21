@@ -64,6 +64,10 @@ import {
 } from "../controllers/studentAccountController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
 import {
+  postStudentAvatarDirectUploadUrl,
+  putStudentAvatar,
+} from "../controllers/studentImageController.js";
+import {
   getStudentEnrolledSections,
   postStudentEnroll,
   postStudentWithdraw,
@@ -121,6 +125,12 @@ apiRouter.get("/health", getHealth);
 apiRouter.get("/health/db", getHealthDb);
 
 apiRouter.post("/auth/login", postStudentLogin);
+
+apiRouter.post(
+  "/uploads/student-avatar-url",
+  postStudentAvatarDirectUploadUrl,
+);
+apiRouter.put("/student/avatar", putStudentAvatar);
 
 apiRouter.post("/student/enroll", postStudentEnroll);
 apiRouter.post("/student/withdraw", postStudentWithdraw);

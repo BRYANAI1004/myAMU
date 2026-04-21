@@ -298,11 +298,18 @@ function normalizeApiStudentAccount(raw: unknown): MahmAccountMock {
       ? o.studentId.trim()
       : String(st.studentId ?? '').trim()
 
+  const avatarUrlRaw = st.avatarUrl
+  const avatarUrl =
+    typeof avatarUrlRaw === 'string' && avatarUrlRaw.trim() !== ''
+      ? avatarUrlRaw.trim()
+      : null
+
   const student = {
     name: String(st.name ?? '').trim() || studentIdRoot || 'Student',
     studentId: String(st.studentId ?? studentIdRoot).trim() || studentIdRoot,
     term: String(st.term ?? '').trim(),
     year: Number(st.year),
+    ...(avatarUrl != null ? { avatarUrl } : {}),
   }
 
   const summaryRaw = o.summary

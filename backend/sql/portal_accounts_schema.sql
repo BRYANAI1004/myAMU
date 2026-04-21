@@ -3,7 +3,8 @@
 
 CREATE TABLE IF NOT EXISTS portal_students (
   student_external_id VARCHAR(64) PRIMARY KEY,
-  full_name VARCHAR(255) NOT NULL
+  full_name VARCHAR(255) NOT NULL,
+  avatar_object_key VARCHAR(512) NULL
 );
 
 CREATE TABLE IF NOT EXISTS portal_courses (

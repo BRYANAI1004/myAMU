@@ -131,6 +131,17 @@ export function AdminStudentEditPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const [photoFilename, setPhotoFilename] = useState<string | null>(null)
+  const [loadedAvatarUrl, setLoadedAvatarUrl] = useState<string | null>(null)
+  const [serverPhotoFailed, setServerPhotoFailed] = useState(false)
+
+  useEffect(() => {
+    setLoadedAvatarUrl(null)
+    setServerPhotoFailed(false)
+  }, [studentId, reloadKey])
+
+  useEffect(() => {
+    setServerPhotoFailed(false)
+  }, [loadedAvatarUrl])
 
   useEffect(() => {
     if (!studentId.trim()) {
@@ -152,6 +163,11 @@ export function AdminStudentEditPage() {
         })
         if (ac.signal.aborted) return
         setForm(detailToFormState(d))
+        const av =
+          typeof d.avatarUrl === 'string' && d.avatarUrl.trim() !== ''
+            ? d.avatarUrl.trim()
+            : null
+        setLoadedAvatarUrl(av)
         setError(null)
       } catch (e) {
         if (ac.signal.aborted) return
@@ -343,12 +359,19 @@ export function AdminStudentEditPage() {
               >
                 Profile Photo
               </h2>
-              <div className="portal-profile-photo-frame">
+              <div className="portal-profile-photo-frame" aria-live="polite">
                 {photoPreviewUrl ? (
                   <img
                     src={photoPreviewUrl}
                     alt="Selected profile photo preview"
                     className="portal-profile-photo-image"
+                  />
+                ) : loadedAvatarUrl && !serverPhotoFailed ? (
+                  <img
+                    src={loadedAvatarUrl}
+                    alt=""
+                    className="portal-profile-photo-image"
+                    onError={() => setServerPhotoFailed(true)}
                   />
                 ) : (
                   <span className="portal-profile-photo-placeholder portal-profile-photo-placeholder--initials">
@@ -365,7 +388,11 @@ export function AdminStudentEditPage() {
                 />
                 Choose photo
               </label>
-              <p className="portal-card-note">Photo upload is not connected yet.</p>
+              <p className="portal-card-note">
+                {loadedAvatarUrl && !serverPhotoFailed
+                  ? 'Current photo from the student portal. Replacing it here is not enabled yet.'
+                  : 'No profile photo on file. Students upload photos from the student portal; replacing them here is not enabled yet.'}
+              </p>
               {photoFilename ? (
                 <p className="portal-card-note portal-profile-photo-filename">
                   Selected: {photoFilename}

@@ -9,6 +9,7 @@ import type {
   PaymentRecord,
   StudentTermPreference,
 } from "../types/studentAccount.js";
+import { hasPortalStudentAvatarObjectKeyColumn } from "./studentAvatarRepository.js";
 
 /**
  * MySQL-first account reads. Expect these tables (adjust names in migrations as needed):
@@ -16,7 +17,7 @@ import type {
  * `student_external_id` is the portal-side key for the student; in a legacy schema this matches
  * `registration.id` (e.g. C17310), not a separate `students.student_id` column.
  *
- * portal_students (student_external_id PK, full_name)
+ * portal_students (student_external_id PK, full_name, avatar_object_key optional)
  * portal_courses (course_id PK, course_code, title, type ENUM, units, hours)
  * portal_enrollments (student_external_id, course_id, term, year)
  * portal_student_term_prefs (student_external_id, term, year, use_installment_plan,
@@ -202,8 +203,11 @@ async function loadPortalTermBillingContextCore(
   year: number,
   enrollmentRows: RowDataPacket[],
 ): Promise<AccountContext> {
+  const avatarSelect = (await hasPortalStudentAvatarObjectKeyColumn(pool))
+    ? ", NULLIF(TRIM(avatar_object_key), '') AS avatarObjectKey"
+    : "";
   const [[nameRow]] = await pool.query<RowDataPacket[]>(
-    `SELECT full_name AS fullName
+    `SELECT full_name AS fullName${avatarSelect}
      FROM portal_students
      WHERE student_external_id = ?
      LIMIT 1`,
@@ -213,6 +217,15 @@ async function loadPortalTermBillingContextCore(
     nameRow?.fullName != null && String(nameRow.fullName).trim() !== ""
       ? String(nameRow.fullName).trim()
       : null;
+  let avatarObjectKey: string | null = null;
+  if (
+    nameRow != null &&
+    "avatarObjectKey" in nameRow &&
+    nameRow.avatarObjectKey != null
+  ) {
+    const raw = String(nameRow.avatarObjectKey).trim();
+    avatarObjectKey = raw !== "" ? raw : null;
+  }
 
   const enrollments: EnrollmentRecord[] = enrollmentRows.map((r) => ({
     studentId: String(r.studentId),
@@ -308,6 +321,7 @@ async function loadPortalTermBillingContextCore(
   return {
     studentId,
     studentDisplayName,
+    avatarObjectKey,
     term,
     year,
     enrollments,

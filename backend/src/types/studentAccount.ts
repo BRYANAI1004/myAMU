@@ -108,6 +108,8 @@ export type StudentAccountPayload = {
     studentId: string;
     term: string;
     year: number;
+    /** Resolved from `portal_students.avatar_object_key` + `R2_PUBLIC_BASE_URL` when configured. */
+    avatarUrl: string | null;
   };
   preference: StudentTermPreference | null;
   lineItems: BillingLineItem[];
@@ -175,6 +177,8 @@ export type AccountContext = {
   studentId: string;
   /** From portal_students.full_name when present */
   studentDisplayName: string | null;
+  /** From portal_students.avatar_object_key when column exists */
+  avatarObjectKey: string | null;
   term: string;
   year: number;
   enrollments: EnrollmentRecord[];

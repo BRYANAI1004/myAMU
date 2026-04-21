@@ -109,6 +109,8 @@ export type AdminStudentDetail = {
   marital: string | null;
   latestRegistrationTerm: string | null;
   loaSummary: AdminStudentLoaSummary;
+  /** Public URL when avatar is stored in R2 and `R2_PUBLIC_BASE_URL` is configured. */
+  avatarUrl: string | null;
   /** Same shape as student account `clinicalProgress` (legacy clinic + requirements). */
   clinicalProgress?: ClinicalProgress;
 };

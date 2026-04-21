@@ -21,6 +21,7 @@ import {
   buildAccountCurrentTerm,
   deriveAccountRegistration,
 } from "./studentAccountDashboard.js";
+import { resolveStudentAvatarPublicUrl } from "./studentImageService.js";
 
 const DEFAULT_INSTALLMENT_DUE_DATES = [
   "Sep 15, 2026",
@@ -126,6 +127,7 @@ export function assembleStudentAccountPayload(
       studentId,
       term,
       year,
+      avatarUrl: resolveStudentAvatarPublicUrl(ctx.avatarObjectKey),
     },
     preference: {
       useInstallmentPlan: pref.useInstallmentPlan,

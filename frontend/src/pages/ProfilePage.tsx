@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEventHandler } from 'react'
+import { useEffect, useState, type ChangeEvent, type ChangeEventHandler } from 'react'
 import { BackToDashboardLink } from '../components/BackToDashboardLink'
 import { useAccount } from '../context/AccountContext'
 import { useStudentPortalT } from '../LanguageContext'
@@ -6,6 +6,7 @@ import {
   fetchApiJson,
   type StudentProfileResponse,
 } from '../lib/api'
+import { tryUploadStudentAvatar } from '../lib/studentAvatarUpload'
 
 function dashText(value: string | null | undefined, dash: string): string {
   const s = value?.trim() ?? ''
@@ -97,8 +98,6 @@ const CITIZENSHIP_OPTIONS = [
 
 const MARITAL_OPTIONS = ['Single', 'Married', 'Divorced', 'Widowed', 'Other'] as const
 
-const PHOTO_UPLOAD_HELPER_TEXT = 'Photo upload is not connected yet.'
-
 function nullableString(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const trimmed = v.trim()
@@ -143,6 +142,7 @@ function mapApiProfile(data: unknown): StudentProfileWithSensitive {
     phone3: nullableString(profile.phone3),
     citizenship: nullableString(profile.citizenship),
     marital: nullableString(profile.marital),
+    avatarUrl: nullableString(profile.avatarUrl),
   }
 }
 
@@ -177,7 +177,7 @@ function maskedSsnDisplay(raw: string, dash: string): string {
 
 export function ProfilePage() {
   const t = useStudentPortalT()
-  const { currentStudentId, authToken } = useAccount()
+  const { currentStudentId, authToken, reload: reloadAccount } = useAccount()
   const dash = t('dashEm')
 
   const [profile, setProfile] = useState<StudentProfileWithSensitive | null>(null)
@@ -191,6 +191,8 @@ export function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const [photoFilename, setPhotoFilename] = useState<string | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null)
 
   useEffect(() => {
     const id = currentStudentId?.trim()
@@ -316,22 +318,71 @@ export function ProfilePage() {
     }
   }
 
-  const handlePhotoSelect: ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0] ?? null
+  const handlePhotoSelect: ChangeEventHandler<HTMLInputElement> = async (
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const input = event.currentTarget
+    const file = input.files?.[0] ?? null
     if (!file) {
       if (photoPreviewUrl) {
         URL.revokeObjectURL(photoPreviewUrl)
       }
       setPhotoPreviewUrl(null)
       setPhotoFilename(null)
+      setPhotoUploadError(null)
       return
     }
-    const nextUrl = URL.createObjectURL(file)
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl)
+
+    setPhotoUploadError(null)
+    let blobUrl: string | null = null
+    try {
+      blobUrl = URL.createObjectURL(file)
+      if (photoPreviewUrl) {
+        URL.revokeObjectURL(photoPreviewUrl)
+      }
+      setPhotoPreviewUrl(blobUrl)
+      setPhotoFilename(file.name)
+    } catch {
+      input.value = ''
+      return
     }
-    setPhotoPreviewUrl(nextUrl)
-    setPhotoFilename(file.name)
+
+    setPhotoUploading(true)
+    try {
+      const result = await tryUploadStudentAvatar(authToken, file)
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl)
+        blobUrl = null
+      }
+      setPhotoPreviewUrl(null)
+      setPhotoFilename(null)
+      if (result.ok) {
+        setProfile((p: StudentProfileWithSensitive | null) =>
+          p ? { ...p, avatarUrl: result.avatarUrl ?? p.avatarUrl ?? null } : null,
+        )
+        reloadAccount()
+      } else {
+        const msg =
+          result.reason === 'no_auth'
+            ? t('studentAvatarNoAuth')
+            : result.reason === 'invalid_type'
+              ? t('studentAvatarInvalidType')
+              : (result.message ?? t('studentAvatarUploadFailed'))
+        setPhotoUploadError(msg)
+      }
+    } catch (e) {
+      if (blobUrl) {
+        URL.revokeObjectURL(blobUrl)
+      }
+      setPhotoPreviewUrl(null)
+      setPhotoFilename(null)
+      setPhotoUploadError(
+        e instanceof Error ? e.message : t('studentAvatarUploadFailed'),
+      )
+    } finally {
+      setPhotoUploading(false)
+      input.value = ''
+    }
   }
 
   return (
@@ -388,30 +439,46 @@ export function ProfilePage() {
               aria-labelledby="profile-photo-heading"
             >
               <h3 id="profile-photo-heading" className="portal-section-heading">
-                Profile Photo
+                {t('profilePhotoSectionTitle')}
               </h3>
               <div className="portal-profile-photo-frame" aria-live="polite">
                 {photoPreviewUrl ? (
                   <img
                     src={photoPreviewUrl}
-                    alt="Selected profile photo preview"
+                    alt=""
+                    className="portal-profile-photo-image"
+                  />
+                ) : profile.avatarUrl ? (
+                  <img
+                    src={profile.avatarUrl}
+                    alt=""
                     className="portal-profile-photo-image"
                   />
                 ) : (
-                  <span className="portal-profile-photo-placeholder">No photo</span>
+                  <span className="portal-profile-photo-placeholder">
+                    {t('profilePhotoNoServer')}
+                  </span>
                 )}
               </div>
-              <label className="portal-btn portal-btn--secondary portal-profile-photo-upload">
+              <label
+                className={`portal-btn portal-btn--secondary portal-profile-photo-upload${photoUploading ? ' portal-profile-photo-upload--disabled' : ''}`}
+              >
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   onChange={handlePhotoSelect}
                   className="portal-profile-photo-upload-input"
+                  disabled={photoUploading}
                 />
-                Choose photo
+                {photoUploading ? t('studentAvatarUploading') : t('profilePhotoChooseButton')}
               </label>
-              <p className="portal-card-note">{PHOTO_UPLOAD_HELPER_TEXT}</p>
-              {photoFilename ? (
+              <p className="portal-card-note">{t('profilePhotoUploadHint')}</p>
+              {photoUploadError ? (
+                <p className="portal-card-note portal-profile-photo-error" role="alert">
+                  {photoUploadError}
+                </p>
+              ) : null}
+              {photoFilename && !photoUploading ? (
                 <p className="portal-card-note portal-profile-photo-filename">
                   Selected: {photoFilename}
                 </p>

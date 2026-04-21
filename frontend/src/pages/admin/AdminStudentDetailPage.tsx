@@ -194,6 +194,8 @@ export function AdminStudentDetailPage() {
     string | null
   >(null)
 
+  const [profilePhotoLoadFailed, setProfilePhotoLoadFailed] = useState(false)
+
   const [documentsData, setDocumentsData] =
     useState<StudentDocumentsResponse | null>(null)
   const [documentsLoading, setDocumentsLoading] = useState(false)
@@ -230,6 +232,10 @@ export function AdminStudentDetailPage() {
     setLoaSaveError(null)
     setLoaSaving(false)
   }, [studentId])
+
+  useEffect(() => {
+    setProfilePhotoLoadFailed(false)
+  }, [detail?.avatarUrl, studentId, reloadKey])
 
   useEffect(() => {
     const hasLoa = detail?.loaSummary.hasLoa === true
@@ -991,13 +997,26 @@ export function AdminStudentDetailPage() {
                     >
                       Profile Photo
                     </h3>
-                    <div className="portal-profile-photo-frame">
-                      <span className="portal-profile-photo-placeholder portal-profile-photo-placeholder--initials">
-                        {profileInitials(detail.name)}
-                      </span>
+                    <div className="portal-profile-photo-frame" aria-live="polite">
+                      {detail.avatarUrl && !profilePhotoLoadFailed ? (
+                        <img
+                          src={detail.avatarUrl}
+                          alt=""
+                          className="portal-profile-photo-image"
+                          onError={() => setProfilePhotoLoadFailed(true)}
+                        />
+                      ) : (
+                        <span className="portal-profile-photo-placeholder portal-profile-photo-placeholder--initials">
+                          {profileInitials(detail.name)}
+                        </span>
+                      )}
                     </div>
                     <p className="portal-card-note">
-                      Photo upload is not connected yet.
+                      {detail.avatarUrl && !profilePhotoLoadFailed
+                        ? 'Uploaded from the student portal.'
+                        : detail.avatarUrl && profilePhotoLoadFailed
+                          ? 'Photo could not be loaded.'
+                          : 'No profile photo on file.'}
                     </p>
                   </section>
                   <dl className="admin-student-profile-details">

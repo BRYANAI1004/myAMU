@@ -44,6 +44,8 @@ import {
   legacyDbDateToIso,
   resolveEnrollmentDate,
 } from "./studentProfileService.js";
+import { loadPortalStudentAvatarObjectKey } from "../repositories/studentAvatarRepository.js";
+import { resolveStudentAvatarPublicUrl } from "./studentImageService.js";
 import {
   batchBuildClinicalProgressForStudentIds,
   buildClinicalProgress,
@@ -573,6 +575,7 @@ function mapProfileRowToAdminDetail(
     marital,
     latestRegistrationTerm,
     loaSummary,
+    avatarUrl: null,
   };
 }
 
@@ -583,9 +586,10 @@ export async function getAdminStudentDetail(
   if (studentId === "") return null;
   const row = await loadLegacyStudentProfileRow(pool, studentId);
   if (!row) return null;
-  const [latest, loaSummary] = await Promise.all([
+  const [latest, loaSummary, avatarObjectKey] = await Promise.all([
     findLatestLegacyTermYear(pool, studentId),
     buildAdminStudentLoaSummary(studentId),
+    loadPortalStudentAvatarObjectKey(pool, studentId),
   ]);
   const latestRegistrationTerm = latest
     ? formatLatestRegistrationTerm(latest.term, latest.year)
@@ -595,12 +599,13 @@ export async function getAdminStudentDetail(
     latestRegistrationTerm,
     loaSummary,
   );
+  const avatarUrl = resolveStudentAvatarPublicUrl(avatarObjectKey);
   try {
     const clinicalProgress = await buildClinicalProgress(pool, studentId);
-    return { ...base, clinicalProgress };
+    return { ...base, clinicalProgress, avatarUrl };
   } catch (e) {
     console.error("[admin] buildClinicalProgress failed", studentId, e);
-    return base;
+    return { ...base, avatarUrl };
   }
 }
 
