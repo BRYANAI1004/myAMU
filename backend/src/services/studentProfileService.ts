@@ -1,6 +1,8 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { pool } from "../lib/db.js";
+import { loadPortalStudentAvatarObjectKey } from "../repositories/studentAvatarRepository.js";
 import type { StudentProfilePayload } from "../types/studentProfile.js";
+import { resolveStudentAvatarPublicUrl } from "./studentImageService.js";
 
 const MS_PER_DAY = 86400000;
 
@@ -214,6 +216,7 @@ export function mapLegacyStudentRowToProfile(
     phone3: r.phone3.length > 0 ? r.phone3 : null,
     citizenship: r.citizenship.length > 0 ? r.citizenship : null,
     marital: r.marital.length > 0 ? r.marital : null,
+    avatarUrl: null,
   };
 }
 
@@ -256,7 +259,12 @@ export async function getLegacyStudentProfile(
   );
   const row = rows[0] ?? null;
   if (!row) return null;
-  return mapLegacyStudentRowToProfile(row);
+  const base = mapLegacyStudentRowToProfile(row);
+  const objectKey = await loadPortalStudentAvatarObjectKey(pool, trimmed);
+  return {
+    ...base,
+    avatarUrl: resolveStudentAvatarPublicUrl(objectKey),
+  };
 }
 
 export type StudentSensitiveProfileUpdate = {

@@ -24,6 +24,7 @@ import {
   listPortalScheduleTermsForStudent,
   loadAccountContext,
 } from "../repositories/studentAccountRepository.js";
+import { loadPortalStudentAvatarObjectKey } from "../repositories/studentAvatarRepository.js";
 import {
   findLatestPortalEnrollmentTermYear,
   listPortalEnrollmentRowsForStudentAcademics,
@@ -318,6 +319,7 @@ async function getRealStudentAccountPayload(
     portalScheduleTermList,
     latestLegacyTermYear,
     allMarksRows,
+    portalStudentAvatarObjectKey,
   ] = await Promise.all([
     loadLegacyAccountSnapshot(pool, studentId, term, year),
     listLegacyRegistrationTermsForStudent(pool, studentId),
@@ -328,6 +330,7 @@ async function getRealStudentAccountPayload(
     ),
     findLatestLegacyTermYear(pool, studentId),
     listMarksForStudent(pool, studentId),
+    loadPortalStudentAvatarObjectKey(pool, studentId),
   ]);
 
   const effectiveSnap = await resolveBrowseAccountSnapshot(
@@ -389,6 +392,7 @@ async function getRealStudentAccountPayload(
       availableScheduleTerms,
       clinicalProgress,
       portalEnrollmentRows,
+      portalStudentAvatarObjectKey,
     },
   );
 }
