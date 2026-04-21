@@ -227,7 +227,8 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem 0.75rem;
-  flex-shrink: 0;
+  /* Allow the right cluster to shrink so long names ellipsize instead of blowing the row */
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -237,20 +238,23 @@
   align-items: center;
   justify-content: flex-end;
   gap: 0.65rem 1rem;
-  flex-shrink: 0;
+  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
 }
 
 .portal-branding-bar-user-cluster {
   display: inline-flex;
   align-items: center;
   flex-wrap: nowrap;
-  flex-shrink: 0;
+  /* Grow into free space on wide screens; shrink on narrow so .portal-user-button__label can ellipsize */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .portal-branding-bar-user-cluster .portal-user-button {
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .portal-lang-toggle {
@@ -339,10 +343,16 @@
     opacity 0.12s ease;
 }
 
+.portal-logout-button {
+  flex-shrink: 0;
+}
+
 .portal-user-button__label {
-  max-width: 14rem;
+  min-width: 0;
+  max-width: min(14rem, 100%);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .portal-user-icon {
@@ -856,8 +866,8 @@
   .portal-shell--authenticated {
     --portal-body-font-size: 0.8125rem;
     flex-direction: column;
-    /* Two-row gold bar when user + logout stack. */
-    --portal-branding-bar-height: 4.75rem;
+    /* Single-row gold bar: user cluster + logout stay on one line with ellipsis */
+    --portal-branding-bar-height: 4.5rem;
   }
 
   .portal-shell--with-banner {
@@ -901,10 +911,24 @@
     max-width: min(9.5rem, 40vw);
   }
 
+  .portal-branding-bar-end {
+    gap: 0.35rem 0.5rem;
+  }
+
   .portal-branding-bar-actions {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.2rem;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.4rem 0.55rem;
+  }
+
+  .portal-branding-bar-user-cluster {
+    gap: 0;
+  }
+
+  .portal-lang-toggle {
+    margin-right: 0.35rem;
   }
 
   .portal-user-button,
@@ -913,7 +937,7 @@
   }
 
   .portal-user-button__label {
-    max-width: 9.5rem;
+    max-width: min(9rem, 28vw);
   }
 
   .portal-portal-banner-inner {
