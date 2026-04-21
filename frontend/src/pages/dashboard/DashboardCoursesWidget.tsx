@@ -21,6 +21,7 @@ import {
   dashboardBlockGoogleCalendarPatternKey,
 } from '../../lib/dashboardGoogleCalendarExport'
 import { resolveAcademicTermIdForPortalTerm } from '../../lib/resolveAcademicTermIdForPortalTerm'
+import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { mergeTermOptions } from '../registration/registrationTermSearch'
 import { currentTermLabel } from '../../lib/academicCourseRecordsDisplay'
 import {
@@ -267,8 +268,20 @@ export function DashboardCoursesWidget() {
   >([])
   const [academicTerms, setAcademicTerms] = useState<AcademicTerm[]>([])
   const [academicTermsLoading, setAcademicTermsLoading] = useState(false)
+  const [portalEnrollmentRefreshTick, setPortalEnrollmentRefreshTick] = useState(0)
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
+
+  useEffect(() => {
+    function onPortalEnrollmentChanged() {
+      weekTermRowsCacheRef.current.clear()
+      setPortalEnrollmentRefreshTick((n) => n + 1)
+    }
+    window.addEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onPortalEnrollmentChanged)
+    return () => {
+      window.removeEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onPortalEnrollmentChanged)
+    }
+  }, [])
 
   useEffect(() => {
     setCalendarWeekTerm(null)
@@ -603,6 +616,7 @@ export function DashboardCoursesWidget() {
     resolvedAcademicTermId,
     resolvedWeekTerm?.term,
     resolvedWeekTerm?.year,
+    portalEnrollmentRefreshTick,
   ])
 
   const weekScheduleLoading =
