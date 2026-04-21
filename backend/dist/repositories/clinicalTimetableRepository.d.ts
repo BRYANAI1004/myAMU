@@ -56,6 +56,21 @@ export type ClinicTimetableWritePayload = {
 export declare function createClinicTimetableSlot(payload: ClinicTimetableWritePayload): Promise<number>;
 export declare function updateClinicTimetableSlot(seqNum: number, payload: ClinicTimetableWritePayload): Promise<boolean>;
 export declare function deleteClinicTimetableSlot(seqNum: number): Promise<boolean>;
+export type ForceDeleteClinicTimetableCleanupCounts = {
+    deletedClinicalRequests: number;
+    deletedClinicalAssignments: number;
+    deletedClinicalEnrollments: number;
+    deletedClinicalBookingPaymentHolds: number;
+    detachedPortalBillingAdjustments: number;
+};
+/**
+ * Force delete cleanup for a timetable slot.
+ * Deletes child/dependent records first in one transaction, then deletes `clinic_timetable`.
+ */
+export declare function forceDeleteClinicTimetableSlot(seqNum: number): Promise<{
+    deleted: boolean;
+    cleanup: ForceDeleteClinicTimetableCleanupCounts;
+}>;
 export type ClinicTimetableReferenceCounts = {
     activeEnrollments: number;
     historicalDroppedEnrollments: number;

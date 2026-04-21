@@ -30,6 +30,29 @@ function pathSlotId(req: Request): number | null {
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
+function parseForceDeleteQuery(req: Request): boolean {
+  const raw = req.query.force;
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof v !== "string") return false;
+  const s = v.trim().toLowerCase();
+  return s === "1" || s === "true" || s === "yes";
+}
+
+function parseForceDeleteActor(req: Request): {
+  adminRole: string | null;
+  adminIdentifier: string | null;
+} {
+  const roleRaw = req.headers["x-admin-role"];
+  const idRaw = req.headers["x-admin-email"];
+  const role =
+    typeof roleRaw === "string" && roleRaw.trim() !== ""
+      ? roleRaw.trim()
+      : null;
+  const adminIdentifier =
+    typeof idRaw === "string" && idRaw.trim() !== "" ? idRaw.trim() : null;
+  return { adminRole: role, adminIdentifier };
+}
+
 function parseCreateBody(body: unknown): AdminClinicalSlotCreateInput | null {
   if (!body || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
@@ -224,11 +247,18 @@ export async function deleteAdminClinicalSlotHandler(
       res.status(400).json({ error: "Invalid slot id" });
       return;
     }
-    const result = await deleteAdminClinicalSlot(id);
+    const forceDelete = parseForceDeleteQuery(req);
+    const actor = parseForceDeleteActor(req);
+    const result = await deleteAdminClinicalSlot(id, {
+      forceDelete,
+      actor,
+    });
     if (!result.ok) {
       const msg = result.error;
       const notFound = msg === "Clinical slot not found.";
-      res.status(notFound ? 404 : 400).json({ error: msg });
+      const forbidden =
+        msg === "Only clinic management admins can force delete a clinical slot.";
+      res.status(notFound ? 404 : forbidden ? 403 : 400).json({ error: msg });
       return;
     }
     res.json({ ok: true });

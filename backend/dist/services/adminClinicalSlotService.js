@@ -1,5 +1,5 @@
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
-import { cleanupHistoricalClinicTimetableReferences, countClinicTimetableReferences, createClinicTimetableSlot, deleteClinicTimetableSlot, getClinicTimetableById, listClinicTimetableSlotsForAdmin, updateClinicTimetableSlot, } from "../repositories/clinicalTimetableRepository.js";
+import { cleanupHistoricalClinicTimetableReferences, countClinicTimetableReferences, createClinicTimetableSlot, deleteClinicTimetableSlot, forceDeleteClinicTimetableSlot, getClinicTimetableById, listClinicTimetableSlotsForAdmin, updateClinicTimetableSlot, } from "../repositories/clinicalTimetableRepository.js";
 import { formatClinicTimeHm } from "./clinicalScheduleService.js";
 const WEEKDAYS = new Set([
     "Monday",
@@ -344,13 +344,54 @@ export async function updateAdminClinicalSlot(seqNum, patch) {
         active_enrolled_count: 0,
     });
 }
-export async function deleteAdminClinicalSlot(seqNum) {
+export async function deleteAdminClinicalSlot(seqNum, options) {
     if (!Number.isFinite(seqNum) || seqNum <= 0) {
         return { ok: false, error: "Invalid slot id." };
+    }
+    const forceDelete = options?.forceDelete === true;
+    const actorRole = (options?.actor?.adminRole ?? "").trim().toLowerCase();
+    const actorIdentifier = (options?.actor?.adminIdentifier ?? "").trim() || null;
+    if (forceDelete && actorRole !== "admin") {
+        return {
+            ok: false,
+            error: "Only clinic management admins can force delete a clinical slot.",
+        };
     }
     const existing = await getClinicTimetableById(seqNum);
     if (!existing) {
         return { ok: false, error: "Clinical slot not found." };
+    }
+    if (forceDelete) {
+        // Force-delete path intentionally removes all dependent rows first, then deletes the slot.
+        const refs = await countClinicTimetableReferences(seqNum);
+        const forced = await forceDeleteClinicTimetableSlot(seqNum);
+        if (!forced.deleted) {
+            return { ok: false, error: "Clinical slot not found." };
+        }
+        console.info("[audit][admin/clinical/slots] force delete", {
+            adminRole: actorRole || null,
+            adminIdentifier: actorIdentifier,
+            slotId: seqNum,
+            slotSummary: {
+                year: existing.year,
+                term: existing.term,
+                day: existing.weekday,
+                timeFrom: existing.time_from,
+                timeTo: existing.time_to,
+                slot: existing.slot,
+                faculty: existing.instructor,
+            },
+            removedCounts: {
+                clinicalEnrollments: forced.cleanup.deletedClinicalEnrollments,
+                clinicalAssignments: forced.cleanup.deletedClinicalAssignments,
+                clinicalRequests: forced.cleanup.deletedClinicalRequests,
+                clinicalBookingPaymentHolds: forced.cleanup.deletedClinicalBookingPaymentHolds,
+                portalBillingAdjustmentsDetached: forced.cleanup.detachedPortalBillingAdjustments,
+            },
+            priorReferenceSnapshot: refs,
+            deletedAt: new Date().toISOString(),
+        });
+        return { ok: true };
     }
     const refs = await countClinicTimetableReferences(seqNum);
     const activeTotal = refs.activeEnrollments + refs.activePendingRequests + refs.activeAssignments;

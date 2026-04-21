@@ -204,6 +204,130 @@ export async function deleteClinicTimetableSlot(seqNum) {
     const [res] = await pool.query(`DELETE FROM clinic_timetable WHERE seqNum = ?`, [seqNum]);
     return res.affectedRows > 0;
 }
+function emptyForceDeleteCleanupCounts() {
+    return {
+        deletedClinicalRequests: 0,
+        deletedClinicalAssignments: 0,
+        deletedClinicalEnrollments: 0,
+        deletedClinicalBookingPaymentHolds: 0,
+        detachedPortalBillingAdjustments: 0,
+    };
+}
+async function tableExistsInConn(conn, tableName) {
+    const [rows] = await conn.query(`SELECT 1 AS ok
+       FROM information_schema.TABLES
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+      LIMIT 1`, [tableName]);
+    return rows.length > 0;
+}
+async function columnExistsInConn(conn, tableName, columnName) {
+    const [rows] = await conn.query(`SELECT 1 AS ok
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = ?
+        AND COLUMN_NAME = ?
+      LIMIT 1`, [tableName, columnName]);
+    return rows.length > 0;
+}
+function buildInPlaceholders(items) {
+    return items.map(() => "?").join(", ");
+}
+/**
+ * Force delete cleanup for a timetable slot.
+ * Deletes child/dependent records first in one transaction, then deletes `clinic_timetable`.
+ */
+export async function forceDeleteClinicTimetableSlot(seqNum) {
+    if (!Number.isFinite(seqNum) || seqNum <= 0) {
+        return {
+            deleted: false,
+            cleanup: emptyForceDeleteCleanupCounts(),
+        };
+    }
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const [slotRows] = await conn.query(`SELECT seqNum
+         FROM clinic_timetable
+        WHERE seqNum = ?
+        LIMIT 1
+        FOR UPDATE`, [seqNum]);
+        if (slotRows.length === 0) {
+            await conn.rollback();
+            return {
+                deleted: false,
+                cleanup: emptyForceDeleteCleanupCounts(),
+            };
+        }
+        const [enrollmentRows] = await conn.query(`SELECT id
+         FROM clinical_enrollments
+        WHERE timetable_id = ?
+        FOR UPDATE`, [seqNum]);
+        const enrollmentIds = enrollmentRows
+            .map((r) => Math.trunc(Number(r.id)))
+            .filter((id) => Number.isFinite(id) && id > 0);
+        let deletedClinicalBookingPaymentHolds = 0;
+        if (enrollmentIds.length > 0 &&
+            (await tableExistsInConn(conn, "clinical_booking_payment_holds"))) {
+            const placeholders = buildInPlaceholders(enrollmentIds);
+            const [holdRes] = await conn.query(`DELETE FROM clinical_booking_payment_holds
+          WHERE clinical_enrollment_id IN (${placeholders})`, enrollmentIds);
+            deletedClinicalBookingPaymentHolds = holdRes.affectedRows;
+        }
+        let detachedPortalBillingAdjustments = 0;
+        if (enrollmentIds.length > 0 &&
+            (await tableExistsInConn(conn, "portal_billing_adjustments")) &&
+            (await columnExistsInConn(conn, "portal_billing_adjustments", "clinical_enrollment_id"))) {
+            const placeholders = buildInPlaceholders(enrollmentIds);
+            const [billingRes] = await conn.query(`UPDATE portal_billing_adjustments
+            SET clinical_enrollment_id = NULL
+          WHERE clinical_enrollment_id IN (${placeholders})`, enrollmentIds);
+            detachedPortalBillingAdjustments = billingRes.affectedRows;
+        }
+        let deletedClinicalRequests = 0;
+        if (await tableExistsInConn(conn, "clinical_requests")) {
+            const [requestRes] = await conn.query(`DELETE FROM clinical_requests
+          WHERE timetable_id = ?`, [seqNum]);
+            deletedClinicalRequests = requestRes.affectedRows;
+        }
+        const [assignmentRes] = await conn.query(`DELETE FROM clinical_assignments
+        WHERE timetable_id = ?`, [seqNum]);
+        const [enrollmentRes] = await conn.query(`DELETE FROM clinical_enrollments
+        WHERE timetable_id = ?`, [seqNum]);
+        const [slotDeleteRes] = await conn.query(`DELETE FROM clinic_timetable
+        WHERE seqNum = ?`, [seqNum]);
+        if (slotDeleteRes.affectedRows === 0) {
+            await conn.rollback();
+            return {
+                deleted: false,
+                cleanup: emptyForceDeleteCleanupCounts(),
+            };
+        }
+        await conn.commit();
+        return {
+            deleted: true,
+            cleanup: {
+                deletedClinicalRequests,
+                deletedClinicalAssignments: assignmentRes.affectedRows,
+                deletedClinicalEnrollments: enrollmentRes.affectedRows,
+                deletedClinicalBookingPaymentHolds,
+                detachedPortalBillingAdjustments,
+            },
+        };
+    }
+    catch (error) {
+        try {
+            await conn.rollback();
+        }
+        catch {
+            // best effort rollback
+        }
+        throw error;
+    }
+    finally {
+        conn.release();
+    }
+}
 /**
  * Status-aware dependency counts for a timetable slot.
  * - Active dependencies should block delete because they are still operationally referenced.

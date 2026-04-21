@@ -2266,11 +2266,34 @@ export async function updateAdminClinicalSlot(
 
 export async function deleteAdminClinicalSlot(
   id: number,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; forceDelete?: boolean },
 ): Promise<{ ok: true }> {
-  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(id))}`
+  const params = new URLSearchParams()
+  if (options?.forceDelete === true) {
+    params.set('force', 'true')
+  }
+  const qs = params.toString()
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(id))}${qs ? `?${qs}` : ''}`
+  const headers: Record<string, string> = {}
+  if (options?.forceDelete === true && typeof window !== 'undefined') {
+    try {
+      const raw = window.sessionStorage.getItem('amu_admin_session')
+      if (raw) {
+        const parsed = JSON.parse(raw) as { role?: unknown; email?: unknown }
+        if (typeof parsed.role === 'string' && parsed.role.trim() !== '') {
+          headers['X-Admin-Role'] = parsed.role.trim()
+        }
+        if (typeof parsed.email === 'string' && parsed.email.trim() !== '') {
+          headers['X-Admin-Email'] = parsed.email.trim()
+        }
+      }
+    } catch {
+      // best effort metadata for backend force-delete audit and role gate
+    }
+  }
   const data = (await fetchApiJson(path, {
     method: 'DELETE',
+    headers: Object.keys(headers).length > 0 ? headers : undefined,
     signal: options?.signal,
   })) as unknown
   if (data == null || typeof data !== 'object') {

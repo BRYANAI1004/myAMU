@@ -15,6 +15,7 @@ import {
   type AdminClinicalSlotRosterRow,
   type AdminPendingClinicalRequestItem,
 } from '../../lib/api'
+import { useAdminAuth } from '../../context/AdminAuthContext'
 import { WEEKDAYS_FULL_ORDERED } from '../../lib/weekdaySchedule'
 import { ClinicalOfferedTimetablePage } from '../clinical/ClinicalOfferedTimetablePage'
 
@@ -102,6 +103,8 @@ function pickLatestAcademicTermId(terms: AcademicTerm[]): string {
 }
 
 export function AdminClinicalPage() {
+  const { role } = useAdminAuth()
+  const canForceDeleteSlot = role === 'admin'
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
 
   const [pendingRequests, setPendingRequests] = useState<
@@ -126,6 +129,8 @@ export function AdminClinicalPage() {
   const [slotFormError, setSlotFormError] = useState<string | null>(null)
   const [slotSaving, setSlotSaving] = useState(false)
   const [deletingSlotId, setDeletingSlotId] = useState<number | null>(null)
+  const [slotDeleteFeedback, setSlotDeleteFeedback] = useState<string | null>(null)
+  const [slotDeleteError, setSlotDeleteError] = useState<string | null>(null)
 
   const [rosterSlot, setRosterSlot] = useState<AdminClinicalSlot | null>(null)
   const [rosterRows, setRosterRows] = useState<AdminClinicalSlotRosterRow[] | null>(
@@ -791,9 +796,17 @@ export function AdminClinicalPage() {
                                 }}
                                 disabled={busy}
                                 onClick={() => {
+                                  setSlotDeleteFeedback(null)
+                                  setSlotDeleteError(null)
+                                  const actionName = canForceDeleteSlot
+                                    ? 'Force delete this slot?'
+                                    : 'Delete this clinical slot?'
+                                  const actionDetail = canForceDeleteSlot
+                                    ? 'This will permanently remove the slot and all related clinical enrollments, requests, and assignments. This action cannot be undone.'
+                                    : `Delete clinical slot #${s.id} (${s.weekday} ${s.timeFrom}–${s.timeTo})? This cannot be undone.`
                                   if (
                                     !window.confirm(
-                                      `Delete clinical slot #${s.id} (${s.weekday} ${s.timeFrom}–${s.timeTo})? This cannot be undone.`,
+                                      `${actionName}\n\n${actionDetail}`,
                                     )
                                   ) {
                                     return
@@ -801,10 +814,17 @@ export function AdminClinicalPage() {
                                   setDeletingSlotId(s.id)
                                   ;(async () => {
                                     try {
-                                      await deleteAdminClinicalSlot(s.id)
+                                      await deleteAdminClinicalSlot(s.id, {
+                                        forceDelete: canForceDeleteSlot,
+                                      })
                                       setSlotsReloadKey((k) => k + 1)
+                                      setSlotDeleteFeedback(
+                                        canForceDeleteSlot
+                                          ? 'Slot force-deleted successfully.'
+                                          : 'Slot deleted successfully.',
+                                      )
                                     } catch (e) {
-                                      window.alert(
+                                      setSlotDeleteError(
                                         e instanceof Error
                                           ? e.message
                                           : 'Delete failed.',
@@ -815,7 +835,7 @@ export function AdminClinicalPage() {
                                   })()
                                 }}
                               >
-                                {busy ? '…' : 'Delete'}
+                                {busy ? '…' : canForceDeleteSlot ? 'Force Delete' : 'Delete'}
                               </button>
                             </div>
                           </td>
@@ -826,6 +846,16 @@ export function AdminClinicalPage() {
                 </tbody>
               </table>
             </div>
+          ) : null}
+          {slotDeleteFeedback ? (
+            <p className="portal-card-note" role="status" style={{ marginTop: '0.75rem' }}>
+              {slotDeleteFeedback}
+            </p>
+          ) : null}
+          {slotDeleteError ? (
+            <p className="portal-page-lede" role="alert" style={{ marginTop: '0.75rem' }}>
+              {slotDeleteError}
+            </p>
           ) : null}
 
           {slotModalMode != null ? (

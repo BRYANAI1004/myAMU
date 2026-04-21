@@ -52,7 +52,13 @@ export declare function listAdminClinicalSlots(options?: {
 }): Promise<AdminClinicalSlotDto[]>;
 export declare function createAdminClinicalSlot(input: AdminClinicalSlotCreateInput): Promise<AdminClinicalSlotDto>;
 export declare function updateAdminClinicalSlot(seqNum: number, patch: AdminClinicalSlotPatchInput): Promise<AdminClinicalSlotDto | null>;
-export declare function deleteAdminClinicalSlot(seqNum: number): Promise<{
+export declare function deleteAdminClinicalSlot(seqNum: number, options?: {
+    forceDelete?: boolean;
+    actor?: {
+        adminRole?: string | null;
+        adminIdentifier?: string | null;
+    };
+}): Promise<{
     ok: true;
 } | {
     ok: false;
