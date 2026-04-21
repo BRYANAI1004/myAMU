@@ -39,4 +39,5 @@ export function buildRegistrationYearOptions(transcriptYears: number[]): number[
     if (Number.isFinite(ty)) set.add(Math.trunc(ty))
   }
   return Array.from(set).sort((a, b) => b - a)
+  
 }
