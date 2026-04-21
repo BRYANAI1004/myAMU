@@ -4,22 +4,18 @@ import {
   deleteAdminClinicalSlot,
   deleteAdminClinicalSlotEnrollment,
   fetchAcademicTerms,
-  fetchAdminClinicalRequests,
   fetchAdminClinicalSlots,
   fetchAdminClinicalSlotRoster,
-  postApproveClinicalRequest,
-  postRejectClinicalRequest,
   updateAdminClinicalSlot,
   type AcademicTerm,
   type AdminClinicalSlot,
   type AdminClinicalSlotRosterRow,
-  type AdminPendingClinicalRequestItem,
 } from '../../lib/api'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { WEEKDAYS_FULL_ORDERED } from '../../lib/weekdaySchedule'
 import { ClinicalOfferedTimetablePage } from '../clinical/ClinicalOfferedTimetablePage'
 
-type AdminClinicalTabId = 'roster' | 'requests' | 'slots' | 'offered-timetable'
+type AdminClinicalTabId = 'roster' | 'offered-timetable'
 
 type SlotModalMode = 'add' | 'edit' | null
 
@@ -106,14 +102,6 @@ export function AdminClinicalPage() {
   useAdminAuth()
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
 
-  const [pendingRequests, setPendingRequests] = useState<
-    AdminPendingClinicalRequestItem[] | null
-  >(null)
-  const [pendingLoading, setPendingLoading] = useState(false)
-  const [pendingError, setPendingError] = useState<string | null>(null)
-  const [pendingReloadKey, setPendingReloadKey] = useState(0)
-  const [pendingActionId, setPendingActionId] = useState<number | null>(null)
-
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
   const [slotsTermId, setSlotsTermId] = useState('')
   const [slots, setSlots] = useState<AdminClinicalSlot[] | null>(null)
@@ -141,33 +129,6 @@ export function AdminClinicalPage() {
 
   useEffect(() => {
     const ac = new AbortController()
-    setPendingLoading(true)
-    setPendingError(null)
-    ;(async () => {
-      try {
-        const list = await fetchAdminClinicalRequests({ signal: ac.signal })
-        if (ac.signal.aborted) return
-        setPendingRequests(list)
-        setPendingError(null)
-      } catch (e) {
-        if (ac.signal.aborted) return
-        setPendingRequests(null)
-        setPendingError(
-          e instanceof Error
-            ? e.message
-            : 'Could not load pending clinical requests.',
-        )
-      } finally {
-        if (!ac.signal.aborted) {
-          setPendingLoading(false)
-        }
-      }
-    })()
-    return () => ac.abort()
-  }, [pendingReloadKey])
-
-  useEffect(() => {
-    const ac = new AbortController()
     ;(async () => {
       try {
         const list = await fetchAcademicTerms({ signal: ac.signal })
@@ -188,7 +149,7 @@ export function AdminClinicalPage() {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'slots' && tab !== 'roster') return
+    if (tab !== 'roster') return
     const ac = new AbortController()
     if (slotsTermId.trim() === '') {
       setSlots(null)
@@ -219,12 +180,6 @@ export function AdminClinicalPage() {
     })()
     return () => ac.abort()
   }, [tab, slotsTermId, slotsReloadKey])
-
-  useEffect(() => {
-    if (tab === 'requests') {
-      setRosterSlot(null)
-    }
-  }, [tab])
 
   useEffect(() => {
     if (rosterSlot == null) {
@@ -261,12 +216,6 @@ export function AdminClinicalPage() {
   const rosterTermLabel = academicTermDisplayLabel(terms, slotsTermId)
   const termsLoading = terms == null
   const hasTerms = (terms?.length ?? 0) > 0
-  const rosterSlotsLoading = slotsLoading && slots === null && slotsError === null
-  const rosterSlotsReady =
-    slotsTermId.trim() !== '' &&
-    !slotsLoading &&
-    !slotsError &&
-    slots != null
 
   return (
     <main className="admin-page">
@@ -289,34 +238,6 @@ export function AdminClinicalPage() {
           onClick={() => setTab('roster')}
         >
           Clinical Roster
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'requests'}
-          className={[
-            'portal-tab',
-            tab === 'requests' ? 'portal-tab--active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          onClick={() => setTab('requests')}
-        >
-          Pending Requests
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'slots'}
-          className={[
-            'portal-tab',
-            tab === 'slots' ? 'portal-tab--active' : '',
-          ]
-            .filter(Boolean)
-            .join(' ')}
-          onClick={() => setTab('slots')}
-        >
-          Manage Slots
         </button>
         <button
           type="button"
@@ -352,282 +273,6 @@ export function AdminClinicalPage() {
                 Academic term
                 <select
                   id="admin-clinical-roster-term-filter"
-                  className="admin-input"
-                  style={{ minWidth: '14rem' }}
-                  value={slotsTermId}
-                  onChange={(e) => setSlotsTermId(e.target.value)}
-                >
-                  <option value="">Select term…</option>
-                  {(terms ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.term_label} ({t.year} · {t.term_name})
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
-          {!termsLoading && !hasTerms ? (
-            <p className="portal-card-note" style={{ marginTop: '0.75rem' }}>
-              No academic terms are available yet.
-            </p>
-          ) : null}
-
-          {slotsTermId.trim() !== '' && rosterSlotsLoading ? (
-            <section
-              className="portal-card portal-profile-state"
-              aria-busy="true"
-              aria-live="polite"
-            >
-              <p className="portal-profile-state__title">Loading slots</p>
-              <p className="portal-profile-state__detail">
-                Fetching clinical timetable rows for the selected term.
-              </p>
-            </section>
-          ) : null}
-
-          {slotsTermId.trim() !== '' && slotsError ? (
-            <section
-              className="portal-card portal-profile-state portal-profile-state--error"
-              role="alert"
-            >
-              <p className="portal-profile-state__title">Could not load slots</p>
-              <p className="portal-profile-state__detail">{slotsError}</p>
-              <div className="portal-actions portal-profile-state__actions">
-                <button
-                  type="button"
-                  className="portal-btn portal-btn--secondary"
-                  onClick={() => setSlotsReloadKey((k) => k + 1)}
-                >
-                  Try again
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {rosterSlotsReady ? (
-            <div className="portal-table-wrap admin-table-wrap">
-              <table className="portal-table portal-data-table admin-students-table--center">
-                <thead>
-                  <tr>
-                    <th scope="col">Academic term</th>
-                    <th scope="col">Day</th>
-                    <th scope="col">Time</th>
-                    <th scope="col">Slot</th>
-                    <th scope="col">Instructor</th>
-                    <th scope="col">Capacities (100 / 200 / 300 / All)</th>
-                    <th scope="col">Active enrolled</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {slots.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="portal-card-note">
-                        No clinical slots for this term yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    slots.map((s) => (
-                      <tr key={s.id}>
-                        <td>{rosterTermLabel}</td>
-                        <td>{s.weekday || '—'}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          {s.timeFrom || '—'}–{s.timeTo || '—'}
-                        </td>
-                        <td>{s.slot}</td>
-                        <td
-                          style={{
-                            maxWidth: '12rem',
-                            textAlign: 'left',
-                            whiteSpace: 'normal',
-                          }}
-                        >
-                          {s.instructor || '—'}
-                        </td>
-                        <td style={{ whiteSpace: 'nowrap' }}>
-                          {s.cap100} / {s.cap200} / {s.cap300} / {s.cap123}
-                        </td>
-                        <td>{s.activeEnrolledCount}</td>
-                        <td>
-                          <button
-                            type="button"
-                            className="portal-btn portal-btn--secondary"
-                            style={{
-                              padding: '0.35rem 0.65rem',
-                              fontSize: '0.8125rem',
-                            }}
-                            onClick={() => {
-                              setRosterSlot(s)
-                            }}
-                          >
-                            View Roster
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-
-      {tab === 'requests' ? (
-        <section
-          className="portal-module-panel"
-          aria-labelledby="admin-pending-clinical-requests-heading"
-        >
-          <h2
-            id="admin-pending-clinical-requests-heading"
-            className="portal-module-panel-heading"
-          >
-            Pending clinical requests
-          </h2>
-          {pendingLoading && pendingRequests === null ? (
-            <p className="portal-card-note" aria-live="polite">
-              Loading requests…
-            </p>
-          ) : null}
-          {pendingError ? (
-            <p className="portal-page-lede" role="alert">
-              {pendingError}
-            </p>
-          ) : null}
-          {!pendingLoading && !pendingError && pendingRequests != null ? (
-            <div className="portal-table-wrap admin-table-wrap">
-              <table className="portal-table portal-data-table admin-students-table--center">
-                <thead>
-                  <tr>
-                    <th scope="col">Student ID</th>
-                    <th scope="col">Slot</th>
-                    <th scope="col">Term / year</th>
-                    <th scope="col">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pendingRequests.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="portal-card-note">
-                        No pending clinical requests.
-                      </td>
-                    </tr>
-                  ) : (
-                    pendingRequests.map((r) => {
-                      const busy = pendingActionId === r.id
-                      return (
-                        <tr key={r.id}>
-                          <td>{r.studentId}</td>
-                          <td
-                            style={{
-                              maxWidth: '20rem',
-                              textAlign: 'left',
-                              whiteSpace: 'normal',
-                            }}
-                          >
-                            {r.slotLabel}
-                          </td>
-                          <td>
-                            {r.term} {r.year}
-                          </td>
-                          <td>
-                            <div
-                              className="portal-actions"
-                              style={{
-                                flexWrap: 'wrap',
-                                gap: '0.35rem',
-                                justifyContent: 'flex-end',
-                              }}
-                            >
-                              <button
-                                type="button"
-                                className="portal-btn portal-btn--primary"
-                                style={{
-                                  padding: '0.35rem 0.65rem',
-                                  fontSize: '0.8125rem',
-                                }}
-                                disabled={busy}
-                                onClick={() => {
-                                  setPendingActionId(r.id)
-                                  ;(async () => {
-                                    try {
-                                      await postApproveClinicalRequest(r.id)
-                                      setPendingReloadKey((k) => k + 1)
-                                    } catch (e) {
-                                      window.alert(
-                                        e instanceof Error
-                                          ? e.message
-                                          : 'Approve failed.',
-                                      )
-                                    } finally {
-                                      setPendingActionId(null)
-                                    }
-                                  })()
-                                }}
-                              >
-                                {busy ? '…' : 'Approve'}
-                              </button>
-                              <button
-                                type="button"
-                                className="portal-btn portal-btn--secondary"
-                                style={{
-                                  padding: '0.35rem 0.65rem',
-                                  fontSize: '0.8125rem',
-                                }}
-                                disabled={busy}
-                                onClick={() => {
-                                  setPendingActionId(r.id)
-                                  ;(async () => {
-                                    try {
-                                      await postRejectClinicalRequest(r.id)
-                                      setPendingReloadKey((k) => k + 1)
-                                    } catch (e) {
-                                      window.alert(
-                                        e instanceof Error
-                                          ? e.message
-                                          : 'Reject failed.',
-                                      )
-                                    } finally {
-                                      setPendingActionId(null)
-                                    }
-                                  })()
-                                }}
-                              >
-                                {busy ? '…' : 'Reject'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
-        </section>
-      ) : null}
-
-      {tab === 'slots' ? (
-        <>
-          <div className="admin-page__toolbar">
-            <div className="admin-page__toolbar-actions" style={{ width: '100%' }}>
-              <label
-                htmlFor="admin-clinical-slots-term-filter"
-                className="portal-card-note"
-                style={{
-                  marginRight: 'auto',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap',
-                }}
-              >
-                Academic term
-                <select
-                  id="admin-clinical-slots-term-filter"
                   className="admin-input"
                   style={{ minWidth: '14rem' }}
                   value={slotsTermId}
@@ -695,14 +340,12 @@ export function AdminClinicalPage() {
             </section>
           ) : null}
 
-          {slotsTermId.trim() !== '' &&
-          !slotsLoading &&
-          !slotsError &&
-          slots != null ? (
+          {slotsTermId.trim() !== '' && !slotsLoading && !slotsError && slots != null ? (
             <div className="portal-table-wrap admin-table-wrap">
               <table className="portal-table portal-data-table admin-students-table--center">
                 <thead>
                   <tr>
+                    <th scope="col">Academic term</th>
                     <th scope="col">Day</th>
                     <th scope="col">Time From</th>
                     <th scope="col">Time To</th>
@@ -712,13 +355,14 @@ export function AdminClinicalPage() {
                     <th scope="col">200 Level</th>
                     <th scope="col">300 Level</th>
                     <th scope="col">All Levels</th>
+                    <th scope="col">Active enrolled</th>
                     <th scope="col">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {slots.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="portal-card-note">
+                      <td colSpan={11} className="portal-card-note">
                         No clinical slots for this term yet.
                       </td>
                     </tr>
@@ -727,6 +371,7 @@ export function AdminClinicalPage() {
                       const busy = deletingSlotId === s.id
                       return (
                         <tr key={s.id}>
+                          <td>{rosterTermLabel}</td>
                           <td>{s.weekday || '—'}</td>
                           <td>{s.timeFrom || '—'}</td>
                           <td>{s.timeTo || '—'}</td>
@@ -744,6 +389,7 @@ export function AdminClinicalPage() {
                           <td>{s.cap200}</td>
                           <td>{s.cap300}</td>
                           <td>{s.cap123}</td>
+                          <td>{s.activeEnrolledCount}</td>
                           <td>
                             <div
                               className="portal-actions"
@@ -777,9 +423,7 @@ export function AdminClinicalPage() {
                                 disabled={busy}
                                 onClick={() => {
                                   setEditingSlotId(s.id)
-                                  setSlotForm(
-                                    slotRowToForm(s, slotsTermId.trim()),
-                                  )
+                                  setSlotForm(slotRowToForm(s, slotsTermId.trim()))
                                   setSlotFormError(null)
                                   setSlotModalMode('edit')
                                 }}
@@ -816,7 +460,9 @@ export function AdminClinicalPage() {
                                       })
                                       setSlotsReloadKey((k) => k + 1)
                                       setSlotDeleteError(null)
-                                      setSlotDeleteFeedback('Slot deleted successfully.')
+                                      setSlotDeleteFeedback(
+                                        'Slot deleted successfully.',
+                                      )
                                     } catch (e) {
                                       setSlotDeleteError(
                                         e instanceof Error
