@@ -4,15 +4,19 @@ import {
   deleteAdminClinicalSlot,
   deleteAdminClinicalSlotEnrollment,
   fetchAcademicTerms,
+  fetchAdminClinicalExamRequests,
   fetchAdminInstructors,
   fetchAdminClinicalSlots,
   fetchAdminClinicalSlotRoster,
+  postAdminClinicalExamRequestAssign,
   updateAdminClinicalSlot,
   type AcademicTerm,
   type AdminInstructor,
   type AdminClinicalSlot,
   type AdminClinicalSlotRosterRow,
+  type ClinicalExamRequestDto,
 } from '../../lib/api'
+import { formatMoney } from '../../lib/formatMoney'
 import { useAdminAuth } from '../../context/AdminAuthContext'
 import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import { adminClinicalSlotsToLayoutRows } from '../../lib/clinicalTimetableAdapter'
@@ -27,7 +31,7 @@ import {
   type WeekdayFull,
 } from '../../lib/weekdaySchedule'
 
-type AdminClinicalTabId = 'roster' | 'offered-timetable'
+type AdminClinicalTabId = 'roster' | 'offered-timetable' | 'exam-requests'
 
 type SlotModalMode = 'add' | 'edit' | null
 
@@ -166,6 +170,11 @@ function weekdayLabel(day: WeekdayFull): string {
   return day
 }
 
+function timeFromDbForTimeInput(raw: string | null | undefined): string {
+  if (!raw || raw.trim() === '') return ''
+  return normalizeTimeForSelect(raw.trim()) || ''
+}
+
 export function AdminClinicalPage() {
   useAdminAuth()
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
@@ -197,6 +206,19 @@ export function AdminClinicalPage() {
   const [rosterLoading, setRosterLoading] = useState(false)
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [rosterRemovingKey, setRosterRemovingKey] = useState<string | null>(null)
+
+  const [examRows, setExamRows] = useState<ClinicalExamRequestDto[] | null>(null)
+  const [examLoading, setExamLoading] = useState(false)
+  const [examError, setExamError] = useState<string | null>(null)
+  const [examReloadKey, setExamReloadKey] = useState(0)
+  const [assignOpen, setAssignOpen] = useState(false)
+  const [assignRow, setAssignRow] = useState<ClinicalExamRequestDto | null>(null)
+  const [assignDate, setAssignDate] = useState('')
+  const [assignTime, setAssignTime] = useState('')
+  const [assignNotes, setAssignNotes] = useState('')
+  const [assignStatus, setAssignStatus] = useState('requested')
+  const [assignSaving, setAssignSaving] = useState(false)
+  const [assignError, setAssignError] = useState<string | null>(null)
 
   useEffect(() => {
     const ac = new AbortController()
@@ -282,6 +304,29 @@ export function AdminClinicalPage() {
     })()
     return () => ac.abort()
   }, [rosterSlot])
+
+  useEffect(() => {
+    if (tab !== 'exam-requests') return
+    const ac = new AbortController()
+    setExamLoading(true)
+    setExamError(null)
+    ;(async () => {
+      try {
+        const list = await fetchAdminClinicalExamRequests({ signal: ac.signal })
+        if (ac.signal.aborted) return
+        setExamRows(list)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setExamRows(null)
+        setExamError(
+          e instanceof Error ? e.message : 'Could not load clinical exam requests.',
+        )
+      } finally {
+        if (!ac.signal.aborted) setExamLoading(false)
+      }
+    })()
+    return () => ac.abort()
+  }, [tab, examReloadKey])
 
   useEffect(() => {
     if (slotModalMode == null) return
@@ -385,8 +430,23 @@ export function AdminClinicalPage() {
         >
           Offered Timetable
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'exam-requests'}
+          className={[
+            'portal-tab',
+            tab === 'exam-requests' ? 'portal-tab--active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          onClick={() => setTab('exam-requests')}
+        >
+          Exam Requests
+        </button>
       </div>
 
+      {tab === 'roster' || tab === 'offered-timetable' ? (
       <div className="admin-page__toolbar">
         <div className="admin-page__toolbar-actions" style={{ width: '100%' }}>
           <label
@@ -431,6 +491,7 @@ export function AdminClinicalPage() {
           </button>
         </div>
       </div>
+      ) : null}
 
       {tab === 'roster' ? (
         <>
@@ -1104,6 +1165,222 @@ export function AdminClinicalPage() {
             )
           ) : null}
         </section>
+      ) : null}
+
+      {tab === 'exam-requests' ? (
+        <section className="portal-stack" style={{ marginTop: '0.75rem' }}>
+          <p className="portal-text-muted" style={{ marginTop: 0 }}>
+            Student exam registrations and fees. Assign or update the exam date after
+            coordinating with the student.
+          </p>
+          {examLoading && examRows === null ? (
+            <p className="portal-card-note" aria-live="polite">
+              Loading exam requests…
+            </p>
+          ) : null}
+          {examError ? (
+            <p className="portal-page-lede" role="alert">
+              {examError}
+            </p>
+          ) : null}
+          {!examLoading && examRows != null && examRows.length === 0 ? (
+            <p className="portal-card-note">No clinical exam requests yet.</p>
+          ) : null}
+          {examRows != null && examRows.length > 0 ? (
+            <div className="portal-table-wrap admin-table-wrap">
+              <table className="portal-table portal-data-table admin-students-table--center">
+                <thead>
+                  <tr>
+                    <th scope="col">Student ID</th>
+                    <th scope="col">Exam</th>
+                    <th scope="col">Term</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Requested at</th>
+                    <th scope="col">Assigned date</th>
+                    <th scope="col">Fee</th>
+                    <th scope="col">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {examRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.studentId}</td>
+                      <td style={{ textAlign: 'left', whiteSpace: 'normal' }}>
+                        {r.examCode} — {r.examName}
+                      </td>
+                      <td>
+                        {r.term} {r.year}
+                      </td>
+                      <td>{r.status}</td>
+                      <td>{formatClinicalRosterBookedAt(r.createdAt)}</td>
+                      <td>
+                        {r.assignedExamDate
+                          ? `${r.assignedExamDate}${r.assignedExamTime ? ` · ${r.assignedExamTime}` : ''}`
+                          : '—'}
+                      </td>
+                      <td>{formatMoney(r.registrationFeeUsd)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="portal-btn portal-btn--secondary"
+                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8125rem' }}
+                          onClick={() => {
+                            setAssignRow(r)
+                            setAssignDate((r.assignedExamDate ?? '').slice(0, 10))
+                            setAssignTime(timeFromDbForTimeInput(r.assignedExamTime))
+                            setAssignNotes(r.notes ?? '')
+                            setAssignStatus(r.status)
+                            setAssignError(null)
+                            setAssignOpen(true)
+                          }}
+                        >
+                          Assign / Update Date
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {assignOpen && assignRow != null ? (
+        <div
+          className="admin-section-detail-backdrop"
+          role="presentation"
+          onMouseDown={(ev) => {
+            if (ev.target === ev.currentTarget && !assignSaving) {
+              setAssignOpen(false)
+              setAssignRow(null)
+            }
+          }}
+        >
+          <div
+            className="admin-section-detail-modal admin-section-detail-modal--form-wide"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="admin-clinical-exam-assign-title"
+          >
+            <h2
+              id="admin-clinical-exam-assign-title"
+              className="admin-section-detail-modal__title"
+            >
+              Assign exam
+            </h2>
+            <p className="admin-section-detail-modal__meta">
+              {assignRow.studentId} · {assignRow.examCode} — {assignRow.examName} ·{' '}
+              {assignRow.term} {assignRow.year}
+            </p>
+            {assignError ? (
+              <p className="portal-page-lede" role="alert">
+                {assignError}
+              </p>
+            ) : null}
+            <form
+              className="portal-stack"
+              style={{ marginTop: '0.75rem' }}
+              onSubmit={(e) => {
+                e.preventDefault()
+                setAssignError(null)
+                void (async () => {
+                  setAssignSaving(true)
+                  try {
+                    await postAdminClinicalExamRequestAssign(assignRow.id, {
+                      assignedExamDate: assignDate.trim() === '' ? null : assignDate.trim(),
+                      assignedExamTime: assignTime.trim() === '' ? null : assignTime.trim(),
+                      notes: assignNotes,
+                      status: assignStatus,
+                    })
+                    setExamReloadKey((k) => k + 1)
+                    setAssignOpen(false)
+                    setAssignRow(null)
+                  } catch (err) {
+                    setAssignError(
+                      err instanceof Error ? err.message : 'Could not save assignment.',
+                    )
+                  } finally {
+                    setAssignSaving(false)
+                  }
+                })()
+              }}
+            >
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-date">
+                  Assigned date
+                </label>
+                <input
+                  id="admin-exam-assign-date"
+                  className="portal-input"
+                  type="date"
+                  value={assignDate}
+                  onChange={(ev) => setAssignDate(ev.target.value)}
+                />
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-time">
+                  Assigned time
+                </label>
+                <input
+                  id="admin-exam-assign-time"
+                  className="portal-input"
+                  type="time"
+                  value={assignTime}
+                  onChange={(ev) => setAssignTime(ev.target.value)}
+                />
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-status">
+                  Status
+                </label>
+                <select
+                  id="admin-exam-assign-status"
+                  className="portal-input"
+                  value={assignStatus}
+                  onChange={(ev) => setAssignStatus(ev.target.value)}
+                >
+                  <option value="requested">requested</option>
+                  <option value="scheduled">scheduled</option>
+                  <option value="completed">completed</option>
+                  <option value="cancelled">cancelled</option>
+                </select>
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-notes">
+                  Notes
+                </label>
+                <textarea
+                  id="admin-exam-assign-notes"
+                  className="portal-input"
+                  rows={3}
+                  value={assignNotes}
+                  onChange={(ev) => setAssignNotes(ev.target.value)}
+                />
+              </div>
+              <div
+                className="portal-actions"
+                style={{ marginTop: '1rem', justifyContent: 'flex-end' }}
+              >
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--secondary"
+                  disabled={assignSaving}
+                  onClick={() => {
+                    if (assignSaving) return
+                    setAssignOpen(false)
+                    setAssignRow(null)
+                  }}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className="portal-btn portal-btn--primary" disabled={assignSaving}>
+                  {assignSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       ) : null}
 
       {rosterSlot != null ? (

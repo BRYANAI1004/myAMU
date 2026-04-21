@@ -18,7 +18,8 @@ function devMessage(e: unknown): string {
 /**
  * GET /api/student/clinical-progress?studentId=
  *
- * Reads passed clinical completions from legacy `clinic` only (grade P, raw hours column).
+ * Reads passed clinical completions from legacy `clinic` (grade P, raw hours column) and
+ * a fixed five-row clinical exam history from the same `clinic` table (code prefix + grade).
  */
 export async function getStudentClinicalProgressHandler(
   req: Request,

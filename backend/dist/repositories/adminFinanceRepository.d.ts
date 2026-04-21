@@ -1,4 +1,6 @@
-import type { Pool } from "mysql2/promise";
+import type { Pool, PoolConnection } from "mysql2/promise";
+/** Pool or transaction connection for inserts. */
+export type PortalBillingSqlExecutor = Pool | PoolConnection;
 export type PortalBillingCategory = "tuition" | "clinical" | "fees" | "other";
 export declare const LATE_FEE_DESCRIPTION = "Late Payment Fee";
 export type FinanceRosterRow = {
@@ -59,7 +61,7 @@ export declare function setFinanceQuarterDdlOnAcademicTerms(pool: Pool, term: st
 /** Students with any portal billing activity for the term (late fee candidates). */
 export declare function listStudentIdsWithPortalQuarterActivity(pool: Pool, term: string, year: number): Promise<string[]>;
 export declare function hasSystemLateFeeForQuarter(pool: Pool, studentExternalId: string, term: string, year: number): Promise<boolean>;
-export declare function insertPortalBillingAdjustment(pool: Pool, params: {
+export declare function insertPortalBillingAdjustment(pool: PortalBillingSqlExecutor, params: {
     studentExternalId: string;
     term: string;
     year: number;
@@ -70,7 +72,7 @@ export declare function insertPortalBillingAdjustment(pool: Pool, params: {
     /** When set, links a `system_clinical` slot booking charge to `clinical_enrollments.id`. */
     clinicalEnrollmentId?: number | null;
 }): Promise<number>;
-export declare function insertSystemLateFee(pool: Pool, params: {
+export declare function insertSystemLateFee(pool: PortalBillingSqlExecutor, params: {
     studentExternalId: string;
     term: string;
     year: number;

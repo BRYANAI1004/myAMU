@@ -111,6 +111,12 @@ import {
   postAdminClinicalAssignHandler,
 } from "../controllers/clinicalScheduleController.js";
 import {
+  getAdminClinicalExamRequestsHandler,
+  getStudentClinicalExamRequestsHandler,
+  postAdminClinicalExamRequestAssignHandler,
+  postStudentClinicalExamRequestHandler,
+} from "../controllers/clinicalExamRequestController.js";
+import {
   getAdminStudentDocumentRequirementsHandler,
   getStudentDocumentRequirementsHandler,
   postAdminStudentDocumentRequirementResetHandler,
@@ -130,6 +136,8 @@ apiRouter.post("/student/enroll", postStudentEnroll);
 apiRouter.post("/student/withdraw", postStudentWithdraw);
 apiRouter.get("/student/enrolled-sections", getStudentEnrolledSections);
 apiRouter.get("/student/clinical-progress", getStudentClinicalProgressHandler);
+apiRouter.post("/student/clinical/exam-request", postStudentClinicalExamRequestHandler);
+apiRouter.get("/student/clinical/exam-requests", getStudentClinicalExamRequestsHandler);
 apiRouter.put("/student/profile", putStudentProfile);
 
 apiRouter.post("/ai/ask", postAiAsk);
@@ -240,6 +248,11 @@ adminRouter.post(
 adminRouter.post(
   "/clinical/requests/:id/reject",
   postRejectClinicalRequestHandler,
+);
+adminRouter.get("/clinical/exam-requests", getAdminClinicalExamRequestsHandler);
+adminRouter.post(
+  "/clinical/exam-requests/:id/assign",
+  postAdminClinicalExamRequestAssignHandler,
 );
 adminRouter.get(
   "/students/:studentId/documents",

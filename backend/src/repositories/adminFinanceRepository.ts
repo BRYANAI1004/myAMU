@@ -1,5 +1,8 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2";
-import type { Pool } from "mysql2/promise";
+import type { Pool, PoolConnection } from "mysql2/promise";
+
+/** Pool or transaction connection for inserts. */
+export type PortalBillingSqlExecutor = Pool | PoolConnection;
 
 export type PortalBillingCategory = "tuition" | "clinical" | "fees" | "other";
 
@@ -426,7 +429,7 @@ export async function hasSystemLateFeeForQuarter(
 }
 
 export async function insertPortalBillingAdjustment(
-  pool: Pool,
+  pool: PortalBillingSqlExecutor,
   params: {
     studentExternalId: string;
     term: string;
@@ -475,7 +478,7 @@ export async function insertPortalBillingAdjustment(
 }
 
 export async function insertSystemLateFee(
-  pool: Pool,
+  pool: PortalBillingSqlExecutor,
   params: {
     studentExternalId: string;
     term: string;

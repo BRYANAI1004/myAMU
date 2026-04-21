@@ -11,6 +11,7 @@ export function ClinicalNav() {
     { to: 'schedule', labelKey: 'clinicSchedule' as const },
     { to: 'my-schedule', labelKey: 'clinicalMyScheduleNav' as const },
     { to: 'progress', labelKey: 'clinicalProgressNav' as const },
+    { to: 'exam-registration', labelKey: 'clinicalExamRegistrationNav' as const },
   ]
 
   return (

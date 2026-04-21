@@ -1783,10 +1783,20 @@ export type StudentClinicalProgressRecord = {
   hours: number
 }
 
+export type StudentClinicalExamHistoryItem = {
+  code: string
+  examName: string
+  status: 'Not Taken' | 'Pending Grade' | 'Completed'
+  grade: string | null
+  term: string | null
+  year: number | null
+}
+
 export type StudentClinicalProgressResponse = {
   completedCount: number
   totalHours: number
   records: StudentClinicalProgressRecord[]
+  exams: StudentClinicalExamHistoryItem[]
 }
 
 function isStudentClinicalProgressRecord(x: unknown): x is StudentClinicalProgressRecord {
@@ -1804,6 +1814,24 @@ function isStudentClinicalProgressRecord(x: unknown): x is StudentClinicalProgre
   )
 }
 
+function isStudentClinicalExamHistoryItem(x: unknown): x is StudentClinicalExamHistoryItem {
+  if (x == null || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  const status = o.status
+  const okStatus =
+    status === 'Not Taken' || status === 'Pending Grade' || status === 'Completed'
+  if (!okStatus) return false
+  const year = o.year
+  const yearOk = year === null || (typeof year === 'number' && Number.isFinite(year))
+  return (
+    typeof o.code === 'string' &&
+    typeof o.examName === 'string' &&
+    (o.grade === null || typeof o.grade === 'string') &&
+    (o.term === null || typeof o.term === 'string') &&
+    yearOk
+  )
+}
+
 function isStudentClinicalProgressResponse(x: unknown): x is StudentClinicalProgressResponse {
   if (x == null || typeof x !== 'object') return false
   const o = x as Record<string, unknown>
@@ -1813,6 +1841,10 @@ function isStudentClinicalProgressResponse(x: unknown): x is StudentClinicalProg
   if (!Array.isArray(o.records)) return false
   for (const row of o.records) {
     if (!isStudentClinicalProgressRecord(row)) return false
+  }
+  if (!Array.isArray(o.exams)) return false
+  for (const row of o.exams) {
+    if (!isStudentClinicalExamHistoryItem(row)) return false
   }
   return true
 }
@@ -1826,6 +1858,152 @@ export async function fetchStudentClinicalProgress(
   const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
   if (!isStudentClinicalProgressResponse(data)) {
     throw new Error('Unexpected clinical progress response')
+  }
+  return data
+}
+
+/** GET/POST clinical exam registration (portal `clinical_exam_requests`). */
+export type ClinicalExamRequestDto = {
+  id: number
+  studentId: string
+  examCode: string
+  examName: string
+  term: string
+  year: number
+  status: string
+  assignedExamDate: string | null
+  assignedExamTime: string | null
+  assignedBy: string | null
+  assignedAt: string | null
+  notes: string | null
+  billingAdjustmentId: number | null
+  registrationFeeUsd: number
+  createdAt: string
+  updatedAt: string
+}
+
+function isClinicalExamRequestDto(x: unknown): x is ClinicalExamRequestDto {
+  if (x == null || typeof x !== 'object') return false
+  const o = x as Record<string, unknown>
+  return (
+    typeof o.id === 'number' &&
+    typeof o.studentId === 'string' &&
+    typeof o.examCode === 'string' &&
+    typeof o.examName === 'string' &&
+    typeof o.term === 'string' &&
+    typeof o.year === 'number' &&
+    typeof o.status === 'string' &&
+    (o.assignedExamDate === null || typeof o.assignedExamDate === 'string') &&
+    (o.assignedExamTime === null || typeof o.assignedExamTime === 'string') &&
+    (o.assignedBy === null || typeof o.assignedBy === 'string') &&
+    (o.assignedAt === null || typeof o.assignedAt === 'string') &&
+    (o.notes === null || typeof o.notes === 'string') &&
+    (o.billingAdjustmentId === null || typeof o.billingAdjustmentId === 'number') &&
+    typeof o.registrationFeeUsd === 'number' &&
+    typeof o.createdAt === 'string' &&
+    typeof o.updatedAt === 'string'
+  )
+}
+
+/** POST /api/student/clinical/exam-request?studentId= */
+export async function postStudentClinicalExamRequest(
+  studentId: string,
+  body: { examCode: string; term: string; year: number },
+  options?: { signal?: AbortSignal },
+): Promise<ClinicalExamRequestDto> {
+  const qs = new URLSearchParams({ studentId: studentId.trim() })
+  const path = `/api/student/clinical/exam-request?${qs.toString()}`
+  const data = (await fetchApiJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (!isClinicalExamRequestDto(data)) {
+    throw new Error('Unexpected clinical exam request create response')
+  }
+  return data
+}
+
+/** GET /api/student/clinical/exam-requests?studentId= */
+export async function fetchStudentClinicalExamRequests(
+  studentId: string,
+  options?: { signal?: AbortSignal },
+): Promise<ClinicalExamRequestDto[]> {
+  const qs = new URLSearchParams({ studentId: studentId.trim() })
+  const path = `/api/student/clinical/exam-requests?${qs.toString()}`
+  const data = (await fetchApiJson(path, { signal: options?.signal })) as unknown
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected clinical exam requests list response')
+  }
+  for (const row of data) {
+    if (!isClinicalExamRequestDto(row)) {
+      throw new Error('Unexpected clinical exam requests list response')
+    }
+  }
+  return data
+}
+
+function readAdminSessionHeaders(): Record<string, string> | undefined {
+  if (typeof window === 'undefined') return undefined
+  try {
+    const raw = window.sessionStorage.getItem('amu_admin_session')
+    if (!raw) return undefined
+    const parsed = JSON.parse(raw) as { role?: unknown; email?: unknown }
+    const headers: Record<string, string> = {}
+    if (typeof parsed.role === 'string' && parsed.role.trim() !== '') {
+      headers['X-Admin-Role'] = parsed.role.trim()
+    }
+    if (typeof parsed.email === 'string' && parsed.email.trim() !== '') {
+      headers['X-Admin-Email'] = parsed.email.trim()
+    }
+    return Object.keys(headers).length > 0 ? headers : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** GET /api/admin/clinical/exam-requests */
+export async function fetchAdminClinicalExamRequests(options?: {
+  signal?: AbortSignal
+}): Promise<ClinicalExamRequestDto[]> {
+  const data = (await fetchApiJson('/api/admin/clinical/exam-requests', {
+    signal: options?.signal,
+  })) as unknown
+  if (!Array.isArray(data)) {
+    throw new Error('Unexpected admin clinical exam requests response')
+  }
+  for (const row of data) {
+    if (!isClinicalExamRequestDto(row)) {
+      throw new Error('Unexpected admin clinical exam requests response')
+    }
+  }
+  return data
+}
+
+/** POST /api/admin/clinical/exam-requests/:id/assign */
+export async function postAdminClinicalExamRequestAssign(
+  requestId: number,
+  body: {
+    assignedExamDate?: string | null
+    assignedExamTime?: string | null
+    notes?: string
+    status?: string
+  },
+  options?: { signal?: AbortSignal },
+): Promise<ClinicalExamRequestDto> {
+  const path = `/api/admin/clinical/exam-requests/${encodeURIComponent(String(requestId))}/assign`
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  const adminH = readAdminSessionHeaders()
+  if (adminH) Object.assign(headers, adminH)
+  const data = (await fetchApiJson(path, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (!isClinicalExamRequestDto(data)) {
+    throw new Error('Unexpected admin clinical exam assign response')
   }
   return data
 }
