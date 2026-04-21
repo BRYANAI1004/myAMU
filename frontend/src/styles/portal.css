@@ -7965,7 +7965,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 
 .admin-timetable-v2__head {
   display: grid;
-  grid-template-columns: 5.5rem repeat(7, minmax(0, 1fr));
+  grid-template-columns: 5.5rem repeat(var(--admin-tt-day-count, 7), minmax(0, 1fr));
   border-bottom: 1px solid var(--portal-border-subtle);
   background: var(--page-gray);
 }
@@ -7983,7 +7983,7 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 
 .admin-timetable-v2__main {
   display: grid;
-  grid-template-columns: 5.5rem repeat(7, minmax(0, 1fr));
+  grid-template-columns: 5.5rem repeat(var(--admin-tt-day-count, 7), minmax(0, 1fr));
 }
 
 .admin-timetable-v2__times {

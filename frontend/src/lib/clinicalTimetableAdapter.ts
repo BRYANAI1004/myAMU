@@ -1,4 +1,4 @@
-import type { ClinicalOfferedTimetableSlot } from './api'
+import type { AdminClinicalSlot, ClinicalOfferedTimetableSlot } from './api'
 import type { TimetableLayoutSource } from './timetableBlockLayout'
 
 /**
@@ -62,6 +62,37 @@ export function clinicalOfferedSlotsToLayoutRows(
       clinicDisplayName: clinicNameFromSlot(s),
       facultyDisplay: s.instructor?.trim() ? s.instructor.trim() : null,
       seatsDisplay: formatSeatsLine(s),
+    })
+  }
+  return out
+}
+
+/**
+ * Maps admin-managed clinical slot rows (`/api/admin/clinical/slots`) into
+ * shared timetable layout rows so roster and offered timetable stay in sync.
+ */
+export function adminClinicalSlotsToLayoutRows(
+  slots: readonly AdminClinicalSlot[],
+): ClinicalTimetableLayoutRow[] {
+  const out: ClinicalTimetableLayoutRow[] = []
+  for (const s of slots) {
+    const weekday = String(s.weekday ?? '').trim()
+    if (weekday === '') continue
+    const start_time = withSecondsHm(s.timeFrom)
+    const end_time = withSecondsHm(s.timeTo)
+    if (start_time == null || end_time == null) continue
+    const capacity = Math.max(0, s.cap100 + s.cap200 + s.cap300 + s.cap123)
+    const slotCode = s.slot.trim()
+    out.push({
+      id: s.id,
+      timetableId: s.id,
+      weekday,
+      start_time,
+      end_time,
+      clinicDisplayName: slotCode !== '' ? slotCode : `Slot ${s.id}`,
+      facultyDisplay: s.instructor.trim() ? s.instructor.trim() : null,
+      seatsDisplay:
+        capacity > 0 ? `${s.activeEnrolledCount} / ${capacity}` : `${s.activeEnrolledCount}`,
     })
   }
   return out

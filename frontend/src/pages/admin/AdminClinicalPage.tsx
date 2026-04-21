@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   createAdminClinicalSlot,
   deleteAdminClinicalSlot,
@@ -14,8 +14,18 @@ import {
   type AdminClinicalSlotRosterRow,
 } from '../../lib/api'
 import { useAdminAuth } from '../../context/AdminAuthContext'
-import { WEEKDAYS_FULL_ORDERED } from '../../lib/weekdaySchedule'
-import { ClinicalOfferedTimetablePage } from '../clinical/ClinicalOfferedTimetablePage'
+import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
+import { adminClinicalSlotsToLayoutRows } from '../../lib/clinicalTimetableAdapter'
+import { formatTimeHmsForDisplay } from '../../lib/formatScheduleTime'
+import {
+  buildPlacedBlocksByDayForLayout,
+  STUDENT_REGISTRATION_TIMETABLE_GRID,
+  timetableBodyHeightPx,
+} from '../../lib/timetableBlockLayout'
+import {
+  WEEKDAYS_FULL_ORDERED,
+  type WeekdayFull,
+} from '../../lib/weekdaySchedule'
 
 type AdminClinicalTabId = 'roster' | 'offered-timetable'
 
@@ -149,6 +159,13 @@ function pickLatestAcademicTermId(terms: AcademicTerm[]): string {
   return latest.id
 }
 
+const ADMIN_CLINICAL_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
+const ADMIN_CLINICAL_WEEKDAYS: readonly WeekdayFull[] = WEEKDAYS_FULL_ORDERED.slice(0, 5)
+
+function weekdayLabel(day: WeekdayFull): string {
+  return day
+}
+
 export function AdminClinicalPage() {
   useAdminAuth()
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
@@ -203,7 +220,6 @@ export function AdminClinicalPage() {
   }, [])
 
   useEffect(() => {
-    if (tab !== 'roster') return
     const ac = new AbortController()
     if (slotsTermId.trim() === '') {
       setSlots(null)
@@ -233,7 +249,7 @@ export function AdminClinicalPage() {
       }
     })()
     return () => ac.abort()
-  }, [tab, slotsTermId, slotsReloadKey])
+  }, [slotsTermId, slotsReloadKey])
 
   useEffect(() => {
     if (rosterSlot == null) {
@@ -319,6 +335,20 @@ export function AdminClinicalPage() {
     const bb = timeToMinutes(b) ?? Number.MAX_SAFE_INTEGER
     return aa - bb
   })
+  const timetableRows = useMemo(
+    () => adminClinicalSlotsToLayoutRows(slots ?? []),
+    [slots],
+  )
+  const placedWeekdays = useMemo(
+    () => buildPlacedBlocksByDayForLayout(timetableRows, ADMIN_CLINICAL_GRID),
+    [timetableRows],
+  )
+  const hourRows = useMemo(() => {
+    const sh = ADMIN_CLINICAL_GRID.startHour ?? 8
+    const eh = ADMIN_CLINICAL_GRID.endHour ?? 21
+    return Array.from({ length: eh - sh + 1 }, (_, i) => sh + i)
+  }, [])
+  const timetableHeightPx = timetableBodyHeightPx(ADMIN_CLINICAL_GRID)
   return (
     <main className="admin-page">
       <div className="admin-page__toolbar">
@@ -357,53 +387,53 @@ export function AdminClinicalPage() {
         </button>
       </div>
 
+      <div className="admin-page__toolbar">
+        <div className="admin-page__toolbar-actions" style={{ width: '100%' }}>
+          <label
+            htmlFor="admin-clinical-term-filter"
+            className="portal-card-note"
+            style={{
+              marginRight: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              flexWrap: 'wrap',
+            }}
+          >
+            Academic term
+            <select
+              id="admin-clinical-term-filter"
+              className="admin-input"
+              style={{ minWidth: '14rem' }}
+              value={slotsTermId}
+              onChange={(e) => setSlotsTermId(e.target.value)}
+            >
+              <option value="">Select term…</option>
+              {(terms ?? []).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.term_label} ({t.year} · {t.term_name})
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="portal-btn portal-btn--primary"
+            disabled={slotsTermId.trim() === ''}
+            onClick={() => {
+              setEditingSlotId(null)
+              setSlotForm(emptySlotForm(slotsTermId.trim()))
+              setSlotFormError(null)
+              setSlotModalMode('add')
+            }}
+          >
+            Create Slot
+          </button>
+        </div>
+      </div>
+
       {tab === 'roster' ? (
         <>
-          <div className="admin-page__toolbar">
-            <div className="admin-page__toolbar-actions" style={{ width: '100%' }}>
-              <label
-                htmlFor="admin-clinical-roster-term-filter"
-                className="portal-card-note"
-                style={{
-                  marginRight: 'auto',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap',
-                }}
-              >
-                Academic term
-                <select
-                  id="admin-clinical-roster-term-filter"
-                  className="admin-input"
-                  style={{ minWidth: '14rem' }}
-                  value={slotsTermId}
-                  onChange={(e) => setSlotsTermId(e.target.value)}
-                >
-                  <option value="">Select term…</option>
-                  {(terms ?? []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.term_label} ({t.year} · {t.term_name})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                className="portal-btn portal-btn--primary"
-                disabled={slotsTermId.trim() === ''}
-                onClick={() => {
-                  setEditingSlotId(null)
-                  setSlotForm(emptySlotForm(slotsTermId.trim()))
-                  setSlotFormError(null)
-                  setSlotModalMode('add')
-                }}
-              >
-                Create Slot
-              </button>
-            </div>
-          </div>
-
           {!termsLoading && !hasTerms ? (
             <p className="portal-card-note" style={{ marginTop: '0.75rem' }}>
               No academic terms are available yet.
@@ -464,7 +494,7 @@ export function AdminClinicalPage() {
                 <tbody>
                   {slots.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="portal-card-note">
+                      <td colSpan={12} className="portal-card-note">
                         No clinical slots for this term yet.
                       </td>
                     </tr>
@@ -970,7 +1000,102 @@ export function AdminClinicalPage() {
       ) : null}
 
       {tab === 'offered-timetable' ? (
-        <ClinicalOfferedTimetablePage embedded />
+        <section
+          className="portal-card portal-stack portal-clinical-offered-timetable portal-clinical-offered-timetable--embedded"
+          aria-labelledby="admin-clinical-offered-timetable-heading"
+        >
+          <h2
+            id="admin-clinical-offered-timetable-heading"
+            className="portal-section-heading"
+          >
+            Offered Timetable
+          </h2>
+          <p className="portal-text-muted" style={{ marginTop: 0 }}>
+            Weekly clinical slots for the selected term.
+          </p>
+
+          {!termsLoading && !hasTerms ? (
+            <p className="portal-text-muted" role="status">
+              No academic terms are available yet.
+            </p>
+          ) : null}
+
+          {slotsTermId.trim() === '' ? (
+            <p className="portal-text-muted" role="status">
+              Select an academic term to view the timetable.
+            </p>
+          ) : null}
+
+          {slotsTermId.trim() !== '' && slotsLoading && slots === null ? (
+            <p className="portal-text-muted" role="status">
+              Loading slots…
+            </p>
+          ) : null}
+
+          {slotsTermId.trim() !== '' && slotsError ? (
+            <p className="portal-text-muted" role="alert">
+              {slotsError}
+            </p>
+          ) : null}
+
+          {slotsTermId.trim() !== '' && !slotsLoading && !slotsError && slots != null ? (
+            timetableRows.length === 0 ? (
+              <p className="portal-text-muted" role="status">
+                No clinical slots for this term yet.
+              </p>
+            ) : (
+              <div className="portal-clinical-offered-timetable__scroll">
+                <div className="admin-timetable-wrap portal-clinical-offered-timetable__inner">
+                  <TimetableWeekGrid
+                    rootClassName="portal-clinical-offered-timetable__grid"
+                    weekdays={ADMIN_CLINICAL_WEEKDAYS}
+                    placedWeekdays={placedWeekdays}
+                    hourRows={hourRows}
+                    bodyHeightPx={timetableHeightPx}
+                    weekdayLabel={weekdayLabel}
+                    hourLabel={(h) => formatTimeHmsForDisplay(`${h}:00:00`)}
+                    renderBlock={(b, d) => {
+                      const row = b.source
+                      const colW = 100 / b.colCount
+                      const insetPx = 3
+                      return (
+                        <div
+                          key={`${row.timetableId}-${d}-${b.startMin}-${b.colIndex}`}
+                          className="admin-timetable-v2__block portal-clinical-offered-timetable__block"
+                          style={{
+                            top: b.topPx,
+                            height: b.heightPx,
+                            left: `calc(${colW * b.colIndex}% + ${insetPx}px)`,
+                            width: `calc(${colW}% - ${insetPx * 2}px)`,
+                            cursor: 'default',
+                          }}
+                        >
+                          <span className="admin-timetable-v2__block-title">
+                            {row.clinicDisplayName}
+                          </span>
+                          <span className="admin-timetable-v2__block-meta">
+                            {formatTimeHmsForDisplay(row.start_time)} -{' '}
+                            {formatTimeHmsForDisplay(row.end_time)}
+                          </span>
+                          {row.facultyDisplay ? (
+                            <span className="admin-timetable-v2__block-meta">
+                              {row.facultyDisplay}
+                            </span>
+                          ) : null}
+                          {row.seatsDisplay ? (
+                            <span className="admin-timetable-v2__block-meta">
+                              {row.seatsDisplay}
+                            </span>
+                          ) : null}
+                        </div>
+                      )
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          ) : null}
+        </section>
       ) : null}
 
       {rosterSlot != null ? (

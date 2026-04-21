@@ -20,6 +20,7 @@ import { postAiAsk } from "../controllers/aiAskController.js";
 import { getAdminClinicalRequestsHandler, getStudentClinicalRequestsHandler, postApproveClinicalRequestHandler, postRejectClinicalRequestHandler, postStudentClinicalRequestHandler, } from "../controllers/clinicalRequestController.js";
 import { deleteAdminClinicalSlotEnrollmentHandler, deleteStudentClinicalEnrollmentHandler, getAdminClinicalSlotRosterHandler, getStudentClinicalEnrollmentsHandler, getStudentOpenClinicalEnrollmentSlotsHandler, postAdminClinicalPaymentHoldCleanupHandler, postStudentClinicalEnrollmentHandler, } from "../controllers/clinicalEnrollmentController.js";
 import { deleteAdminClinicalSlotHandler, getAdminClinicalSlotsHandler, patchAdminClinicalSlotHandler, postAdminClinicalSlotHandler, } from "../controllers/adminClinicalSlotController.js";
+import { getAdminInstructorsHandler } from "../controllers/adminInstructorController.js";
 import { getAdminClinicalTimetableHandler, getClinicalOfferedTimetableHandler, getStudentClinicalScheduleHandler, postAdminClinicalAssignHandler, } from "../controllers/clinicalScheduleController.js";
 import { getAdminStudentDocumentRequirementsHandler, getStudentDocumentRequirementsHandler, postAdminStudentDocumentRequirementResetHandler, postAdminStudentDocumentRequirementsResetAllHandler, postStudentAgreementSubmitHandler, postStudentQuizSubmitHandler, } from "../controllers/studentDocumentsController.js";
 export const apiRouter = Router();
@@ -86,6 +87,7 @@ adminRouter.get("/clinical/slots/:timetableId/roster", getAdminClinicalSlotRoste
 adminRouter.delete("/clinical/slots/:timetableId/enrollments/:enrollmentId", deleteAdminClinicalSlotEnrollmentHandler);
 adminRouter.post("/clinical/run-payment-hold-cleanup", postAdminClinicalPaymentHoldCleanupHandler);
 adminRouter.get("/clinical/slots", getAdminClinicalSlotsHandler);
+adminRouter.get("/instructors", getAdminInstructorsHandler);
 adminRouter.post("/clinical/slots", postAdminClinicalSlotHandler);
 adminRouter.patch("/clinical/slots/:id", patchAdminClinicalSlotHandler);
 adminRouter.delete("/clinical/slots/:id", deleteAdminClinicalSlotHandler);
