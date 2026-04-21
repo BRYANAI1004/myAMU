@@ -229,10 +229,8 @@ const TERM_ID_TABLES = [
     "portal_document_requirements",
     "portal_document_requirement_attempts",
 ];
-export async function countAcademicTermDeleteDependencies(id, termName, year) {
+export async function countAcademicTermDeleteDependencies(id, _termName, _year) {
     const existing = await listExistingTables([...TERM_YEAR_TABLES, ...TERM_ID_TABLES]);
-    const t = termName.trim();
-    const y = Math.trunc(year);
     const out = {
         courseSections: 0,
         portalEnrollments: 0,
@@ -247,59 +245,61 @@ export async function countAcademicTermDeleteDependencies(id, termName, year) {
         portalBillingAdjustments: 0,
         portalStudentTermPrefs: 0,
     };
-    const termYearWhere = `
-    TRIM(term) COLLATE utf8mb4_unicode_ci =
-      CONVERT(? USING utf8mb4) COLLATE utf8mb4_unicode_ci
-    AND year = ?
+    const termYearCountSql = (tableName, alias) => `
+    SELECT COUNT(*) AS cnt
+      FROM ${tableName} ${alias}
+      JOIN academic_terms at ON at.id = ?
+     WHERE ${alias}.term = at.term_name
+       AND ${alias}.year = at.year
   `;
     const promises = [];
     if (existing.has("course_sections")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM course_sections WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("course_sections", "cs"), [id]).then((cnt) => {
             out.courseSections = cnt;
         }));
     }
     if (existing.has("portal_enrollments")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM portal_enrollments WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("portal_enrollments", "pe"), [id]).then((cnt) => {
             out.portalEnrollments = cnt;
         }));
     }
     if (existing.has("clinic_timetable")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM clinic_timetable WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("clinic_timetable", "ct"), [id]).then((cnt) => {
             out.clinicalTimetableSlots = cnt;
         }));
     }
     if (existing.has("clinical_enrollments")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM clinical_enrollments WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("clinical_enrollments", "ce"), [id]).then((cnt) => {
             out.clinicalEnrollments = cnt;
         }));
     }
     if (existing.has("clinical_assignments")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM clinical_assignments WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("clinical_assignments", "ca"), [id]).then((cnt) => {
             out.clinicalAssignments = cnt;
         }));
     }
     if (existing.has("clinical_requests")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM clinical_requests WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("clinical_requests", "cr"), [id]).then((cnt) => {
             out.clinicalRequests = cnt;
         }));
     }
     if (existing.has("portal_term_finance_settings")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM portal_term_finance_settings WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("portal_term_finance_settings", "ptfs"), [id]).then((cnt) => {
             out.portalTermFinanceSettings = cnt;
         }));
     }
     if (existing.has("portal_payments")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM portal_payments WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("portal_payments", "pp"), [id]).then((cnt) => {
             out.portalPayments = cnt;
         }));
     }
     if (existing.has("portal_billing_adjustments")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM portal_billing_adjustments WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("portal_billing_adjustments", "pba"), [id]).then((cnt) => {
             out.portalBillingAdjustments = cnt;
         }));
     }
     if (existing.has("portal_student_term_prefs")) {
-        promises.push(countRows(`SELECT COUNT(*) AS cnt FROM portal_student_term_prefs WHERE ${termYearWhere}`, [t, y]).then((cnt) => {
+        promises.push(countRows(termYearCountSql("portal_student_term_prefs", "pstp"), [id]).then((cnt) => {
             out.portalStudentTermPrefs = cnt;
         }));
     }

@@ -31,7 +31,7 @@ export type AcademicTermDeleteDependencies = {
     portalBillingAdjustments: number;
     portalStudentTermPrefs: number;
 };
-export declare function countAcademicTermDeleteDependencies(id: string, termName: string, year: number): Promise<AcademicTermDeleteDependencies>;
+export declare function countAcademicTermDeleteDependencies(id: string, _termName: string, _year: number): Promise<AcademicTermDeleteDependencies>;
 /**
  * Clears all posted flags, then marks `id` as posted. Requires `is_posted_to_dashboard` column.
  */
