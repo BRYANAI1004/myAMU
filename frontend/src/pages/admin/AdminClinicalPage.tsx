@@ -104,7 +104,6 @@ function pickLatestAcademicTermId(terms: AcademicTerm[]): string {
 
 export function AdminClinicalPage() {
   useAdminAuth()
-  const canForceDeleteSlot = true
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
 
   const [pendingRequests, setPendingRequests] = useState<
@@ -798,7 +797,7 @@ export function AdminClinicalPage() {
                                 onClick={() => {
                                   setSlotDeleteFeedback(null)
                                   setSlotDeleteError(null)
-                                  const actionName = 'Force delete this slot?'
+                                  const actionName = 'Delete this slot?'
                                   const actionDetail =
                                     'This will permanently remove the slot and all related clinical enrollments, requests, and assignments. This action cannot be undone.'
                                   if (
@@ -813,11 +812,11 @@ export function AdminClinicalPage() {
                                     try {
                                       // Admin Clinical slot management intentionally uses backend force-delete.
                                       await deleteAdminClinicalSlot(s.id, {
-                                        forceDelete: canForceDeleteSlot,
+                                        forceDelete: true,
                                       })
                                       setSlotsReloadKey((k) => k + 1)
                                       setSlotDeleteError(null)
-                                      setSlotDeleteFeedback('Slot force-deleted successfully.')
+                                      setSlotDeleteFeedback('Slot deleted successfully.')
                                     } catch (e) {
                                       setSlotDeleteError(
                                         e instanceof Error
@@ -830,7 +829,7 @@ export function AdminClinicalPage() {
                                   })()
                                 }}
                               >
-                                {busy ? '…' : canForceDeleteSlot ? 'Force Delete' : 'Delete'}
+                                {busy ? '…' : 'Delete'}
                               </button>
                             </div>
                           </td>
