@@ -4370,6 +4370,55 @@ export async function downloadAdminRegisteredStudentsCsv(
   }
 }
 
+/**
+ * GET /api/admin/course-sections/:id/export-feedback.csv — triggers a browser download.
+ */
+export async function downloadAdminFeedbackCsv(
+  sectionId: number,
+  options?: { signal?: AbortSignal },
+): Promise<void> {
+  const path = `/api/admin/course-sections/${encodeURIComponent(String(sectionId))}/export-feedback.csv`
+  const res = await apiFetch(path, { signal: options?.signal })
+  if (!res.ok) {
+    const text = await res.text()
+    let msg = `Export failed (HTTP ${res.status}).`
+    const ct = (res.headers.get('content-type') ?? '').toLowerCase()
+    if (ct.includes('application/json') && text.trim() !== '') {
+      try {
+        const body = JSON.parse(text) as {
+          error?: string
+          message?: string
+        }
+        if (typeof body.message === 'string' && body.message.trim() !== '') {
+          msg = body.message.trim()
+        } else if (typeof body.error === 'string' && body.error.trim() !== '') {
+          msg = body.error.trim()
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    throw new Error(msg)
+  }
+  const blob = await res.blob()
+  const fromHeader = parseAttachmentFilenameFromContentDisposition(
+    res.headers.get('content-disposition'),
+  )
+  const filename = fromHeader ?? `feedback-${sectionId}.csv`
+  const url = URL.createObjectURL(blob)
+  try {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.rel = 'noopener'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
 export type AdminPortalEnrollmentDeleteResponse = {
   success: boolean
   removedCount: number

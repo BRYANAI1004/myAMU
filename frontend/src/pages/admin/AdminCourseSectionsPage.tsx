@@ -8,6 +8,7 @@ import { AdminTime12hFields } from '../../components/admin/AdminTime12hFields'
 import {
   createAdminCourseSection,
   deleteAdminCourseSection,
+  downloadAdminFeedbackCsv,
   downloadAdminRegisteredStudentsCsv,
   fetchAcademicTerms,
   fetchAdminCourseSectionCourseMeta,
@@ -121,8 +122,10 @@ type AdminCourseSectionGroupTableProps = {
   resolvePrerequisiteCode: (row: AdminCourseSection) => string
   busy: boolean
   csvExportSectionId: number | null
+  feedbackExportSectionId: number | null
   onViewStudents: (row: AdminCourseSection) => void
   onExportCsv: (row: AdminCourseSection) => void
+  onExportFeedback: (row: AdminCourseSection) => void
   onEdit: (row: AdminCourseSection) => void
   onDeleteRow: (row: AdminCourseSection) => void
 }
@@ -136,8 +139,10 @@ function AdminCourseSectionGroupTable({
   resolvePrerequisiteCode,
   busy,
   csvExportSectionId,
+  feedbackExportSectionId,
   onViewStudents,
   onExportCsv,
+  onExportFeedback,
   onEdit,
   onDeleteRow,
 }: AdminCourseSectionGroupTableProps) {
@@ -227,6 +232,16 @@ function AdminCourseSectionGroupTable({
                       <button
                         type="button"
                         className="portal-btn portal-btn--secondary portal-btn--compact"
+                        disabled={busy || feedbackExportSectionId === row.id}
+                        onClick={() => onExportFeedback(row)}
+                      >
+                        {feedbackExportSectionId === row.id
+                          ? 'Exporting…'
+                          : 'Export Feedback'}
+                      </button>
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary portal-btn--compact"
                         disabled={busy}
                         onClick={() => onEdit(row)}
                       >
@@ -269,6 +284,9 @@ export function AdminCourseSectionsPage() {
   const [csvExportSectionId, setCsvExportSectionId] = useState<number | null>(
     null,
   )
+  const [feedbackExportSectionId, setFeedbackExportSectionId] = useState<
+    number | null
+  >(null)
   const [csvExportError, setCsvExportError] = useState<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | null>(null)
   /** Bumped after create/update/delete so the sections query re-runs without changing term/course. */
@@ -864,6 +882,22 @@ export function AdminCourseSectionsPage() {
     }
   }
 
+  const onExportFeedbackForSection = useCallback((row: AdminCourseSection) => {
+    setCsvExportError(null)
+    setFeedbackExportSectionId(row.id)
+    void (async () => {
+      try {
+        await downloadAdminFeedbackCsv(row.id)
+      } catch (e) {
+        setCsvExportError(
+          e instanceof Error ? e.message : 'CSV export failed.',
+        )
+      } finally {
+        setFeedbackExportSectionId(null)
+      }
+    })()
+  }, [])
+
   return (
     <main className="admin-page">
       <div className="admin-page__toolbar admin-course-sections-toolbar">
@@ -1041,8 +1075,10 @@ export function AdminCourseSectionsPage() {
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
+            feedbackExportSectionId={feedbackExportSectionId}
             onViewStudents={openRosterForSection}
             onExportCsv={onExportCsvForSection}
+            onExportFeedback={onExportFeedbackForSection}
             onEdit={beginEdit}
             onDeleteRow={onDeleteRow}
           />
@@ -1055,8 +1091,10 @@ export function AdminCourseSectionsPage() {
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
+            feedbackExportSectionId={feedbackExportSectionId}
             onViewStudents={openRosterForSection}
             onExportCsv={onExportCsvForSection}
+            onExportFeedback={onExportFeedbackForSection}
             onEdit={beginEdit}
             onDeleteRow={onDeleteRow}
           />

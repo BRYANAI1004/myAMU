@@ -157,6 +157,17 @@ export type CourseFeedbackExportSlice = {
   comment: string | null;
 };
 
+export type CourseFeedbackAnonymousExportRow = {
+  q1_rating: number | null;
+  q2_rating: number | null;
+  q3_rating: number | null;
+  q4_rating: number | null;
+  q5_rating: number | null;
+  overall_rating: number | null;
+  comment: string | null;
+  submitted_at: Date | null;
+};
+
 /** Integer 1–5 only; anything else becomes null (empty CSV cell). */
 export function parseStoredFeedbackRating1to5(raw: unknown): number | null {
   if (raw == null) return null;
@@ -220,4 +231,59 @@ export async function mapCourseFeedbackByStudentForCourseTermYear(
     });
   }
   return out;
+}
+
+export async function listCourseFeedbackForCourseTermYear(
+  pool: Pool,
+  args: {
+    courseCode: string;
+    term: string;
+    year: number;
+  },
+): Promise<CourseFeedbackAnonymousExportRow[]> {
+  const code = args.courseCode.trim();
+  const term = args.term.trim();
+  const year = Math.trunc(args.year);
+  if (code === "" || term === "" || !Number.isFinite(year)) return [];
+
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT q1_rating,
+            q2_rating,
+            q3_rating,
+            q4_rating,
+            q5_rating,
+            overall_rating,
+            comment,
+            submitted_at
+     FROM course_feedback
+     WHERE course_code = ?
+       AND term = ?
+       AND year = ?
+     ORDER BY submitted_at ASC, id ASC`,
+    [code, term, year],
+  );
+
+  return rows.map((r) => {
+    const commentRaw = r.comment;
+    const submittedRaw = r.submitted_at;
+    const submittedAt =
+      submittedRaw == null
+        ? null
+        : submittedRaw instanceof Date
+          ? submittedRaw
+          : new Date(String(submittedRaw));
+    return {
+      q1_rating: parseStoredFeedbackRating1to5(r.q1_rating),
+      q2_rating: parseStoredFeedbackRating1to5(r.q2_rating),
+      q3_rating: parseStoredFeedbackRating1to5(r.q3_rating),
+      q4_rating: parseStoredFeedbackRating1to5(r.q4_rating),
+      q5_rating: parseStoredFeedbackRating1to5(r.q5_rating),
+      overall_rating: parseStoredFeedbackRating1to5(r.overall_rating),
+      comment: commentRaw == null ? null : String(commentRaw),
+      submitted_at:
+        submittedAt != null && Number.isNaN(submittedAt.getTime())
+          ? null
+          : submittedAt,
+    };
+  });
 }

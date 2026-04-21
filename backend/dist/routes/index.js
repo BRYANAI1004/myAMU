@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAdminStudent, getAdminStudents, getNextAdminStudentId, postExportAdminStudentsCsv, postAdminStudent, postAdminStudentLoa, postDeleteSelectedAdminStudents, putAdminStudent, } from "../controllers/adminStudentController.js";
-import { deleteAdminCourseSection, getAdminCourseSectionCourseMeta, getAdminCourseSectionEnrollments, getAdminCourseSections, getAdminExportRegisteredStudentsCsv, patchAdminCourseSection, postAdminCourseSection, } from "../controllers/adminCourseSectionController.js";
+import { deleteAdminCourseSection, getAdminCourseSectionCourseMeta, getAdminCourseSectionEnrollments, getAdminExportFeedbackCsv, getAdminCourseSections, getAdminExportRegisteredStudentsCsv, patchAdminCourseSection, postAdminCourseSection, } from "../controllers/adminCourseSectionController.js";
 import { deleteAdminPortalEnrollmentHandler } from "../controllers/adminEnrollmentController.js";
 import { setStudentGrade } from "../controllers/adminMarksController.js";
 import { deleteAdminFinanceChargeByIdHandler, deleteAdminFinancePaymentByIdHandler, getAdminFinanceLedgerHandler, getAdminFinanceQuartersHandler, getAdminFinanceStudents, getFinanceQuarterSettings, getGlobalFinanceQuarters, postAdminFinanceChargeHandler, postAdminFinancePaymentHandler, postRunLateFeeCheck, putAdminFinanceChargeByIdHandler, putAdminFinancePaymentByIdHandler, putFinanceQuarterSettings, } from "../controllers/adminFinanceController.js";
@@ -59,6 +59,7 @@ adminRouter.get("/courses/open-for-registration", getAdminCoursesOpenForRegistra
 adminRouter.get("/course-sections/enrollments", getAdminCourseSectionEnrollments);
 adminRouter.get("/course-sections/course-meta", getAdminCourseSectionCourseMeta);
 adminRouter.get("/course-sections/:id/export-registered-students.csv", getAdminExportRegisteredStudentsCsv);
+adminRouter.get("/course-sections/:id/export-feedback.csv", getAdminExportFeedbackCsv);
 adminRouter.get("/course-sections", getAdminCourseSections);
 adminRouter.post("/course-sections", postAdminCourseSection);
 adminRouter.patch("/course-sections/:id", patchAdminCourseSection);

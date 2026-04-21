@@ -1,7 +1,5 @@
-import { COURSE_FEEDBACK_CSV_QUESTION_RATING_HEADERS } from "../constants/courseFeedbackCsvColumns.js";
 import { env } from "../config/env.js";
 import { pool } from "../lib/db.js";
-import { mapCourseFeedbackByStudentForCourseTermYear } from "../repositories/courseFeedbackRepository.js";
 import { getCourseSectionById } from "../repositories/courseSectionRepository.js";
 import { listAdminEnrollmentRowsForSection } from "../repositories/studentEnrollmentRepository.js";
 import { mapLegacyStudentProfileExportRowsById } from "../repositories/studentLegacyAccountRepository.js";
@@ -11,12 +9,6 @@ import { mapLegacyStudentProfileExportRowsById } from "../repositories/studentLe
  * `section_id` = the requested `course_sections.id` (plus legacy course-level rows on the canonical
  * MIN(section id) for that course when applicable). The `sectionId` argument resolves course_code /
  * term / year for the filename (`registeredstudent_<code>_<year><termlower>.csv`).
- *
- * Course feedback (`course_feedback`) is keyed by **course_code + term + year only** (not section).
- * There is no section_id on `course_feedback`; the same feedback row applies to every scheduled
- * section of that course in the term. We match enrollments and feedback on that shared key.
- * Columns mirror the stored form: `q1_rating`–`q5_rating`, separately stored `overall_rating`
- * (student “Overall rating” in the modal — not computed in the API), and `comment`.
  *
  * Grades use the same subquery as `listAdminEnrollmentRowsForSection`: latest legacy `marks` row by
  * `seqNumber` for student id + course code + term + year; withdrawn enrollments show `W`.
@@ -62,11 +54,6 @@ function cell(v) {
         return "";
     return String(v);
 }
-function ratingCsvCell(n) {
-    if (n == null)
-        return "";
-    return String(n);
-}
 const CSV_HEADERS = [
     "Student ID",
     "Division",
@@ -76,14 +63,11 @@ const CSV_HEADERS = [
     "Program",
     "Highest Degree",
     "Background School",
-    ...COURSE_FEEDBACK_CSV_QUESTION_RATING_HEADERS,
-    "Overall Feedback Rating",
-    "Feedback Comment",
     "Grade",
 ];
 /** Exposed so the HTTP handler can log the same header list that was used to build the CSV. */
 export const REGISTERED_STUDENTS_CSV_HEADERS = CSV_HEADERS;
-const CSV_FIRST_LINE_MARKER = "Course Content & Organization Rating";
+const CSV_FIRST_LINE_MARKER = "Student ID";
 export async function buildRegisteredStudentsCsvForSection(sectionId) {
     const section = await getCourseSectionById(sectionId);
     if (!section) {
@@ -96,15 +80,7 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
     const studentIds = enrollments
         .map((e) => e.studentId.trim())
         .filter((id) => id !== "");
-    const [profiles, feedbackByStudent] = await Promise.all([
-        mapLegacyStudentProfileExportRowsById(pool, studentIds),
-        mapCourseFeedbackByStudentForCourseTermYear(pool, {
-            courseCode,
-            term,
-            year,
-            studentIds,
-        }),
-    ]);
+    const profiles = await mapLegacyStudentProfileExportRowsById(pool, studentIds);
     const lines = [];
     const headerLine = CSV_HEADERS.map((h) => csvEscapeCell(h)).join(",");
     lines.push(headerLine);
@@ -114,7 +90,6 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
         if (sid === "")
             continue;
         const legacy = profiles.get(sid);
-        const fb = feedbackByStudent.get(sid);
         const legacyName = legacy?.name ?? "";
         const rosterName = row.name != null ? String(row.name).trim() : "";
         const displayName = legacyName !== ""
@@ -125,17 +100,6 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
         const gradeCell = row.grade != null && String(row.grade).trim() !== ""
             ? String(row.grade).trim()
             : "";
-        const commentCell = fb != null && fb.comment != null ? fb.comment : "";
-        const qCells = fb == null
-            ? ["", "", "", "", ""]
-            : [
-                ratingCsvCell(fb.q1_rating),
-                ratingCsvCell(fb.q2_rating),
-                ratingCsvCell(fb.q3_rating),
-                ratingCsvCell(fb.q4_rating),
-                ratingCsvCell(fb.q5_rating),
-            ];
-        const overallCell = fb == null ? "" : ratingCsvCell(fb.overall_rating);
         const values = [
             sid,
             divisionFromStudentId(sid),
@@ -145,9 +109,6 @@ export async function buildRegisteredStudentsCsvForSection(sectionId) {
             cell(legacy?.program),
             cell(legacy?.highestDegree),
             cell(legacy?.backgroundSchool),
-            ...qCells,
-            overallCell,
-            commentCell,
             gradeCell,
         ];
         lines.push(values.map(csvEscapeCell).join(","));

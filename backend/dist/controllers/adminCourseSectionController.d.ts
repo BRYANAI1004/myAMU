@@ -15,6 +15,11 @@ export declare function getAdminCourseSectionEnrollments(req: Request, res: Resp
  * UTF-8 CSV with BOM for Excel; roster is course+term+year (see adminExportRegisteredStudentsCsvService).
  */
 export declare function getAdminExportRegisteredStudentsCsv(req: Request, res: Response): Promise<void>;
+/**
+ * GET /api/admin/course-sections/:id/export-feedback.csv
+ * UTF-8 CSV with BOM for Excel; rows are anonymized and scoped to section course+term+year.
+ */
+export declare function getAdminExportFeedbackCsv(req: Request, res: Response): Promise<void>;
 export declare function postAdminCourseSection(req: Request, res: Response): Promise<void>;
 export declare function patchAdminCourseSection(req: Request, res: Response): Promise<void>;
 export declare function deleteAdminCourseSection(req: Request, res: Response): Promise<void>;

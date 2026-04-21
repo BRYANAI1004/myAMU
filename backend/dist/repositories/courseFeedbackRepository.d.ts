@@ -49,6 +49,16 @@ export type CourseFeedbackExportSlice = {
     overall_rating: number | null;
     comment: string | null;
 };
+export type CourseFeedbackAnonymousExportRow = {
+    q1_rating: number | null;
+    q2_rating: number | null;
+    q3_rating: number | null;
+    q4_rating: number | null;
+    q5_rating: number | null;
+    overall_rating: number | null;
+    comment: string | null;
+    submitted_at: Date | null;
+};
 /** Integer 1–5 only; anything else becomes null (empty CSV cell). */
 export declare function parseStoredFeedbackRating1to5(raw: unknown): number | null;
 /**
@@ -61,4 +71,9 @@ export declare function mapCourseFeedbackByStudentForCourseTermYear(pool: Pool, 
     year: number;
     studentIds: string[];
 }): Promise<Map<string, CourseFeedbackExportSlice>>;
+export declare function listCourseFeedbackForCourseTermYear(pool: Pool, args: {
+    courseCode: string;
+    term: string;
+    year: number;
+}): Promise<CourseFeedbackAnonymousExportRow[]>;
 //# sourceMappingURL=courseFeedbackRepository.d.ts.map

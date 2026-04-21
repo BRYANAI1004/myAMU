@@ -13,6 +13,7 @@ import {
   deleteAdminCourseSection,
   getAdminCourseSectionCourseMeta,
   getAdminCourseSectionEnrollments,
+  getAdminExportFeedbackCsv,
   getAdminCourseSections,
   getAdminExportRegisteredStudentsCsv,
   patchAdminCourseSection,
@@ -179,6 +180,10 @@ adminRouter.get(
 adminRouter.get(
   "/course-sections/:id/export-registered-students.csv",
   getAdminExportRegisteredStudentsCsv,
+);
+adminRouter.get(
+  "/course-sections/:id/export-feedback.csv",
+  getAdminExportFeedbackCsv,
 );
 adminRouter.get("/course-sections", getAdminCourseSections);
 adminRouter.post("/course-sections", postAdminCourseSection);
