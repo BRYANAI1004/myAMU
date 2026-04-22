@@ -9,6 +9,7 @@ import { deleteCourseBinItemHandler, getCourseBin, postCourseBin, } from "../con
 import { getCourseSections, getCourses } from "../controllers/courseController.js";
 import { getHealth, getHealthDb } from "../controllers/healthController.js";
 import { getAccountingLedger, getAccountingQuarters, } from "../controllers/studentLedgerController.js";
+import { postAuthorizeNetChargeHandler } from "../controllers/studentAuthorizePaymentController.js";
 import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
 import { getAdminStudentCourseFeedback, getStudentCourseFeedback, postStudentCourseFeedback, } from "../controllers/studentCourseFeedbackController.js";
 import { getStudentTranscriptPreview } from "../controllers/studentTranscriptController.js";
@@ -30,6 +31,7 @@ export const apiRouter = Router();
 apiRouter.get("/health", getHealth);
 apiRouter.get("/health/db", getHealthDb);
 apiRouter.post("/auth/login", postStudentLogin);
+apiRouter.post("/payments/authorize/charge", postAuthorizeNetChargeHandler);
 apiRouter.post("/student/enroll", postStudentEnroll);
 apiRouter.post("/student/withdraw", postStudentWithdraw);
 apiRouter.get("/student/enrolled-sections", getStudentEnrolledSections);
