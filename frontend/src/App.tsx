@@ -31,6 +31,7 @@ import { CourseBinCheckoutPage } from './pages/registration/CourseBinCheckoutPag
 import { OfferedTimetablePage } from './pages/registration/OfferedTimetablePage'
 import { FinancesLayout } from './pages/finances/FinancesLayout'
 import { FinancesOverviewPage } from './pages/finances/FinancesOverviewPage'
+import { FinancesPaymentPage } from './pages/finances/FinancesPaymentPage'
 import { AcademicsLayout } from './pages/academics/AcademicsLayout'
 import { AcademicsPortalPage } from './pages/academics/AcademicsPortalPage'
 import { GradesPage } from './pages/academics/GradesPage'
@@ -203,7 +204,7 @@ export default function App() {
             <Route path="/finances" element={<FinancesLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<FinancesOverviewPage />} />
-              <Route path="payment" element={<Navigate to="/finances/overview" replace />} />
+              <Route path="payment" element={<FinancesPaymentPage />} />
               <Route path="history" element={<Navigate to="/finances/overview" replace />} />
               <Route path="statements" element={<Navigate to="/finances/overview" replace />} />
               <Route path="late-fees" element={<Navigate to="/finances/overview" replace />} />
