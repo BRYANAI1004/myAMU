@@ -63,7 +63,13 @@ function buildClinicalExamHistoryFromMarks(marksRows) {
 export async function loadStudentClinicalProgressFromClinic(pool, studentId) {
     const sid = studentId.trim();
     const clinicCompletedWhere = `TRIM(id) = TRIM(?)
-     AND TRIM(COALESCE(grade, '')) <> ''`;
+     AND TRIM(COALESCE(grade, '')) <> ''
+     AND (
+       UPPER(TRIM(code)) LIKE 'CL111%'
+       OR UPPER(TRIM(code)) LIKE 'CL113%'
+       OR UPPER(TRIM(code)) LIKE 'CL211%'
+       OR UPPER(TRIM(code)) LIKE 'CL311%'
+     )`;
     const [detailRows] = await pool.query(`SELECT code,
             course_title,
             term,

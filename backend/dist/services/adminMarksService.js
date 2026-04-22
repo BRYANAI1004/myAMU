@@ -17,6 +17,9 @@ const GRADE_TO_NUMERIC = {
     NP: null,
     INC: null,
 };
+function isClinicalAttemptCourseCode(code) {
+    return /^(CL111|CL113|CL211|CL311)(-\d+)?$/i.test(code.trim());
+}
 async function assertEnrollmentAllowsMarkGrade(db, studentId, courseCode, legacyTerm, year) {
     const sid = studentId.trim();
     const code = courseCode.trim();
@@ -37,6 +40,137 @@ async function assertEnrollmentAllowsMarkGrade(db, studentId, courseCode, legacy
         };
     }
     return { ok: true };
+}
+async function resolveStudentNameForMarks(conn, studentId) {
+    const sid = studentId.trim();
+    const [legacyRows] = await conn.query(`SELECT TRIM(name) AS name
+       FROM students
+      WHERE TRIM(id) = TRIM(?)
+      LIMIT 1`, [sid]);
+    if (legacyRows.length > 0) {
+        const n = String(legacyRows[0].name ?? "").trim();
+        if (n !== "")
+            return n;
+    }
+    const [portalRows] = await conn.query(`SELECT TRIM(full_name) AS name
+       FROM portal_students
+      WHERE TRIM(student_external_id) = TRIM(?)
+      LIMIT 1`, [sid]);
+    if (portalRows.length > 0) {
+        const n = String(portalRows[0].name ?? "").trim();
+        if (n !== "")
+            return n;
+    }
+    return sid;
+}
+async function updateClinicAndUpsertMarksForClinicalAttempt(args) {
+    const conn = await pool.getConnection();
+    try {
+        await conn.beginTransaction();
+        const sid = args.studentId.trim();
+        const code = args.courseCode.trim().toUpperCase();
+        const term = args.term.trim();
+        const year = Math.trunc(args.year);
+        const grade = args.grade.trim();
+        const grade2 = args.grade2Numeric != null && Number.isFinite(args.grade2Numeric)
+            ? args.grade2Numeric
+            : 0;
+        const [clinicRows] = await conn.query(`SELECT course_title, units, days, time_from, time_to, instructor
+         FROM clinic
+        WHERE TRIM(id) = TRIM(?)
+          AND UPPER(TRIM(code)) = UPPER(TRIM(?))
+          AND LOWER(TRIM(term)) = LOWER(TRIM(?))
+          AND year = ?
+        ORDER BY year DESC
+        LIMIT 1
+        FOR UPDATE`, [sid, code, term, year]);
+        if (clinicRows.length === 0) {
+            await conn.rollback();
+            return {
+                ok: false,
+                status: 404,
+                error: "Clinical attempt row not found in clinic for this term.",
+            };
+        }
+        const clinic = clinicRows[0];
+        const courseTitle = String(clinic.course_title ?? "").trim();
+        const unitsRaw = Number(clinic.units);
+        const units = Number.isFinite(unitsRaw) ? unitsRaw : 2;
+        const days = String(clinic.days ?? "").trim();
+        const timeFrom = String(clinic.time_from ?? "00:00:00");
+        const timeTo = String(clinic.time_to ?? "00:00:00");
+        const instructor = String(clinic.instructor ?? "").trim();
+        const [clinicUpdate] = await conn.query(`UPDATE clinic
+          SET grade = ?, grade2 = ?
+        WHERE TRIM(id) = TRIM(?)
+          AND UPPER(TRIM(code)) = UPPER(TRIM(?))
+          AND LOWER(TRIM(term)) = LOWER(TRIM(?))
+          AND year = ?`, [grade, grade2, sid, code, term, year]);
+        if (Number(clinicUpdate.affectedRows ?? 0) <= 0) {
+            await conn.rollback();
+            return {
+                ok: false,
+                status: 404,
+                error: "Clinical attempt row could not be updated.",
+            };
+        }
+        const [marksSeqRows] = await conn.query(`SELECT seqNumber AS seq
+         FROM marks
+        WHERE TRIM(id) = TRIM(?)
+          AND UPPER(TRIM(code)) = UPPER(TRIM(?))
+          AND LOWER(TRIM(term)) = LOWER(TRIM(?))
+          AND year = ?
+        ORDER BY seqNumber DESC
+        LIMIT 1
+        FOR UPDATE`, [sid, code, term, year]);
+        if (marksSeqRows.length > 0) {
+            const seq = Number(marksSeqRows[0].seq);
+            if (Number.isFinite(seq)) {
+                await conn.query(`UPDATE marks
+              SET course_title = ?,
+                  grade = ?,
+                  grade2 = ?
+            WHERE seqNumber = ?`, [courseTitle, grade, grade2, Math.trunc(seq)]);
+            }
+        }
+        else {
+            const studentName = await resolveStudentNameForMarks(conn, sid);
+            await conn.query(`INSERT INTO marks (
+          name, id, regis, code, grade, grade2, course_title, units,
+          days, time_from, time_to, instructor, term, year, language, indie_study
+        ) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'English', '')`, [
+                studentName,
+                sid,
+                code,
+                grade,
+                grade2,
+                courseTitle,
+                units,
+                days,
+                timeFrom,
+                timeTo,
+                instructor,
+                term,
+                year,
+            ]);
+        }
+        await conn.commit();
+        return { ok: true };
+    }
+    catch (e) {
+        await conn.rollback();
+        const o = e;
+        const dbOrMsg = o?.sqlMessage ?? (e instanceof Error ? e.message : String(e));
+        console.error("[admin-marks] clinical attempt grade update failed:", dbOrMsg);
+        return {
+            ok: false,
+            status: 500,
+            error: "Failed to save clinical attempt grade.",
+        };
+    }
+    finally {
+        conn.release();
+    }
 }
 export async function setAdminStudentMarkGrade(input) {
     const studentId = input.studentId.trim();
@@ -60,11 +194,21 @@ export async function setAdminStudentMarkGrade(input) {
             error: "The selected academic term is not valid or no longer exists.",
         };
     }
+    const grade2Numeric = GRADE_TO_NUMERIC[grade] ?? null;
+    if (isClinicalAttemptCourseCode(courseCode)) {
+        return updateClinicAndUpsertMarksForClinicalAttempt({
+            studentId,
+            courseCode,
+            term: termRow.term_name,
+            year: termRow.year,
+            grade,
+            grade2Numeric,
+        });
+    }
     const gate = await assertEnrollmentAllowsMarkGrade(pool, studentId, courseCode, termRow.term_name, termRow.year);
     if (!gate.ok) {
         return { ok: false, status: 400, error: gate.error };
     }
-    const grade2Numeric = GRADE_TO_NUMERIC[grade] ?? null;
     try {
         await upsertMarkGrade(pool, {
             studentId,

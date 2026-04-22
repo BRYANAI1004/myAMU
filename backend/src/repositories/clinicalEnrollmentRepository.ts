@@ -114,26 +114,15 @@ async function resolveStudentNameForClinic(
   studentId: string,
 ): Promise<string> {
   const sid = studentId.trim();
-  const [legacyRows] = await conn.query<RowDataPacket[]>(
+  const [studentRows] = await conn.query<RowDataPacket[]>(
     `SELECT TRIM(name) AS name
        FROM students
       WHERE TRIM(id) = TRIM(?)
       LIMIT 1`,
     [sid],
   );
-  if (legacyRows.length > 0) {
-    const n = trimOrEmpty((legacyRows[0] as { name?: unknown }).name);
-    if (n !== "") return n;
-  }
-  const [portalRows] = await conn.query<RowDataPacket[]>(
-    `SELECT TRIM(full_name) AS name
-       FROM portal_students
-      WHERE student_external_id = TRIM(?)
-      LIMIT 1`,
-    [sid],
-  );
-  if (portalRows.length > 0) {
-    const n = trimOrEmpty((portalRows[0] as { name?: unknown }).name);
+  if (studentRows.length > 0) {
+    const n = trimOrEmpty((studentRows[0] as { name?: unknown }).name);
     if (n !== "") return n;
   }
   return sid;
@@ -185,9 +174,9 @@ async function insertClinicAttemptRowForEnrollment(
   const studentName = await resolveStudentNameForClinic(conn, args.studentId);
   await conn.query<ResultSetHeader>(
     `INSERT INTO clinic (
-      name, id, regis, code, grade, grade2, course_title, units, hours,
-      days, time_from, time_to, instructor, term, year, language, indie_study
-    ) VALUES (?, ?, 0, ?, '', 0, ?, 2, 40, ?, ?, ?, ?, ?, ?, 'English', '')`,
+      name, id, code, grade, grade2, course_title, units, days,
+      time_from, time_to, instructor, term, year, hours
+    ) VALUES (?, ?, ?, '', 0, ?, 2, ?, ?, ?, ?, ?, ?, 40)`,
     [
       studentName,
       args.studentId.trim(),
