@@ -44,9 +44,6 @@ export function PaymentSummaryCard({
           <dd>{formatMoney(amountToPay)}</dd>
         </div>
       </dl>
-      <p className="portal-finance-checkout-summary__note">
-        Payment will be applied to this selected term after successful authorization.
-      </p>
     </section>
   )
 }

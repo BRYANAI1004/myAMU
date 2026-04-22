@@ -2542,30 +2542,6 @@ select.portal-profile-input {
   gap: 0.85rem;
 }
 
-.portal-finance-checkout-form__subhead {
-  margin: 0.25rem 0 0;
-  color: var(--portal-text-muted);
-  font-size: 0.8125rem;
-}
-
-.portal-finance-checkout-form__brands {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.portal-finance-checkout-form__brands span {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid var(--portal-border-subtle);
-  border-radius: 999px;
-  font-size: 0.6875rem;
-  color: var(--portal-text-muted);
-  letter-spacing: 0.01em;
-}
-
 .portal-finance-checkout-form__field {
   display: flex;
   flex-direction: column;
@@ -2604,16 +2580,46 @@ select.portal-profile-input {
   position: relative;
 }
 
-.portal-finance-checkout-form__input-wrap svg {
-  position: absolute;
-  left: 0.65rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--portal-text-faint);
+.portal-finance-checkout-form__input-wrap--card-number input {
+  padding-right: 8.9rem;
 }
 
-.portal-finance-checkout-form__input-wrap input {
-  padding-left: 2rem;
+.portal-finance-checkout-form__input-wrap--cvv input {
+  padding-right: 2.8rem;
+}
+
+.portal-finance-checkout-form__trailing-icons {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  pointer-events: none;
+}
+
+.portal-finance-checkout-form__trailing-icons img {
+  width: 1.4rem;
+  height: 0.95rem;
+  object-fit: contain;
+  border-radius: 0.15rem;
+}
+
+.portal-finance-checkout-form__trailing-icon {
+  position: absolute;
+  right: 0.65rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.portal-finance-checkout-form__trailing-icon img {
+  width: 1.1rem;
+  height: 1.1rem;
+  object-fit: contain;
 }
 
 .portal-finance-checkout-form__triple {
@@ -2677,6 +2683,20 @@ select.portal-profile-input {
 @media (max-width: 640px) {
   .portal-finance-checkout-form__triple {
     grid-template-columns: 1fr;
+  }
+
+  .portal-finance-checkout-form__input-wrap--card-number input {
+    padding-right: 7.4rem;
+  }
+
+  .portal-finance-checkout-form__trailing-icons {
+    right: 0.45rem;
+    gap: 0.22rem;
+  }
+
+  .portal-finance-checkout-form__trailing-icons img {
+    width: 1.15rem;
+    height: 0.78rem;
   }
 
   .portal-finance-checkout-card__header--form {

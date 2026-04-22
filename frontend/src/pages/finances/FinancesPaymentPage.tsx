@@ -232,9 +232,6 @@ export function FinancesPaymentPage() {
           <span>Back to Finances</span>
         </Link>
         <h2 className="portal-page-title portal-finance-checkout-page__title">Payment</h2>
-        <p className="portal-page-lede portal-finance-checkout-page__subtitle">
-          Complete your tuition payment securely.
-        </p>
       </header>
 
       {loading ? (

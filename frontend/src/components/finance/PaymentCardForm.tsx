@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { CreditCard, Lock, ShieldCheck } from 'lucide-react'
+import { Lock, ShieldCheck } from 'lucide-react'
 
 type PaymentCardFormProps = {
   amount: string
@@ -45,21 +45,13 @@ export function PaymentCardForm({
           <h2 id="payment-form-title" className="portal-section-heading">
             Card Payment
           </h2>
-          <p className="portal-finance-checkout-form__subhead">Use a credit or debit card to complete payment.</p>
-        </div>
-        <div className="portal-finance-checkout-form__brands" aria-label="Accepted card networks">
-          <span>VISA</span>
-          <span>Mastercard</span>
-          <span>AmEx</span>
-          <span>Discover</span>
         </div>
       </header>
 
       <form className="portal-finance-checkout-form" onSubmit={onSubmit}>
         <label className="portal-finance-checkout-form__field">
           <span>Card number</span>
-          <div className="portal-finance-checkout-form__input-wrap">
-            <CreditCard size={16} aria-hidden="true" />
+          <div className="portal-finance-checkout-form__input-wrap portal-finance-checkout-form__input-wrap--card-number">
             <input
               type="text"
               inputMode="numeric"
@@ -70,6 +62,12 @@ export function PaymentCardForm({
               disabled={busy}
               required
             />
+            <div className="portal-finance-checkout-form__trailing-icons" aria-hidden="true">
+              <img src="/visa.png" alt="" />
+              <img src="/master.png" alt="" />
+              <img src="/amex.png" alt="" />
+              <img src="/discover.jpg" alt="" />
+            </div>
           </div>
         </label>
 
@@ -104,16 +102,21 @@ export function PaymentCardForm({
           </label>
           <label className="portal-finance-checkout-form__field">
             <span>CVV</span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="cc-csc"
-              maxLength={4}
-              value={cvv}
-              onChange={(event) => onCvvChange(event.target.value)}
-              disabled={busy}
-              required
-            />
+            <div className="portal-finance-checkout-form__input-wrap portal-finance-checkout-form__input-wrap--cvv">
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="cc-csc"
+                maxLength={4}
+                value={cvv}
+                onChange={(event) => onCvvChange(event.target.value)}
+                disabled={busy}
+                required
+              />
+              <div className="portal-finance-checkout-form__trailing-icon" aria-hidden="true">
+                <img src="/CVC.png" alt="" />
+              </div>
+            </div>
           </label>
         </div>
 
@@ -132,14 +135,8 @@ export function PaymentCardForm({
         </label>
 
         {!allowPartialPayment ? (
-          <p className="portal-finance-checkout-form__helper">
-            This term requires full-balance payment. Amount is read-only.
-          </p>
-        ) : (
-          <p className="portal-finance-checkout-form__helper">
-            Partial payments are allowed up to your current balance.
-          </p>
-        )}
+          <p className="portal-finance-checkout-form__helper">This term requires full-balance payment. Amount is read-only.</p>
+        ) : null}
 
         <p className="portal-finance-checkout-form__trust">
           <Lock size={14} aria-hidden="true" />
