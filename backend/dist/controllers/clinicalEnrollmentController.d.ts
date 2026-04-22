@@ -8,6 +8,11 @@ export declare function getAdminClinicalSlotRosterHandler(req: Request, res: Res
  */
 export declare function deleteAdminClinicalSlotEnrollmentHandler(req: Request, res: Response): Promise<void>;
 /**
+ * POST /api/admin/clinical/slots/:timetableId/enrollments/:enrollmentId/grade
+ * Body: { studentId: string, grade: string, grade2?: number | null }
+ */
+export declare function postAdminClinicalSlotEnrollmentGradeHandler(req: Request, res: Response): Promise<void>;
+/**
  * GET /api/students/:studentId/clinical-enrollments/open
  */
 export declare function getStudentOpenClinicalEnrollmentSlotsHandler(req: Request, res: Response): Promise<void>;

@@ -2,6 +2,12 @@ import { type ClinicalEnrollmentSlotRow, type ClinicalEnrollmentStudentRow, type
 export type OpenClinicalSlotForStudentDto = ClinicalEnrollmentSlotRow & {
     alreadyEnrolled: boolean;
 };
+export type AdminClinicalSlotRosterDto = ClinicalSlotRosterAdminRow & {
+    clinicalCode: string | null;
+    clinicalBaseCode: string | null;
+    clinicalGrade: string;
+    clinicalGrade2: number | null;
+};
 export declare function listOpenClinicalSlotsForStudent(studentId: string, query?: {
     term?: string | null;
     year?: string | number | null;
@@ -21,7 +27,7 @@ export declare function enrollStudentInClinicalSlot(studentId: string, timetable
     error: string;
     status: number;
 }>;
-export declare function listAdminClinicalSlotRoster(timetableId: number): Promise<ClinicalSlotRosterAdminRow[]>;
+export declare function listAdminClinicalSlotRoster(timetableId: number): Promise<AdminClinicalSlotRosterDto[]>;
 /**
  * Admin removes a student from a slot: same non-destructive drop as student self-serve.
  * Verifies the enrollment belongs to the given timetable row.

@@ -6,6 +6,7 @@ import { createClinicalEnrollment, dropClinicalEnrollment, getClinicalEnrollment
 import { insertClinicalAssignment } from "../repositories/clinicalScheduleRepository.js";
 import { buildClinicTimetableSlotLabel, buildTimetableClinicalAssignmentPayload, ClinicalScheduleValidationError, formatClinicTimeHm, } from "./clinicalScheduleService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
+import { getAdminClinicalEnrollmentGradeSnapshot } from "./adminMarksService.js";
 /**
  * Phase 2: flat fee for a new clinical timetable slot booking until per-slot pricing exists.
  * Single source for this placeholder amount (replace when `clinic_timetable` carries price).
@@ -217,7 +218,22 @@ export async function listAdminClinicalSlotRoster(timetableId) {
     if (!Number.isFinite(timetableId) || timetableId <= 0) {
         return [];
     }
-    return listActiveClinicalRosterForTimetable(timetableId);
+    const rows = await listActiveClinicalRosterForTimetable(timetableId);
+    const snapshots = await Promise.all(rows.map((row) => getAdminClinicalEnrollmentGradeSnapshot({
+        timetableId,
+        enrollmentId: row.enrollmentId,
+        studentId: row.studentId,
+    })));
+    return rows.map((row, idx) => {
+        const snap = snapshots[idx];
+        return {
+            ...row,
+            clinicalCode: snap?.clinicalCode ?? null,
+            clinicalBaseCode: snap?.clinicalBaseCode ?? null,
+            clinicalGrade: snap?.grade ?? "",
+            clinicalGrade2: snap?.grade2 ?? null,
+        };
+    });
 }
 /**
  * Admin removes a student from a slot: same non-destructive drop as student self-serve.

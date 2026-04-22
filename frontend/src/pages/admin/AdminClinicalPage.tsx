@@ -9,6 +9,7 @@ import {
   fetchAdminClinicalSlots,
   fetchAdminClinicalSlotRoster,
   postAdminClinicalExamRequestAssign,
+  postAdminClinicalSlotEnrollmentGrade,
   updateAdminClinicalSlot,
   type AcademicTerm,
   type AdminInstructor,
@@ -34,6 +35,19 @@ import {
 type AdminClinicalTabId = 'roster' | 'offered-timetable' | 'exam-requests'
 
 type SlotModalMode = 'add' | 'edit' | null
+
+const GRADE_OPTIONS = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F', 'P', 'NP', 'INC'] as const
+
+type ClinicalRosterGradeModalState = {
+  timetableId: number
+  enrollmentId: number
+  studentId: string
+  studentName: string
+  clinicalCode: string | null
+  clinicalBaseCode: string | null
+  grade: string
+  grade2: string
+}
 
 type SlotFormState = {
   academicTermId: string
@@ -138,6 +152,13 @@ function formatClinicalRosterBookedAt(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString()
 }
 
+function clinicalSeatBucketBaseCode(seatBucket: AdminClinicalSlotRosterRow['seatBucket']): string | null {
+  if (seatBucket === '100') return 'CL111'
+  if (seatBucket === '200') return 'CL211'
+  if (seatBucket === '300') return 'CL311'
+  return null
+}
+
 function academicTermDisplayLabel(
   terms: AcademicTerm[] | null,
   termId: string,
@@ -206,6 +227,9 @@ export function AdminClinicalPage() {
   const [rosterLoading, setRosterLoading] = useState(false)
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [rosterRemovingKey, setRosterRemovingKey] = useState<string | null>(null)
+  const [gradeModal, setGradeModal] = useState<ClinicalRosterGradeModalState | null>(null)
+  const [gradeSaving, setGradeSaving] = useState(false)
+  const [gradeModalError, setGradeModalError] = useState<string | null>(null)
 
   const [examRows, setExamRows] = useState<ClinicalExamRequestDto[] | null>(null)
   const [examLoading, setExamLoading] = useState(false)
@@ -281,6 +305,9 @@ export function AdminClinicalPage() {
       setRosterRows(null)
       setRosterError(null)
       setRosterLoading(false)
+      setGradeModal(null)
+      setGradeModalError(null)
+      setGradeSaving(false)
       return
     }
     const ac = new AbortController()
@@ -1477,7 +1504,12 @@ export function AdminClinicalPage() {
           className="admin-section-detail-backdrop"
           role="presentation"
           onMouseDown={(ev) => {
-            if (ev.target === ev.currentTarget && rosterRemovingKey == null) {
+            if (
+              ev.target === ev.currentTarget &&
+              rosterRemovingKey == null &&
+              gradeModal == null &&
+              !gradeSaving
+            ) {
               setRosterSlot(null)
             }
           }}
@@ -1569,7 +1601,10 @@ export function AdminClinicalPage() {
                             {formatClinicalRosterBookedAt(r.createdAt)}
                           </td>
                           <td>
-                            {canRemove ? (
+                            <div
+                              className="portal-actions"
+                              style={{ gap: '0.35rem', justifyContent: 'flex-end' }}
+                            >
                               <button
                                 type="button"
                                 className="portal-btn portal-btn--secondary"
@@ -1577,57 +1612,247 @@ export function AdminClinicalPage() {
                                   padding: '0.35rem 0.65rem',
                                   fontSize: '0.8125rem',
                                 }}
-                                disabled={removing}
+                                disabled={removing || gradeSaving}
                                 onClick={() => {
-                                  if (
-                                    !window.confirm(
-                                      `Remove ${r.studentName} (${r.studentId}) from this slot? Their enrollment will be marked dropped.`,
-                                    )
-                                  ) {
-                                    return
-                                  }
-                                  setRosterRemovingKey(removeKey)
-                                  ;(async () => {
-                                    try {
-                                      await deleteAdminClinicalSlotEnrollment(
-                                        rosterSlot.id,
-                                        r.enrollmentId,
-                                        r.studentId,
-                                      )
-                                      setRosterRows((prev) =>
-                                        prev == null
-                                          ? prev
-                                          : prev.filter(
-                                              (x) => x.enrollmentId !== r.enrollmentId,
-                                            ),
-                                      )
-                                      setSlotsReloadKey((k) => k + 1)
-                                    } catch (e) {
-                                      window.alert(
-                                        e instanceof Error ? e.message : 'Remove failed.',
-                                      )
-                                    } finally {
-                                      setRosterRemovingKey(null)
-                                    }
-                                  })()
+                                  setGradeModal({
+                                    timetableId: rosterSlot.id,
+                                    enrollmentId: r.enrollmentId,
+                                    studentId: r.studentId,
+                                    studentName: r.studentName,
+                                    clinicalCode: r.clinicalCode,
+                                    clinicalBaseCode:
+                                      r.clinicalBaseCode ??
+                                      clinicalSeatBucketBaseCode(r.seatBucket),
+                                    grade: (r.clinicalGrade ?? '').trim(),
+                                    grade2:
+                                      r.clinicalGrade2 == null
+                                        ? ''
+                                        : String(r.clinicalGrade2),
+                                  })
+                                  setGradeModalError(null)
                                 }}
                               >
-                                {removing ? '…' : 'Remove'}
+                                Update Grade
                               </button>
-                            ) : (
-                              <span
-                                className="portal-card-note"
-                                title="Only enrolled rows can be removed here."
-                              >
-                                —
-                              </span>
-                            )}
+                              {canRemove ? (
+                                <button
+                                  type="button"
+                                  className="portal-btn portal-btn--secondary"
+                                  style={{
+                                    padding: '0.35rem 0.65rem',
+                                    fontSize: '0.8125rem',
+                                  }}
+                                  disabled={removing || gradeSaving}
+                                  onClick={() => {
+                                    if (
+                                      !window.confirm(
+                                        `Remove ${r.studentName} (${r.studentId}) from this slot? Their enrollment will be marked dropped.`,
+                                      )
+                                    ) {
+                                      return
+                                    }
+                                    setRosterRemovingKey(removeKey)
+                                    ;(async () => {
+                                      try {
+                                        await deleteAdminClinicalSlotEnrollment(
+                                          rosterSlot.id,
+                                          r.enrollmentId,
+                                          r.studentId,
+                                        )
+                                        setRosterRows((prev) =>
+                                          prev == null
+                                            ? prev
+                                            : prev.filter(
+                                                (x) => x.enrollmentId !== r.enrollmentId,
+                                              ),
+                                        )
+                                        setSlotsReloadKey((k) => k + 1)
+                                      } catch (e) {
+                                        window.alert(
+                                          e instanceof Error ? e.message : 'Remove failed.',
+                                        )
+                                      } finally {
+                                        setRosterRemovingKey(null)
+                                      }
+                                    })()
+                                  }}
+                                >
+                                  {removing ? '…' : 'Remove'}
+                                </button>
+                              ) : (
+                                <span
+                                  className="portal-card-note"
+                                  title="Only enrolled rows can be removed here."
+                                >
+                                  —
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       )
                     })}
                   </tbody>
                 </table>
+              </div>
+            ) : null}
+            {gradeModal != null ? (
+              <div
+                className="admin-section-detail-backdrop"
+                role="presentation"
+                onMouseDown={(ev) => {
+                  if (ev.target === ev.currentTarget && !gradeSaving) {
+                    setGradeModal(null)
+                    setGradeModalError(null)
+                  }
+                }}
+              >
+                <div
+                  className="admin-section-detail-modal"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="admin-clinical-roster-grade-title"
+                >
+                  <h3
+                    id="admin-clinical-roster-grade-title"
+                    className="admin-section-detail-modal__title"
+                  >
+                    Update Clinical Grade
+                  </h3>
+                  <p className="admin-section-detail-modal__meta">
+                    {gradeModal.studentName} · {gradeModal.studentId}
+                  </p>
+                  <div className="portal-stack" style={{ marginTop: '0.5rem' }}>
+                    <p className="portal-card-note">
+                      Clinical code:{' '}
+                      <strong>
+                        {gradeModal.clinicalCode ??
+                          gradeModal.clinicalBaseCode ??
+                          'To be matched from enrollment context'}
+                      </strong>
+                    </p>
+                  </div>
+                  {gradeModalError ? (
+                    <p className="portal-page-lede" role="alert">
+                      {gradeModalError}
+                    </p>
+                  ) : null}
+                  <form
+                    className="portal-stack"
+                    onSubmit={(ev) => {
+                      ev.preventDefault()
+                      const selectedGrade = gradeModal.grade.trim().toUpperCase()
+                      if (selectedGrade === '') {
+                        setGradeModalError('Grade is required.')
+                        return
+                      }
+                      const grade2Raw = gradeModal.grade2.trim()
+                      if (grade2Raw !== '' && !Number.isFinite(Number(grade2Raw))) {
+                        setGradeModalError('Grade2 must be numeric when provided.')
+                        return
+                      }
+                      setGradeModalError(null)
+                      setGradeSaving(true)
+                      ;(async () => {
+                        try {
+                          const result = await postAdminClinicalSlotEnrollmentGrade({
+                            timetableId: gradeModal.timetableId,
+                            enrollmentId: gradeModal.enrollmentId,
+                            studentId: gradeModal.studentId,
+                            grade: selectedGrade,
+                            grade2: grade2Raw === '' ? null : Number(grade2Raw),
+                          })
+                          setRosterRows((prev) =>
+                            prev == null
+                              ? prev
+                              : prev.map((row) =>
+                                  row.enrollmentId === gradeModal.enrollmentId &&
+                                  row.studentId === gradeModal.studentId
+                                    ? {
+                                        ...row,
+                                        clinicalCode: result.clinicalCode,
+                                        clinicalBaseCode: result.clinicalBaseCode,
+                                        clinicalGrade: selectedGrade,
+                                        clinicalGrade2:
+                                          grade2Raw === '' ? null : Number(grade2Raw),
+                                      }
+                                    : row,
+                                ),
+                          )
+                          setGradeModal(null)
+                          setGradeModalError(null)
+                        } catch (e) {
+                          setGradeModalError(
+                            e instanceof Error ? e.message : 'Failed to save grade.',
+                          )
+                        } finally {
+                          setGradeSaving(false)
+                        }
+                      })()
+                    }}
+                  >
+                    <div className="portal-course-feedback-modal__field">
+                      <label htmlFor="admin-clinical-roster-grade">Grade</label>
+                      <select
+                        id="admin-clinical-roster-grade"
+                        className="admin-input"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                        value={gradeModal.grade}
+                        onChange={(e) =>
+                          setGradeModal((prev) =>
+                            prev == null ? prev : { ...prev, grade: e.target.value },
+                          )
+                        }
+                      >
+                        <option value="">Select grade…</option>
+                        {GRADE_OPTIONS.map((g) => (
+                          <option key={g} value={g}>
+                            {g}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="portal-course-feedback-modal__field">
+                      <label htmlFor="admin-clinical-roster-grade2">Grade2 (optional)</label>
+                      <input
+                        id="admin-clinical-roster-grade2"
+                        className="admin-input"
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                        inputMode="decimal"
+                        value={gradeModal.grade2}
+                        onChange={(e) =>
+                          setGradeModal((prev) =>
+                            prev == null ? prev : { ...prev, grade2: e.target.value },
+                          )
+                        }
+                      />
+                    </div>
+                    <div
+                      className="portal-actions"
+                      style={{ marginTop: '1rem', justifyContent: 'flex-end' }}
+                    >
+                      <button
+                        type="button"
+                        className="portal-btn portal-btn--secondary"
+                        disabled={gradeSaving}
+                        onClick={() => {
+                          if (gradeSaving) return
+                          setGradeModal(null)
+                          setGradeModalError(null)
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="portal-btn portal-btn--primary"
+                        disabled={gradeSaving}
+                      >
+                        {gradeSaving ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
               </div>
             ) : null}
             <div
@@ -1637,7 +1862,7 @@ export function AdminClinicalPage() {
               <button
                 type="button"
                 className="portal-btn portal-btn--secondary"
-                disabled={rosterRemovingKey != null}
+                disabled={rosterRemovingKey != null || gradeModal != null || gradeSaving}
                 onClick={() => setRosterSlot(null)}
               >
                 Close

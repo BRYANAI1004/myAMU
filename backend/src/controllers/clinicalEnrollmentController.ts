@@ -8,6 +8,7 @@ import {
   listOpenClinicalSlotsForStudent,
   listStudentClinicalEnrollmentRows,
 } from "../services/clinicalEnrollmentService.js";
+import { setAdminClinicalEnrollmentGrade } from "../services/adminMarksService.js";
 import {
   getStudentPortalClinicalBookingHold,
   reconcilePaidClinicalBookingPaymentHoldsForStudent,
@@ -57,6 +58,20 @@ function parseOptYearQuery(req: Request): number | null {
   }
   if (typeof v === "number" && Number.isFinite(v)) return v;
   return null;
+}
+
+function parseOptionalGrade2(value: unknown): number | null | "invalid" {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : "invalid";
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    return Number.isFinite(n) ? n : "invalid";
+  }
+  return "invalid";
 }
 
 /**
@@ -128,6 +143,68 @@ export async function deleteAdminClinicalSlotEnrollmentHandler(
     console.error("[admin clinical slot enrollment DELETE] failed:", e);
     const body: { error: string; message?: string } = {
       error: "Could not remove student from this slot.",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * POST /api/admin/clinical/slots/:timetableId/enrollments/:enrollmentId/grade
+ * Body: { studentId: string, grade: string, grade2?: number | null }
+ */
+export async function postAdminClinicalSlotEnrollmentGradeHandler(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const tid = pathTimetableId(req);
+    if (!Number.isInteger(tid) || tid <= 0) {
+      res.status(400).json({ error: "Invalid timetable id" });
+      return;
+    }
+    const eid = pathEnrollmentId(req);
+    if (!Number.isFinite(eid) || eid <= 0) {
+      res.status(400).json({ error: "Invalid enrollment id" });
+      return;
+    }
+    const body = req.body as Record<string, unknown> | null | undefined;
+    if (body == null || typeof body !== "object") {
+      res.status(400).json({ error: "JSON body is required" });
+      return;
+    }
+    const studentId =
+      typeof body.studentId === "string" ? body.studentId.trim() : "";
+    const grade = typeof body.grade === "string" ? body.grade.trim() : "";
+    if (studentId === "" || grade === "") {
+      res.status(400).json({ error: "studentId and grade are required." });
+      return;
+    }
+    const grade2 = parseOptionalGrade2(body.grade2);
+    if (grade2 === "invalid") {
+      res.status(400).json({ error: "grade2 must be a valid number when provided." });
+      return;
+    }
+    const result = await setAdminClinicalEnrollmentGrade({
+      timetableId: tid,
+      enrollmentId: eid,
+      studentId,
+      grade,
+      grade2,
+    });
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    res.json({
+      ok: true,
+      clinicalCode: result.clinicalCode,
+      clinicalBaseCode: result.clinicalBaseCode,
+    });
+  } catch (e) {
+    console.error("[admin clinical slot enrollment grade] failed:", e);
+    const body: { error: string; message?: string } = {
+      error: "Could not update clinical grade for this enrollment.",
     };
     if (env.nodeEnv === "development") body.message = devMessage(e);
     res.status(500).json(body);

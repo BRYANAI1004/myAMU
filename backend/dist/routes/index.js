@@ -19,7 +19,7 @@ import { getStudentClinicalProgressHandler } from "../controllers/studentClinica
 import { deleteAdminAcademicTerm, getAcademicTerms, getAcademicTermsCurrent, getAcademicTermsCurrentPosted, getAcademicTermsRecent, patchAdminAcademicTerm, postAdminAcademicTerm, postAdminAcademicTermPost, } from "../controllers/academicTermController.js";
 import { postAiAsk } from "../controllers/aiAskController.js";
 import { getAdminClinicalRequestsHandler, getStudentClinicalRequestsHandler, postApproveClinicalRequestHandler, postRejectClinicalRequestHandler, postStudentClinicalRequestHandler, } from "../controllers/clinicalRequestController.js";
-import { deleteAdminClinicalSlotEnrollmentHandler, deleteStudentClinicalEnrollmentHandler, getAdminClinicalSlotRosterHandler, getStudentClinicalEnrollmentsHandler, getStudentOpenClinicalEnrollmentSlotsHandler, postAdminClinicalPaymentHoldCleanupHandler, postStudentClinicalEnrollmentHandler, } from "../controllers/clinicalEnrollmentController.js";
+import { deleteAdminClinicalSlotEnrollmentHandler, deleteStudentClinicalEnrollmentHandler, getAdminClinicalSlotRosterHandler, getStudentClinicalEnrollmentsHandler, getStudentOpenClinicalEnrollmentSlotsHandler, postAdminClinicalSlotEnrollmentGradeHandler, postAdminClinicalPaymentHoldCleanupHandler, postStudentClinicalEnrollmentHandler, } from "../controllers/clinicalEnrollmentController.js";
 import { deleteAdminClinicalSlotHandler, getAdminClinicalSlotsHandler, patchAdminClinicalSlotHandler, postAdminClinicalSlotHandler, } from "../controllers/adminClinicalSlotController.js";
 import { getAdminInstructorsHandler } from "../controllers/adminInstructorController.js";
 import { getAdminClinicalTimetableHandler, getClinicalOfferedTimetableHandler, getStudentClinicalScheduleHandler, postAdminClinicalAssignHandler, } from "../controllers/clinicalScheduleController.js";
@@ -91,6 +91,7 @@ adminRouter.delete("/academic-terms/:id", deleteAdminAcademicTerm);
 adminRouter.get("/clinical/timetable", getAdminClinicalTimetableHandler);
 adminRouter.get("/clinical/slots/:timetableId/roster", getAdminClinicalSlotRosterHandler);
 adminRouter.delete("/clinical/slots/:timetableId/enrollments/:enrollmentId", deleteAdminClinicalSlotEnrollmentHandler);
+adminRouter.post("/clinical/slots/:timetableId/enrollments/:enrollmentId/grade", postAdminClinicalSlotEnrollmentGradeHandler);
 adminRouter.post("/clinical/run-payment-hold-cleanup", postAdminClinicalPaymentHoldCleanupHandler);
 adminRouter.get("/clinical/slots", getAdminClinicalSlotsHandler);
 adminRouter.get("/instructors", getAdminInstructorsHandler);

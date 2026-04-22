@@ -30,6 +30,7 @@ import {
   formatClinicTimeHm,
 } from "./clinicalScheduleService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
+import { getAdminClinicalEnrollmentGradeSnapshot } from "./adminMarksService.js";
 
 /**
  * Phase 2: flat fee for a new clinical timetable slot booking until per-slot pricing exists.
@@ -57,6 +58,13 @@ function clinicalSlotBookingLedgerDescription(tt: ClinicTimetableDbRow): string 
 
 export type OpenClinicalSlotForStudentDto = ClinicalEnrollmentSlotRow & {
   alreadyEnrolled: boolean;
+};
+
+export type AdminClinicalSlotRosterDto = ClinicalSlotRosterAdminRow & {
+  clinicalCode: string | null;
+  clinicalBaseCode: string | null;
+  clinicalGrade: string;
+  clinicalGrade2: number | null;
 };
 
 function normalizeQueryTerm(term: string | null | undefined): string | null {
@@ -322,11 +330,30 @@ export async function enrollStudentInClinicalSlot(
 
 export async function listAdminClinicalSlotRoster(
   timetableId: number,
-): Promise<ClinicalSlotRosterAdminRow[]> {
+): Promise<AdminClinicalSlotRosterDto[]> {
   if (!Number.isFinite(timetableId) || timetableId <= 0) {
     return [];
   }
-  return listActiveClinicalRosterForTimetable(timetableId);
+  const rows = await listActiveClinicalRosterForTimetable(timetableId);
+  const snapshots = await Promise.all(
+    rows.map((row) =>
+      getAdminClinicalEnrollmentGradeSnapshot({
+        timetableId,
+        enrollmentId: row.enrollmentId,
+        studentId: row.studentId,
+      }),
+    ),
+  );
+  return rows.map((row, idx) => {
+    const snap = snapshots[idx];
+    return {
+      ...row,
+      clinicalCode: snap?.clinicalCode ?? null,
+      clinicalBaseCode: snap?.clinicalBaseCode ?? null,
+      clinicalGrade: snap?.grade ?? "",
+      clinicalGrade2: snap?.grade2 ?? null,
+    };
+  });
 }
 
 /**

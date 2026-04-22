@@ -2658,6 +2658,10 @@ export type AdminClinicalSlotRosterRow = {
   status: string
   seatBucket: '100' | '200' | '300' | 'all' | null
   createdAt: string
+  clinicalCode: string | null
+  clinicalBaseCode: string | null
+  clinicalGrade: string
+  clinicalGrade2: number | null
 }
 
 function isAdminClinicalSlotRosterRow(x: unknown): x is AdminClinicalSlotRosterRow {
@@ -2677,7 +2681,11 @@ function isAdminClinicalSlotRosterRow(x: unknown): x is AdminClinicalSlotRosterR
     (o.email === null || typeof o.email === 'string') &&
     typeof o.status === 'string' &&
     seatOk &&
-    typeof o.createdAt === 'string'
+    typeof o.createdAt === 'string' &&
+    (o.clinicalCode === null || typeof o.clinicalCode === 'string') &&
+    (o.clinicalBaseCode === null || typeof o.clinicalBaseCode === 'string') &&
+    typeof o.clinicalGrade === 'string' &&
+    (o.clinicalGrade2 === null || typeof o.clinicalGrade2 === 'number')
   )
 }
 
@@ -2719,6 +2727,42 @@ export async function deleteAdminClinicalSlotEnrollment(
     throw new Error('Unexpected clinical slot enrollment delete response')
   }
   return { ok: true }
+}
+
+export async function postAdminClinicalSlotEnrollmentGrade(params: {
+  timetableId: number
+  enrollmentId: number
+  studentId: string
+  grade: string
+  grade2?: number | null
+  signal?: AbortSignal
+}): Promise<{ ok: true; clinicalCode: string; clinicalBaseCode: string }> {
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(params.timetableId))}/enrollments/${encodeURIComponent(String(params.enrollmentId))}/grade`
+  const data = (await fetchApiJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      studentId: params.studentId.trim(),
+      grade: params.grade.trim(),
+      grade2: params.grade2 ?? null,
+    }),
+    signal: params.signal,
+  })) as unknown
+  if (
+    data == null ||
+    typeof data !== 'object' ||
+    (data as { ok?: unknown }).ok !== true ||
+    typeof (data as { clinicalCode?: unknown }).clinicalCode !== 'string' ||
+    typeof (data as { clinicalBaseCode?: unknown }).clinicalBaseCode !== 'string'
+  ) {
+    throw new Error('Unexpected clinical slot enrollment grade response')
+  }
+  const out = data as {
+    ok: true
+    clinicalCode: string
+    clinicalBaseCode: string
+  }
+  return out
 }
 
 /** GET /api/students/:studentId/clinical-requests */
