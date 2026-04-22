@@ -33,7 +33,12 @@ function clinicalLevelFromCodes(codes: string[]): number {
     if (codeStartsWithClinicalPrefix(c, "CL211")) return 2;
   }
   for (const c of codes) {
-    if (codeStartsWithClinicalPrefix(c, "CL111")) return 1;
+    if (
+      codeStartsWithClinicalPrefix(c, "CL111") ||
+      codeStartsWithClinicalPrefix(c, "CL113")
+    ) {
+      return 1;
+    }
   }
   return 0;
 }

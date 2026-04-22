@@ -23,6 +23,272 @@ function normalizeEnrollmentTerm(term: string): string {
   return term.trim().slice(0, 20);
 }
 
+type ClinicalAttemptLevelBucket = "100" | "200" | "300";
+
+type ClinicalCourseTemplate = {
+  levelBucket: ClinicalAttemptLevelBucket;
+  baseCode: string;
+  courseTitle: string;
+};
+
+const CLINICAL_COURSE_TEMPLATE_BY_BUCKET: Record<
+  ClinicalAttemptLevelBucket,
+  ClinicalCourseTemplate
+> = {
+  "100": {
+    levelBucket: "100",
+    baseCode: "CL111",
+    courseTitle: "Clinic Observation",
+  },
+  "200": {
+    levelBucket: "200",
+    baseCode: "CL211",
+    courseTitle: "Supervised Assisted Practice",
+  },
+  "300": {
+    levelBucket: "300",
+    baseCode: "CL311",
+    courseTitle: "Supervised Solo Practice",
+  },
+};
+
+function preferredClinicalAttemptBucket(args: {
+  requestedSeatBucket: ClinicalSeatBucket | null;
+  chosenSeatBucket: ClinicalSeatBucket | null;
+  caps: { c100: number; c200: number; c300: number };
+}): ClinicalAttemptLevelBucket {
+  const candidates: Array<ClinicalSeatBucket | null> = [
+    args.chosenSeatBucket,
+    args.requestedSeatBucket,
+  ];
+  for (const c of candidates) {
+    if (c === "100" || c === "200" || c === "300") {
+      return c;
+    }
+  }
+  const available: ClinicalAttemptLevelBucket[] = [];
+  if (args.caps.c100 > 0) available.push("100");
+  if (args.caps.c200 > 0) available.push("200");
+  if (args.caps.c300 > 0) available.push("300");
+  if (available.length === 1) return available[0]!;
+  return "100";
+}
+
+function parseClinicalAttemptSuffix(
+  code: unknown,
+  baseCode: string,
+): number | null {
+  const raw = String(code ?? "").trim().toUpperCase();
+  const base = baseCode.trim().toUpperCase();
+  const m = raw.match(new RegExp(`^${base}-(\\d+)$`));
+  if (!m) return null;
+  const n = Number(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.trunc(n);
+}
+
+function trimOrEmpty(v: unknown): string {
+  return String(v ?? "").trim();
+}
+
+function normalizeSqlTimeHms(v: unknown): string {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    const hh = String(v.getHours()).padStart(2, "0");
+    const mm = String(v.getMinutes()).padStart(2, "0");
+    const ss = String(v.getSeconds()).padStart(2, "0");
+    return `${hh}:${mm}:${ss}`;
+  }
+  const s = String(v ?? "").trim();
+  const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return "00:00:00";
+  const hh = String(Math.max(0, Math.min(23, Number(m[1])))).padStart(2, "0");
+  const mm = String(Math.max(0, Math.min(59, Number(m[2])))).padStart(2, "0");
+  const ss = String(
+    Math.max(0, Math.min(59, m[3] != null ? Number(m[3]) : 0)),
+  ).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
+}
+
+async function resolveStudentNameForClinic(
+  conn: PoolConnection,
+  studentId: string,
+): Promise<string> {
+  const sid = studentId.trim();
+  const [legacyRows] = await conn.query<RowDataPacket[]>(
+    `SELECT TRIM(name) AS name
+       FROM students
+      WHERE TRIM(id) = TRIM(?)
+      LIMIT 1`,
+    [sid],
+  );
+  if (legacyRows.length > 0) {
+    const n = trimOrEmpty((legacyRows[0] as { name?: unknown }).name);
+    if (n !== "") return n;
+  }
+  const [portalRows] = await conn.query<RowDataPacket[]>(
+    `SELECT TRIM(full_name) AS name
+       FROM portal_students
+      WHERE student_external_id = TRIM(?)
+      LIMIT 1`,
+    [sid],
+  );
+  if (portalRows.length > 0) {
+    const n = trimOrEmpty((portalRows[0] as { name?: unknown }).name);
+    if (n !== "") return n;
+  }
+  return sid;
+}
+
+async function nextClinicalAttemptCodeForBase(
+  conn: PoolConnection,
+  args: { studentId: string; term: string; year: number; baseCode: string },
+): Promise<string> {
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT code
+       FROM clinic
+      WHERE id = ?
+        AND term = ?
+        AND year = ?
+        AND code LIKE CONCAT(?, '-%')
+      FOR UPDATE`,
+    [
+      args.studentId.trim(),
+      args.term.trim(),
+      args.year,
+      args.baseCode.trim().toUpperCase(),
+    ],
+  );
+  let maxSuffix = 0;
+  for (const raw of rows) {
+    const row = raw as Record<string, unknown>;
+    const suffix = parseClinicalAttemptSuffix(row.code, args.baseCode);
+    if (suffix != null && suffix > maxSuffix) maxSuffix = suffix;
+  }
+  const nextSuffix = maxSuffix + 1;
+  return `${args.baseCode.trim().toUpperCase()}-${nextSuffix}`;
+}
+
+async function insertClinicAttemptRowForEnrollment(
+  conn: PoolConnection,
+  args: {
+    studentId: string;
+    term: string;
+    year: number;
+    code: string;
+    courseTitle: string;
+    weekday: string;
+    timeFrom: string;
+    timeTo: string;
+    instructor: string;
+  },
+): Promise<void> {
+  const studentName = await resolveStudentNameForClinic(conn, args.studentId);
+  await conn.query<ResultSetHeader>(
+    `INSERT INTO clinic (
+      name, id, regis, code, grade, grade2, course_title, units, hours,
+      days, time_from, time_to, instructor, term, year, language, indie_study
+    ) VALUES (?, ?, 0, ?, '', 0, ?, 2, 40, ?, ?, ?, ?, ?, ?, 'English', '')`,
+    [
+      studentName,
+      args.studentId.trim(),
+      args.code.trim().toUpperCase(),
+      args.courseTitle.trim(),
+      args.weekday.trim(),
+      args.timeFrom,
+      args.timeTo,
+      args.instructor.trim(),
+      args.term.trim(),
+      args.year,
+    ],
+  );
+}
+
+async function deleteLatestUngradedClinicAttemptForDrop(
+  conn: PoolConnection,
+  args: {
+    studentId: string;
+    term: string;
+    year: number;
+    baseCode: string;
+    weekday: string;
+    timeFrom: string;
+    timeTo: string;
+    instructor: string;
+  },
+): Promise<void> {
+  const likePrefix = `${args.baseCode.trim().toUpperCase()}-%`;
+  const [rows] = await conn.query<RowDataPacket[]>(
+    `SELECT code, grade
+       FROM clinic
+      WHERE TRIM(id) = TRIM(?)
+        AND TRIM(term) = TRIM(?)
+        AND year = ?
+        AND UPPER(TRIM(code)) LIKE ?
+        AND TRIM(COALESCE(days, '')) = TRIM(?)
+        AND time_from = ?
+        AND time_to = ?
+        AND TRIM(COALESCE(instructor, '')) = TRIM(?)
+      FOR UPDATE`,
+    [
+      args.studentId.trim(),
+      args.term.trim(),
+      args.year,
+      likePrefix,
+      args.weekday.trim(),
+      args.timeFrom,
+      args.timeTo,
+      args.instructor.trim(),
+    ],
+  );
+  let bestSuffix = -1;
+  let bestCode: string | null = null;
+  for (const raw of rows) {
+    const row = raw as Record<string, unknown>;
+    const grade = trimOrEmpty(row.grade);
+    if (grade !== "") continue;
+    const code = trimOrEmpty(row.code);
+    const suffix = parseClinicalAttemptSuffix(code, args.baseCode);
+    if (suffix != null && suffix > bestSuffix) {
+      bestSuffix = suffix;
+      bestCode = code;
+    }
+  }
+  if (bestCode == null) {
+    const [fallbackRows] = await conn.query<RowDataPacket[]>(
+      `SELECT code, grade
+         FROM clinic
+        WHERE TRIM(id) = TRIM(?)
+          AND TRIM(term) = TRIM(?)
+          AND year = ?
+          AND UPPER(TRIM(code)) LIKE ?
+        FOR UPDATE`,
+      [args.studentId.trim(), args.term.trim(), args.year, likePrefix],
+    );
+    for (const raw of fallbackRows) {
+      const row = raw as Record<string, unknown>;
+      const grade = trimOrEmpty(row.grade);
+      if (grade !== "") continue;
+      const code = trimOrEmpty(row.code);
+      const suffix = parseClinicalAttemptSuffix(code, args.baseCode);
+      if (suffix != null && suffix > bestSuffix) {
+        bestSuffix = suffix;
+        bestCode = code;
+      }
+    }
+  }
+  if (bestCode == null) return;
+  await conn.query<ResultSetHeader>(
+    `DELETE FROM clinic
+      WHERE TRIM(id) = TRIM(?)
+        AND TRIM(term) = TRIM(?)
+        AND year = ?
+        AND UPPER(TRIM(code)) = UPPER(TRIM(?))
+        AND TRIM(COALESCE(grade, '')) = ''
+      LIMIT 1`,
+    [args.studentId.trim(), args.term.trim(), args.year, bestCode],
+  );
+}
+
 /** Sum of legacy level caps on `clinic_timetable` (100/200/300/123 Max). */
 export function totalClinicTimetableCapacityCaps(row: {
   cap_100: number;
@@ -813,6 +1079,10 @@ export async function createClinicalEnrollment(
       `SELECT seqNum AS id,
               TRIM(term) AS term,
               year,
+              TRIM(day) AS weekday,
+              time_from,
+              time_to,
+              TRIM(instructor) AS instructor,
               \`100Max\` AS cap_100,
               \`200Max\` AS cap_200,
               \`300Max\` AS cap_300,
@@ -926,6 +1196,30 @@ export async function createClinicalEnrollment(
 
     const assignmentId = await insertAssignment(conn);
 
+    const attemptBucket = preferredClinicalAttemptBucket({
+      requestedSeatBucket,
+      chosenSeatBucket: chosenBucket,
+      caps,
+    });
+    const template = CLINICAL_COURSE_TEMPLATE_BY_BUCKET[attemptBucket];
+    const clinicalCode = await nextClinicalAttemptCodeForBase(conn, {
+      studentId: sid,
+      term: te,
+      year,
+      baseCode: template.baseCode,
+    });
+    await insertClinicAttemptRowForEnrollment(conn, {
+      studentId: sid,
+      term: te,
+      year,
+      code: clinicalCode,
+      courseTitle: template.courseTitle,
+      weekday: trimOrEmpty(tt.weekday),
+      timeFrom: normalizeSqlTimeHms(tt.time_from),
+      timeTo: normalizeSqlTimeHms(tt.time_to),
+      instructor: trimOrEmpty(tt.instructor),
+    });
+
     await conn.commit();
     return {
       ok: true,
@@ -953,7 +1247,7 @@ export async function dropClinicalEnrollmentInConn(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const sid = studentId.trim();
   const [rows] = await conn.query<RowDataPacket[]>(
-    `SELECT id, timetable_id, TRIM(term) AS term, year, TRIM(status) AS status
+    `SELECT id, timetable_id, TRIM(term) AS term, year, TRIM(status) AS status, seat_bucket
        FROM clinical_enrollments
       WHERE id = ?
         AND TRIM(student_id) = TRIM(?)
@@ -973,6 +1267,14 @@ export async function dropClinicalEnrollmentInConn(
   const timetableId = Number(r.timetable_id);
   const term = String(r.term ?? "").trim();
   const year = Number(r.year);
+  const seatBucketRaw = String(r.seat_bucket ?? "").trim().toLowerCase();
+  const seatBucket: ClinicalSeatBucket | null =
+    seatBucketRaw === "100" ||
+    seatBucketRaw === "200" ||
+    seatBucketRaw === "300" ||
+    seatBucketRaw === "all"
+      ? (seatBucketRaw as ClinicalSeatBucket)
+      : null;
 
   const n = await updateClinicalEnrollmentStatusById(
     conn,
@@ -991,6 +1293,43 @@ export async function dropClinicalEnrollmentInConn(
     term,
     year,
   );
+
+  const [ttRows] = await conn.query<RowDataPacket[]>(
+    `SELECT TRIM(day) AS weekday,
+            time_from,
+            time_to,
+            TRIM(instructor) AS instructor,
+            \`100Max\` AS cap_100,
+            \`200Max\` AS cap_200,
+            \`300Max\` AS cap_300
+       FROM clinic_timetable
+      WHERE seqNum = ?
+      LIMIT 1`,
+    [timetableId],
+  );
+  if (ttRows.length > 0) {
+    const tt = ttRows[0] as Record<string, unknown>;
+    const attemptBucket = preferredClinicalAttemptBucket({
+      requestedSeatBucket: seatBucket,
+      chosenSeatBucket: seatBucket,
+      caps: {
+        c100: Math.max(0, Math.trunc(Number(tt.cap_100))),
+        c200: Math.max(0, Math.trunc(Number(tt.cap_200))),
+        c300: Math.max(0, Math.trunc(Number(tt.cap_300))),
+      },
+    });
+    const template = CLINICAL_COURSE_TEMPLATE_BY_BUCKET[attemptBucket];
+    await deleteLatestUngradedClinicAttemptForDrop(conn, {
+      studentId: sid,
+      term,
+      year,
+      baseCode: template.baseCode,
+      weekday: trimOrEmpty(tt.weekday),
+      timeFrom: normalizeSqlTimeHms(tt.time_from),
+      timeTo: normalizeSqlTimeHms(tt.time_to),
+      instructor: trimOrEmpty(tt.instructor),
+    });
+  }
 
   return { ok: true };
 }

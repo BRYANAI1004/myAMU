@@ -4742,7 +4742,9 @@ export type AdminPortalEnrollmentDeleteResponse = {
 }
 
 /**
- * POST /api/admin/marks/set-grade — writes legacy `marks` only (grade / grade2); never portal_enrollments.
+ * POST /api/admin/marks/set-grade — writes legacy marks, and for clinical attempt codes
+ * (CL111/CL113/CL211/CL311 with optional suffix) also syncs legacy `clinic` grade / grade2.
+ * Never writes portal_enrollments.
  */
 export async function postAdminMarksSetGrade(params: {
   studentId: string
