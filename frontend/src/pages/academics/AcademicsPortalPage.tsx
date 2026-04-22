@@ -69,6 +69,7 @@ export function AcademicsPortalPage() {
     | { mode: 'view'; row: EnrollmentHistoryRow }
     | null
   >(null)
+  const [selectedRegistrationTermKey, setSelectedRegistrationTermKey] = useState('')
 
   useEffect(() => {
     const id = currentStudentId?.trim()
@@ -131,6 +132,24 @@ export function AcademicsPortalPage() {
     () => (academics ? groupRowsByTermYear(academics.enrollmentHistory) : []),
     [academics],
   )
+  const registrationTermOptions = useMemo(
+    () =>
+      registrationGroups.map((g) => ({
+        key: termYearKey(g.term, g.year),
+        label: `${g.term} ${g.year}`,
+        term: g.term,
+        year: g.year,
+        rows: g.rows,
+      })),
+    [registrationGroups],
+  )
+  const selectedRegistrationGroup = useMemo(() => {
+    if (registrationTermOptions.length === 0) return null
+    return (
+      registrationTermOptions.find((opt) => opt.key === selectedRegistrationTermKey) ??
+      registrationTermOptions[0]!
+    )
+  }, [registrationTermOptions, selectedRegistrationTermKey])
 
   const groupedPreview = useMemo(
     () =>
@@ -152,6 +171,21 @@ export function AcademicsPortalPage() {
   const showAcademicsError = academicsError != null && academics === null && !academicsLoading
   const showTranscriptError =
     transcriptPreviewError != null && transcriptPreview === null && !transcriptPreviewLoading
+
+  useEffect(() => {
+    if (registrationTermOptions.length === 0) {
+      if (selectedRegistrationTermKey !== '') {
+        setSelectedRegistrationTermKey('')
+      }
+      return
+    }
+    const hasSelected = registrationTermOptions.some(
+      (opt) => opt.key === selectedRegistrationTermKey,
+    )
+    if (!hasSelected) {
+      setSelectedRegistrationTermKey(registrationTermOptions[0]!.key)
+    }
+  }, [registrationTermOptions, selectedRegistrationTermKey])
 
   return (
     <main className="portal-page portal-stack">
@@ -247,51 +281,72 @@ export function AcademicsPortalPage() {
                   </p>
                 </div>
               ) : (
-                registrationGroups.map((g) => (
-                  <div key={termYearKey(g.term, g.year)} className="portal-stack">
-                    <h2 className="portal-academics-term-heading">
-                      {g.term} {g.year}
-                    </h2>
-                    <div className="portal-table-wrap">
-                      <table className={REGISTRATION_HISTORY_TABLE_CLASS}>
-                        <thead>
-                          <tr>
-                            <th scope="col">{t('courseCode')}</th>
-                            <th scope="col">{t('courseTitle')}</th>
-                            <th scope="col">{t('credits')}</th>
-                            <th scope="col">{t('status')}</th>
-                            <th scope="col">{t('grade')}</th>
-                            <th scope="col">{t('instructor')}</th>
-                            <th scope="col">{t('courseFeedbackColumn')}</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {g.rows.map((row, idx) => (
-                            <tr key={`${row.courseCode}-${g.term}-${g.year}-${idx}`}>
-                              <td>{row.courseCode}</td>
-                              <td className="portal-academics-course-title-cell">
-                                <span className="portal-academics-course-title__en">
-                                  {courseRowDisplayTitle(row)}
-                                </span>
-                              </td>
-                              <td>{formatCreditsCell(row.credits)}</td>
-                              <td>{academicStatusLabel(row.status, locale)}</td>
-                              <td>{formatGradeCell(row.grade)}</td>
-                              <td>{instructorCell(row.instructor, dash)}</td>
-                              <td>
-                                <CourseFeedbackCell
-                                  row={row}
-                                  onOpenSubmit={(r) => setFeedbackModal({ mode: 'submit', row: r })}
-                                  onOpenView={(r) => setFeedbackModal({ mode: 'view', row: r })}
-                                />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                <>
+                  <div className="portal-stack portal-account-ledger__toolbar portal-academics-term-toolbar">
+                    <label className="portal-account-ledger__quarter-label" htmlFor="registration-history-term-select">
+                      <span className="portal-card-note">{t('term')}</span>
+                      <select
+                        id="registration-history-term-select"
+                        className="portal-account-ledger__select"
+                        value={selectedRegistrationTermKey}
+                        onChange={(e) => setSelectedRegistrationTermKey(e.target.value)}
+                      >
+                        {registrationTermOptions.map((termOpt) => (
+                          <option key={termOpt.key} value={termOpt.key}>
+                            {termOpt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
-                ))
+                  {selectedRegistrationGroup ? (
+                    <div key={selectedRegistrationGroup.key} className="portal-stack">
+                      <h2 className="portal-academics-term-heading">
+                        {selectedRegistrationGroup.term} {selectedRegistrationGroup.year}
+                      </h2>
+                      <div className="portal-table-wrap">
+                        <table className={REGISTRATION_HISTORY_TABLE_CLASS}>
+                          <thead>
+                            <tr>
+                              <th scope="col">{t('courseCode')}</th>
+                              <th scope="col">{t('courseTitle')}</th>
+                              <th scope="col">{t('credits')}</th>
+                              <th scope="col">{t('status')}</th>
+                              <th scope="col">{t('grade')}</th>
+                              <th scope="col">{t('instructor')}</th>
+                              <th scope="col">{t('courseFeedbackColumn')}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedRegistrationGroup.rows.map((row, idx) => (
+                              <tr
+                                key={`${row.courseCode}-${selectedRegistrationGroup.term}-${selectedRegistrationGroup.year}-${idx}`}
+                              >
+                                <td>{row.courseCode}</td>
+                                <td className="portal-academics-course-title-cell">
+                                  <span className="portal-academics-course-title__en">
+                                    {courseRowDisplayTitle(row)}
+                                  </span>
+                                </td>
+                                <td>{formatCreditsCell(row.credits)}</td>
+                                <td>{academicStatusLabel(row.status, locale)}</td>
+                                <td>{formatGradeCell(row.grade)}</td>
+                                <td>{instructorCell(row.instructor, dash)}</td>
+                                <td>
+                                  <CourseFeedbackCell
+                                    row={row}
+                                    onOpenSubmit={(r) => setFeedbackModal({ mode: 'submit', row: r })}
+                                    onOpenView={(r) => setFeedbackModal({ mode: 'view', row: r })}
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
               )}
             </section>
           ) : null}
