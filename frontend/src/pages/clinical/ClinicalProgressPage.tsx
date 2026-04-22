@@ -81,7 +81,6 @@ export function ClinicalProgressPage() {
   return (
     <main className="portal-page">
       <h2 className="portal-section-heading">{t('clinicalProgressNav')}</h2>
-      <p className="portal-page-lede">{t('clinicalProgressLede')}</p>
 
       {showEmptyAccount ? (
         <p className="portal-page-lede" role="status">

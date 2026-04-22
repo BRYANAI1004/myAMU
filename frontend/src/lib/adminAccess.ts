@@ -1,4 +1,8 @@
-export type AdminRole = 'admin' | 'teacher' | 'clinical_teacher'
+export type AdminRole =
+  | 'admin'
+  | 'teacher'
+  | 'clinical_teacher'
+  | 'clinical_admin'
 
 export type AdminModuleKey =
   | 'students'
@@ -42,6 +46,7 @@ const ROLE_MODULE_ACCESS: Record<AdminRole, readonly AdminModuleKey[]> = {
   admin: ADMIN_MODULES.map((module) => module.key),
   teacher: ['courses', 'course_sections', 'scheduling_timetable'],
   clinical_teacher: ['clinical', 'finance'],
+  clinical_admin: ['students', 'clinical', 'finance'],
 }
 
 export function getAllowedAdminModules(role: AdminRole): readonly AdminModuleKey[] {

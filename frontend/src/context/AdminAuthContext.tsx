@@ -65,6 +65,11 @@ const ADMIN_ACCOUNTS: readonly AdminAccount[] = [
     password: 'clinical123',
     role: 'clinical_teacher',
   },
+  {
+    email: 'clinicaladmin@amu',
+    password: 'clinicaladmin',
+    role: 'clinical_admin',
+  },
 ] as const
 
 const ADMIN_ACCOUNT_MAP = new Map(
@@ -86,7 +91,8 @@ function readSession(): StoredAdminSession | null {
       typeof parsed.role === 'string' &&
       (parsed.role === 'admin' ||
         parsed.role === 'teacher' ||
-        parsed.role === 'clinical_teacher')
+        parsed.role === 'clinical_teacher' ||
+        parsed.role === 'clinical_admin')
     ) {
       return {
         email: typeof parsed.email === 'string' ? parsed.email : '',

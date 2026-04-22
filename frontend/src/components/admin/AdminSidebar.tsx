@@ -14,6 +14,7 @@ export function AdminSidebar() {
   const schedulingSearch = location.pathname.startsWith('/admin/course-sections')
     ? location.search
     : ''
+  const clinicalAdminOnly = role === 'clinical_admin'
 
   return (
     <aside className="admin-sidebar" aria-label="Administration">
@@ -21,6 +22,9 @@ export function AdminSidebar() {
         <ul className="portal-sidebar-nav-list portal-sidebar-nav-list--text-only">
           {ADMIN_MODULES.map(({ key, path, label, end, schedulingContext }) => {
             const isAllowed = role == null ? true : hasAdminModuleAccess(role, key)
+            if (clinicalAdminOnly && !isAllowed) {
+              return null
+            }
             return (
               <li key={path}>
                 {isAllowed ? (
