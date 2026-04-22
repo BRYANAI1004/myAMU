@@ -177,7 +177,7 @@ function maskedSsnDisplay(raw: string, dash: string): string {
 
 export function ProfilePage() {
   const t = useStudentPortalT()
-  const { currentStudentId, authToken } = useAccount()
+  const { currentStudentId } = useAccount()
   const dash = t('dashEm')
 
   const [profile, setProfile] = useState<StudentProfileWithSensitive | null>(null)
@@ -246,9 +246,8 @@ export function ProfilePage() {
   }, [currentStudentId, profileReloadKey, t])
 
   useEffect(() => {
-    const token = authToken?.trim()
     const id = currentStudentId?.trim()
-    if (!token || !id) {
+    if (!id) {
       setPhotoUrl(null)
       setPhotoLoading(false)
       setPhotoError(null)
@@ -262,7 +261,7 @@ export function ProfilePage() {
 
     ;(async () => {
       try {
-        const result = await fetchMyStudentPhotoUrl(token, { signal: ac.signal })
+        const result = await fetchMyStudentPhotoUrl({ signal: ac.signal })
         if (ac.signal.aborted) return
         setPhotoUrl(result.photoUrl)
       } catch (e) {
@@ -279,7 +278,7 @@ export function ProfilePage() {
     })()
 
     return () => ac.abort()
-  }, [authToken, currentStudentId, photoReloadKey])
+  }, [currentStudentId, photoReloadKey])
 
   useEffect(() => {
     return () => {
@@ -336,16 +335,10 @@ export function ProfilePage() {
         race: toPatchValue(editable.race),
         marital: toPatchValue(editable.marital),
       }
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-      }
-      if (authToken?.trim()) {
-        headers.Authorization = `Bearer ${authToken.trim()}`
-      }
       const updated = mapApiProfile(
         await fetchApiJson('/api/student/profile', {
           method: 'PUT',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(patch),
         }),
       )
@@ -393,7 +386,7 @@ export function ProfilePage() {
     setPhotoError(null)
     setPhotoSuccess(null)
     try {
-      const uploaded = await uploadMyStudentPhoto(photoFile, authToken)
+      const uploaded = await uploadMyStudentPhoto(photoFile)
       if (photoPreviewUrl) {
         URL.revokeObjectURL(photoPreviewUrl)
       }

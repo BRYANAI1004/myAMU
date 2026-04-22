@@ -29,6 +29,29 @@ export class ApiError extends Error {
   }
 }
 
+const STUDENT_AUTH_STORAGE_KEYS = [
+  'portal_student_auth_token',
+  'studentToken',
+  'token',
+] as const
+
+function shouldAttachStudentAuthorization(path: string): boolean {
+  return path.startsWith('/api/student/') || path.startsWith('/api/students/')
+}
+
+function readStudentAccessTokenFromStorage(): string | null {
+  try {
+    for (const key of STUDENT_AUTH_STORAGE_KEYS) {
+      const raw = localStorage.getItem(key)
+      const trimmed = raw?.trim() ?? ''
+      if (trimmed !== '') return trimmed
+    }
+  } catch {
+    // Ignore localStorage access errors (private mode, blocked storage, etc.)
+  }
+  return null
+}
+
 /**
  * Full URL for an API path. `path` must start with `/` (e.g. `/api/students/x/account`).
  */
@@ -70,9 +93,20 @@ export async function apiFetch(
  */
 export async function fetchApiJson(
   path: string,
-  init?: RequestInit,
+  init: RequestInit = {},
 ): Promise<unknown> {
-  const res = await apiFetch(path, init)
+  const headers = new Headers(init.headers ?? undefined)
+  if (!headers.has('Authorization') && shouldAttachStudentAuthorization(path)) {
+    const token = readStudentAccessTokenFromStorage()
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
+  }
+
+  const res = await apiFetch(path, {
+    ...init,
+    headers,
+  })
   const ct = (res.headers.get('content-type') ?? '').toLowerCase()
   const text = await res.text()
 
@@ -84,6 +118,9 @@ export async function fetchApiJson(
         .trim() || '(empty)'
     const prefix = `Expected application/json but got "${ct || 'no content-type'}" (HTTP ${res.status}). Body starts with: ${snippet}`
     if (!res.ok) {
+      if (res.status === 401) {
+        console.warn('Unauthorized, token may be expired')
+      }
       throw new Error(`Request failed: ${prefix}`)
     }
     throw new Error(prefix)
@@ -105,6 +142,9 @@ export async function fetchApiJson(
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      console.warn('Unauthorized, token may be expired')
+    }
     const body = data as { error?: string; message?: string }
     const msg =
       (typeof body.message === 'string' && body.message) ||
@@ -925,14 +965,9 @@ export async function uploadAdminStudentPhoto(
 }
 
 export async function fetchMyStudentPhotoUrl(
-  accessToken?: string | null,
   options?: { signal?: AbortSignal },
 ): Promise<StudentSelfPhotoPayload> {
-  const headers: Record<string, string> = {}
-  const token = accessToken?.trim()
-  if (token) headers.Authorization = `Bearer ${token}`
   const data = await fetchApiJson('/api/student/me/photo-url', {
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
     signal: options?.signal,
   })
   return parseStudentSelfPhotoPayload(data)
@@ -940,18 +975,13 @@ export async function fetchMyStudentPhotoUrl(
 
 export async function uploadMyStudentPhoto(
   photoFile: File,
-  accessToken?: string | null,
   options?: { signal?: AbortSignal },
 ): Promise<StudentSelfPhotoPayload> {
-  const headers: Record<string, string> = {}
-  const token = accessToken?.trim()
-  if (token) headers.Authorization = `Bearer ${token}`
   const form = new FormData()
   form.set('photo', photoFile)
   const data = await fetchApiJson('/api/student/me/photo', {
     method: 'POST',
     body: form,
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
     signal: options?.signal,
   })
   return parseStudentSelfPhotoPayload(data)
