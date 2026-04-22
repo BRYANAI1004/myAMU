@@ -14,6 +14,7 @@ type AdminAccount = {
   email: string
   password: string
   role: AdminRole
+  loginIds?: readonly string[]
 }
 
 type AdminLoginResult =
@@ -69,12 +70,24 @@ const ADMIN_ACCOUNTS: readonly AdminAccount[] = [
     email: 'clinicaladmin@amu',
     password: 'clinicaladmin',
     role: 'clinical_admin',
+    loginIds: ['clinicaladmin'],
   },
 ] as const
 
-const ADMIN_ACCOUNT_MAP = new Map(
-  ADMIN_ACCOUNTS.map((account) => [account.email.toLowerCase(), account] as const),
-)
+function normalizeLoginId(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+const ADMIN_ACCOUNT_MAP = new Map<string, AdminAccount>()
+for (const account of ADMIN_ACCOUNTS) {
+  const ids = [account.email, ...(account.loginIds ?? [])]
+  for (const id of ids) {
+    const normalized = normalizeLoginId(id)
+    if (normalized) {
+      ADMIN_ACCOUNT_MAP.set(normalized, account)
+    }
+  }
+}
 
 function readSession(): StoredAdminSession | null {
   try {
@@ -110,15 +123,19 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = session !== null
 
   const login = useCallback((email: string, password: string): AdminLoginResult => {
-    const trimmedEmail = email.trim()
-    if (!trimmedEmail) {
+    const normalizedLoginId = normalizeLoginId(email)
+    if (!normalizedLoginId) {
       return { ok: false, error: 'Username or Email is required' }
     }
     if (password === '') {
       return { ok: false, error: 'Password is required' }
     }
-    const account = ADMIN_ACCOUNT_MAP.get(trimmedEmail.toLowerCase())
-    if (!account || password !== account.password) {
+    const normalizedPassword = password.trim()
+    const account = ADMIN_ACCOUNT_MAP.get(normalizedLoginId)
+    if (!account) {
+      return { ok: false, error: 'Invalid email or password.' }
+    }
+    if (password !== account.password && normalizedPassword !== account.password) {
       return { ok: false, error: 'Invalid email or password.' }
     }
     const nextSession: StoredAdminSession = {
