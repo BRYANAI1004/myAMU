@@ -7,7 +7,9 @@ import {
   insertClinicalExamRequest,
   listClinicalExamRequestsForAdmin,
   listClinicalExamRequestsForStudent,
+  upsertClinicalExamMarkByPrefix,
   updateClinicalExamRequestFields,
+  voidClinicalExamBillingAdjustmentById,
   type ClinicalExamRequestDbRow,
 } from "../repositories/clinicalExamRequestRepository.js";
 
@@ -19,6 +21,7 @@ const ASSIGNABLE_STATUSES = new Set([
   "completed",
   "cancelled",
 ]);
+const ASSIGNABLE_GRADES = new Set(["", "P", "F"]);
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
@@ -72,6 +75,7 @@ function formatSqlDateTimeIso(v: unknown): string | null {
 export type ClinicalExamRequestApi = {
   id: number;
   studentId: string;
+  studentName: string | null;
   examCode: string;
   examName: string;
   term: string;
@@ -92,6 +96,7 @@ function rowToApi(r: ClinicalExamRequestDbRow): ClinicalExamRequestApi {
   return {
     id: r.id,
     studentId: r.student_id,
+    studentName: r.student_name,
     examCode: r.exam_code,
     examName: r.exam_name,
     term: r.term,
@@ -209,6 +214,9 @@ export type ClinicalExamAssignPatch = {
   assignedExamTime?: string | null;
   notes?: string;
   status?: string;
+  grade?: string;
+  term?: string;
+  year?: number;
 };
 
 export async function assignClinicalExamRequest(
@@ -263,20 +271,84 @@ export async function assignClinicalExamRequest(
     status = s;
   }
 
+  let grade = "";
+  if (patch.grade !== undefined) {
+    const g = patch.grade.trim().toUpperCase();
+    if (!ASSIGNABLE_GRADES.has(g)) {
+      return { ok: false, status: 400, error: "Invalid grade." };
+    }
+    grade = g;
+  }
+
+  let term = existing.term;
+  if (patch.term !== undefined) {
+    const t = patch.term.trim();
+    if (t === "") return { ok: false, status: 400, error: "term is required." };
+    term = t;
+  }
+
+  let year = Math.trunc(existing.year);
+  if (patch.year !== undefined) {
+    const y = Math.trunc(Number(patch.year));
+    if (!Number.isFinite(y) || y < 1900 || y > 2100) {
+      return { ok: false, status: 400, error: "year must be a valid number." };
+    }
+    year = y;
+  }
+
+  if (status === "cancelled") {
+    assignedExamDate = null;
+    assignedExamTime = null;
+  }
+
   const assignedByFinal =
     assignedBy != null && assignedBy.trim() !== ""
       ? assignedBy.trim()
       : existing.assigned_by ?? null;
 
-  const ok = await updateClinicalExamRequestFields(pool, id, {
-    assignedExamDate,
-    assignedExamTime,
-    notes,
-    status,
-    assignedBy: assignedByFinal,
-  });
-  if (!ok) {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const ok = await updateClinicalExamRequestFields(conn, id, {
+      assignedExamDate,
+      assignedExamTime,
+      notes,
+      status,
+      term,
+      year,
+      assignedBy: assignedByFinal,
+    });
+    if (!ok) {
+      await conn.rollback();
+      return { ok: false, status: 500, error: "Failed to update exam request." };
+    }
+
+    if (status === "cancelled" && existing.billing_adjustment_id != null) {
+      await voidClinicalExamBillingAdjustmentById(conn, {
+        billingAdjustmentId: existing.billing_adjustment_id,
+        studentId: existing.student_id,
+        term: existing.term,
+        year: existing.year,
+      });
+    }
+
+    if (grade === "P" || grade === "F") {
+      await upsertClinicalExamMarkByPrefix(conn, {
+        studentId: existing.student_id,
+        examCode: existing.exam_code,
+        examName: existing.exam_name,
+        grade,
+        term,
+        year,
+      });
+    }
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback();
+    console.error("[clinical exam request] assign failed:", e);
     return { ok: false, status: 500, error: "Failed to update exam request." };
+  } finally {
+    conn.release();
   }
 
   const row = await getClinicalExamRequestById(pool, id);

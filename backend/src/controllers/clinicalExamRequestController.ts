@@ -123,7 +123,7 @@ export async function getAdminClinicalExamRequestsHandler(
 
 /**
  * POST /api/admin/clinical/exam-requests/:id/assign
- * Body: { assignedExamDate?, assignedExamTime?, notes?, status? }
+ * Body: { assignedExamDate?, assignedExamTime?, notes?, status?, grade?, term?, year? }
  */
 export async function postAdminClinicalExamRequestAssignHandler(
   req: Request,
@@ -177,6 +177,31 @@ export async function postAdminClinicalExamRequestAssignHandler(
         res.status(400).json({ error: "status must be a string." });
         return;
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "grade")) {
+      const v = body.grade;
+      if (typeof v === "string") patch.grade = v;
+      else {
+        res.status(400).json({ error: "grade must be a string." });
+        return;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "term")) {
+      const v = body.term;
+      if (typeof v === "string") patch.term = v;
+      else {
+        res.status(400).json({ error: "term must be a string." });
+        return;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(body, "year")) {
+      const v = body.year;
+      const n = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+      if (!Number.isFinite(n)) {
+        res.status(400).json({ error: "year must be a number." });
+        return;
+      }
+      patch.year = n;
     }
 
     const assignedBy = readAdminEmailHeader(req);

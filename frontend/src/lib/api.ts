@@ -1866,6 +1866,7 @@ export async function fetchStudentClinicalProgress(
 export type ClinicalExamRequestDto = {
   id: number
   studentId: string
+  studentName: string | null
   examCode: string
   examName: string
   term: string
@@ -1888,6 +1889,7 @@ function isClinicalExamRequestDto(x: unknown): x is ClinicalExamRequestDto {
   return (
     typeof o.id === 'number' &&
     typeof o.studentId === 'string' &&
+    (o.studentName === null || typeof o.studentName === 'string') &&
     typeof o.examCode === 'string' &&
     typeof o.examName === 'string' &&
     typeof o.term === 'string' &&
@@ -1989,6 +1991,9 @@ export async function postAdminClinicalExamRequestAssign(
     assignedExamTime?: string | null
     notes?: string
     status?: string
+    grade?: string
+    term?: string
+    year?: number
   },
   options?: { signal?: AbortSignal },
 ): Promise<ClinicalExamRequestDto> {

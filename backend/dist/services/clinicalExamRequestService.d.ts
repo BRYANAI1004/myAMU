@@ -1,6 +1,7 @@
 export type ClinicalExamRequestApi = {
     id: number;
     studentId: string;
+    studentName: string | null;
     examCode: string;
     examName: string;
     term: string;
@@ -31,6 +32,9 @@ export type ClinicalExamAssignPatch = {
     assignedExamTime?: string | null;
     notes?: string;
     status?: string;
+    grade?: string;
+    term?: string;
+    year?: number;
 };
 export declare function assignClinicalExamRequest(id: number, patch: ClinicalExamAssignPatch, assignedBy: string | null): Promise<{
     ok: true;

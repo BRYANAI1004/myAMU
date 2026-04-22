@@ -14,7 +14,7 @@ export declare function getStudentClinicalExamRequestsHandler(req: Request, res:
 export declare function getAdminClinicalExamRequestsHandler(_req: Request, res: Response): Promise<void>;
 /**
  * POST /api/admin/clinical/exam-requests/:id/assign
- * Body: { assignedExamDate?, assignedExamTime?, notes?, status? }
+ * Body: { assignedExamDate?, assignedExamTime?, notes?, status?, grade?, term?, year? }
  */
 export declare function postAdminClinicalExamRequestAssignHandler(req: Request, res: Response): Promise<void>;
 //# sourceMappingURL=clinicalExamRequestController.d.ts.map

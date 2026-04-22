@@ -217,6 +217,9 @@ export function AdminClinicalPage() {
   const [assignTime, setAssignTime] = useState('')
   const [assignNotes, setAssignNotes] = useState('')
   const [assignStatus, setAssignStatus] = useState('requested')
+  const [assignGrade, setAssignGrade] = useState('')
+  const [assignTerm, setAssignTerm] = useState('')
+  const [assignYear, setAssignYear] = useState('')
   const [assignSaving, setAssignSaving] = useState(false)
   const [assignError, setAssignError] = useState<string | null>(null)
 
@@ -1192,6 +1195,7 @@ export function AdminClinicalPage() {
                 <thead>
                   <tr>
                     <th scope="col">Student ID</th>
+                    <th scope="col">Student Name</th>
                     <th scope="col">Exam</th>
                     <th scope="col">Term</th>
                     <th scope="col">Status</th>
@@ -1205,6 +1209,9 @@ export function AdminClinicalPage() {
                   {examRows.map((r) => (
                     <tr key={r.id}>
                       <td>{r.studentId}</td>
+                      <td style={{ textAlign: 'left', whiteSpace: 'normal' }}>
+                        {r.studentName ?? '—'}
+                      </td>
                       <td style={{ textAlign: 'left', whiteSpace: 'normal' }}>
                         {r.examCode} — {r.examName}
                       </td>
@@ -1220,22 +1227,61 @@ export function AdminClinicalPage() {
                       </td>
                       <td>{formatMoney(r.registrationFeeUsd)}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="portal-btn portal-btn--secondary"
-                          style={{ padding: '0.35rem 0.65rem', fontSize: '0.8125rem' }}
-                          onClick={() => {
-                            setAssignRow(r)
-                            setAssignDate((r.assignedExamDate ?? '').slice(0, 10))
-                            setAssignTime(timeFromDbForTimeInput(r.assignedExamTime))
-                            setAssignNotes(r.notes ?? '')
-                            setAssignStatus(r.status)
-                            setAssignError(null)
-                            setAssignOpen(true)
-                          }}
+                        <div
+                          className="portal-actions"
+                          style={{ gap: '0.35rem', justifyContent: 'flex-end' }}
                         >
-                          Assign / Update Date
-                        </button>
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8125rem' }}
+                            onClick={() => {
+                              setAssignRow(r)
+                              setAssignDate((r.assignedExamDate ?? '').slice(0, 10))
+                              setAssignTime(timeFromDbForTimeInput(r.assignedExamTime))
+                              setAssignNotes(r.notes ?? '')
+                              setAssignStatus(r.status)
+                              setAssignGrade('')
+                              setAssignTerm(r.term)
+                              setAssignYear(String(r.year))
+                              setAssignError(null)
+                              setAssignOpen(true)
+                            }}
+                          >
+                            Update Request
+                          </button>
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary"
+                            style={{ padding: '0.35rem 0.65rem', fontSize: '0.8125rem' }}
+                            disabled={r.status.trim().toLowerCase() === 'cancelled'}
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Cancel exam request for ${r.studentId} (${r.examCode})? This will also void the linked $50 exam fee.`,
+                                )
+                              ) {
+                                return
+                              }
+                              void (async () => {
+                                try {
+                                  await postAdminClinicalExamRequestAssign(r.id, {
+                                    status: 'cancelled',
+                                    term: r.term,
+                                    year: r.year,
+                                  })
+                                  setExamReloadKey((k) => k + 1)
+                                } catch (err) {
+                                  window.alert(
+                                    err instanceof Error ? err.message : 'Could not cancel request.',
+                                  )
+                                }
+                              })()
+                            }}
+                          >
+                            Cancel Request
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1267,11 +1313,13 @@ export function AdminClinicalPage() {
               id="admin-clinical-exam-assign-title"
               className="admin-section-detail-modal__title"
             >
-              Assign exam
+              Update exam request
             </h2>
             <p className="admin-section-detail-modal__meta">
-              {assignRow.studentId} · {assignRow.examCode} — {assignRow.examName} ·{' '}
-              {assignRow.term} {assignRow.year}
+              {assignRow.studentId}
+              {assignRow.studentName ? ` · ${assignRow.studentName}` : ''} ·{' '}
+              {assignRow.examCode} — {assignRow.examName} · {assignRow.term}{' '}
+              {assignRow.year}
             </p>
             {assignError ? (
               <p className="portal-page-lede" role="alert">
@@ -1292,6 +1340,9 @@ export function AdminClinicalPage() {
                       assignedExamTime: assignTime.trim() === '' ? null : assignTime.trim(),
                       notes: assignNotes,
                       status: assignStatus,
+                      grade: assignGrade,
+                      term: assignTerm,
+                      year: Number(assignYear),
                     })
                     setExamReloadKey((k) => k + 1)
                     setAssignOpen(false)
@@ -1345,6 +1396,44 @@ export function AdminClinicalPage() {
                   <option value="completed">completed</option>
                   <option value="cancelled">cancelled</option>
                 </select>
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-grade">
+                  Grade
+                </label>
+                <select
+                  id="admin-exam-assign-grade"
+                  className="portal-input"
+                  value={assignGrade}
+                  onChange={(ev) => setAssignGrade(ev.target.value)}
+                >
+                  <option value="">(blank)</option>
+                  <option value="P">P</option>
+                  <option value="F">F</option>
+                </select>
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-term">
+                  Term
+                </label>
+                <input
+                  id="admin-exam-assign-term"
+                  className="portal-input"
+                  value={assignTerm}
+                  onChange={(ev) => setAssignTerm(ev.target.value)}
+                />
+              </div>
+              <div className="portal-field-stack">
+                <label className="portal-label" htmlFor="admin-exam-assign-year">
+                  Year
+                </label>
+                <input
+                  id="admin-exam-assign-year"
+                  className="portal-input"
+                  inputMode="numeric"
+                  value={assignYear}
+                  onChange={(ev) => setAssignYear(ev.target.value)}
+                />
               </div>
               <div className="portal-field-stack">
                 <label className="portal-label" htmlFor="admin-exam-assign-notes">
