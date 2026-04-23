@@ -40,6 +40,8 @@ export type AccountingLedgerPayloadOptions = {
      * Used by `getStudentQuarterBalance` to avoid recursion while holds are reconciled.
      */
     skipExpiredClinicalBookingReconciliation?: boolean;
+    /** Internal recursion guard and read-only contexts that must not mutate ledger rows. */
+    skipLateFeeEvaluation?: boolean;
 };
 export declare function getAccountingLedgerPayload(studentId: string, term: string, year: number, options?: AccountingLedgerPayloadOptions): Promise<{
     studentId: string;

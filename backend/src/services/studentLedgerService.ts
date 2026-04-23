@@ -1,5 +1,11 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
+import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
+import {
+  getFinanceQuarterDdlFromAcademicTerms,
+  hasSystemLateFeeForQuarter,
+  insertSystemLateFee,
+} from "../repositories/adminFinanceRepository.js";
 import { listClinicalFinanceQuarterHintsForStudent } from "../repositories/clinicalEnrollmentRepository.js";
 import {
   listPortalScheduleTermsForStudent,
@@ -23,6 +29,12 @@ import {
   formatPortalLedgerCourseMemo,
   STANDARD_TERM_FEES,
 } from "./billingMath.js";
+import {
+  isClinicBucketCharge,
+  isExamFeeMemo,
+  isLateFeeRow,
+  isTuitionBucketCharge,
+} from "./billingChargeBuckets.js";
 import { termSortOrder } from "./studentAcademicCourseRecords.js";
 
 export type LedgerQuarterOption = {
@@ -98,6 +110,171 @@ function legacyAccountingDateToIso(date: number): string {
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+type ChargeBucketType = "tuition" | "clinic_fee" | "exam_fee" | "late_fee";
+
+function inferPaymentChargeTypeFromMemo(memo: string): ChargeBucketType | null {
+  const m = memo.trim().toLowerCase();
+  const explicit = /authorize\.net\s+(tuition|clinic_fee|exam_fee|late_fee)\b/.exec(
+    m,
+  );
+  if (explicit) {
+    return explicit[1] as ChargeBucketType;
+  }
+  if (/\btuition\b/.test(m)) return "tuition";
+  if (/clinic/.test(m)) return "clinic_fee";
+  if (/exam/.test(m)) return "exam_fee";
+  if (/late\s*payment\s*fee|late\s*fee/.test(m)) return "late_fee";
+  return null;
+}
+
+function summarizeTermChargesFromLedger(rows: LedgerRowDto[]): {
+  chargeTotals: Record<ChargeBucketType, number>;
+  paymentTotals: Record<ChargeBucketType, number>;
+  unassignedPayments: number;
+} {
+  const chargeTotals: Record<ChargeBucketType, number> = {
+    tuition: 0,
+    clinic_fee: 0,
+    exam_fee: 0,
+    late_fee: 0,
+  };
+  const paymentTotals: Record<ChargeBucketType, number> = {
+    tuition: 0,
+    clinic_fee: 0,
+    exam_fee: 0,
+    late_fee: 0,
+  };
+  let totalCredits = 0;
+  for (const row of rows) {
+    const debit = roundMoney(Math.max(0, Number(row.debit) || 0));
+    const credit = roundMoney(Math.max(0, Number(row.credit) || 0));
+    if (debit > 0) {
+      if (
+        isLateFeeRow({
+          type: row.type,
+          memo: row.memo,
+          sourceType: row.sourceType,
+        })
+      ) {
+        chargeTotals.late_fee = roundMoney(chargeTotals.late_fee + debit);
+      } else if (isExamFeeMemo(row.memo)) {
+        chargeTotals.exam_fee = roundMoney(chargeTotals.exam_fee + debit);
+      } else if (
+        isClinicBucketCharge({
+          type: row.type,
+          code: row.code,
+          memo: row.memo,
+          sourceType: row.sourceType,
+        })
+      ) {
+        chargeTotals.clinic_fee = roundMoney(chargeTotals.clinic_fee + debit);
+      } else if (
+        isTuitionBucketCharge({
+          type: row.type,
+          code: row.code,
+          memo: row.memo,
+          sourceType: row.sourceType,
+        })
+      ) {
+        chargeTotals.tuition = roundMoney(chargeTotals.tuition + debit);
+      }
+    }
+    if (credit > 0) {
+      totalCredits = roundMoney(totalCredits + credit);
+      const inferred = inferPaymentChargeTypeFromMemo(row.memo);
+      if (inferred != null) {
+        paymentTotals[inferred] = roundMoney(paymentTotals[inferred] + credit);
+      }
+    }
+  }
+
+  const typedPayments = roundMoney(
+    paymentTotals.tuition +
+      paymentTotals.clinic_fee +
+      paymentTotals.exam_fee +
+      paymentTotals.late_fee,
+  );
+  return {
+    chargeTotals,
+    paymentTotals,
+    unassignedPayments: roundMoney(Math.max(0, totalCredits - typedPayments)),
+  };
+}
+
+function distributeUnassignedPayments(
+  chargeTotals: Record<ChargeBucketType, number>,
+  paymentTotals: Record<ChargeBucketType, number>,
+  unassignedPayments: number,
+): Record<ChargeBucketType, number> {
+  const paid: Record<ChargeBucketType, number> = {
+    tuition: 0,
+    clinic_fee: 0,
+    exam_fee: 0,
+    late_fee: 0,
+  };
+  let carry = roundMoney(Math.max(0, unassignedPayments));
+  const order: ChargeBucketType[] = [
+    "tuition",
+    "clinic_fee",
+    "exam_fee",
+    "late_fee",
+  ];
+  for (const key of order) {
+    const target = roundMoney(Math.max(0, chargeTotals[key]));
+    if (target <= 0) continue;
+    const direct = roundMoney(Math.max(0, paymentTotals[key]));
+    const remainingAfterDirect = roundMoney(Math.max(0, target - direct));
+    const allocation = roundMoney(Math.min(remainingAfterDirect, carry));
+    carry = roundMoney(Math.max(0, carry - allocation));
+    paid[key] = roundMoney(Math.min(target, direct + allocation));
+  }
+  return paid;
+}
+
+async function ensureSystemLateFeeForStudentQuarter(
+  studentId: string,
+  term: string,
+  year: number,
+  options?: AccountingLedgerPayloadOptions,
+): Promise<boolean> {
+  const { paymentDueDate } = await getFinanceQuarterDdlFromAcademicTerms(
+    pool,
+    term,
+    year,
+  );
+  const due = paymentDueDate?.trim() ?? "";
+  if (due === "" || !isPastSchoolLocalDueDate(due)) return false;
+
+  const already = await hasSystemLateFeeForQuarter(pool, studentId, term, year);
+  if (already) return false;
+
+  const payload = await getAccountingLedgerPayload(studentId, term, year, {
+    skipExpiredClinicalBookingReconciliation:
+      options?.skipExpiredClinicalBookingReconciliation === true,
+    skipLateFeeEvaluation: true,
+  });
+  if (!payload) return false;
+
+  const summarized = summarizeTermChargesFromLedger(payload.rows);
+  const paid = distributeUnassignedPayments(
+    summarized.chargeTotals,
+    summarized.paymentTotals,
+    summarized.unassignedPayments,
+  );
+  const tuitionDue = roundMoney(
+    Math.max(0, summarized.chargeTotals.tuition - paid.tuition),
+  );
+  if (tuitionDue <= 0) return false;
+
+  await insertSystemLateFee(pool, {
+    studentExternalId: studentId,
+    term,
+    year,
+    amount: 30,
+  });
+  return true;
 }
 
 function quarterDedupeKey(term: string, year: number): string {
@@ -399,6 +576,8 @@ export type AccountingLedgerPayloadOptions = {
    * Used by `getStudentQuarterBalance` to avoid recursion while holds are reconciled.
    */
   skipExpiredClinicalBookingReconciliation?: boolean;
+  /** Internal recursion guard and read-only contexts that must not mutate ledger rows. */
+  skipLateFeeEvaluation?: boolean;
 };
 
 export async function getAccountingLedgerPayload(
@@ -416,6 +595,10 @@ export async function getAccountingLedgerPayload(
   const termTrim = term.trim();
   if (termTrim === "" || !Number.isFinite(year)) {
     return null;
+  }
+
+  if (!options?.skipLateFeeEvaluation) {
+    await ensureSystemLateFeeForStudentQuarter(studentId, termTrim, year, options);
   }
 
   if (!options?.skipExpiredClinicalBookingReconciliation) {
@@ -522,6 +705,7 @@ export async function getStudentQuarterBalance(
 ): Promise<number> {
   const payload = await getAccountingLedgerPayload(studentId, term.trim(), year, {
     skipExpiredClinicalBookingReconciliation: true,
+    skipLateFeeEvaluation: true,
   });
   return payload?.summary.balance ?? 0;
 }

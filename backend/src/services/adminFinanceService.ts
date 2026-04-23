@@ -25,6 +25,7 @@ import {
   getAccountingLedgerPayload,
   getAccountingQuartersPayload,
 } from "./studentLedgerService.js";
+import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
 
 /** One row in the paginated admin finance student list. */
 export type AdminFinanceStudentListItem = {
@@ -638,8 +639,7 @@ export async function runLateFeeCheckForQuarter(
     };
   }
 
-  const today = todayIsoDate();
-  if (today <= paymentDueDate) {
+  if (!isPastSchoolLocalDueDate(paymentDueDate)) {
     return {
       ok: true,
       insertedCount: 0,

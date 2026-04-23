@@ -79,8 +79,26 @@ CREATE TABLE IF NOT EXISTS portal_billing_adjustments (
   description VARCHAR(255) NOT NULL,
   amount DECIMAL(12, 2) NOT NULL,
   category ENUM('tuition', 'clinical', 'fees', 'other') NOT NULL,
-  adjustment_source ENUM('manual', 'system_late_fee') NOT NULL DEFAULT 'manual',
-  KEY idx_adj_student_term (student_external_id, term, year)
+  adjustment_source VARCHAR(64) NOT NULL DEFAULT 'manual' COMMENT 'manual|system_late_fee|system_clinical',
+  clinical_enrollment_id INT NULL COMMENT 'clinical_enrollments.id when this row is a system clinical slot booking charge',
+  system_late_fee_unique_key VARCHAR(191)
+    GENERATED ALWAYS AS (
+      CASE
+        WHEN adjustment_source = 'system_late_fee' THEN
+          CONCAT(
+            TRIM(student_external_id),
+            '|',
+            LOWER(TRIM(term)),
+            '|',
+            CAST(year AS CHAR(11))
+          )
+        ELSE NULL
+      END
+    ) STORED
+    COMMENT 'Generated uniqueness scope for system late fees only',
+  KEY idx_adj_student_term (student_external_id, term, year),
+  KEY idx_portal_billing_adj_clinical_enrollment (clinical_enrollment_id),
+  UNIQUE KEY uq_portal_billing_adjustments_system_late_fee_scope (system_late_fee_unique_key)
 );
 
 CREATE TABLE IF NOT EXISTS portal_term_finance_settings (

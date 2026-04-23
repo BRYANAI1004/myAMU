@@ -1,12 +1,11 @@
 import { pool } from "../lib/db.js";
-import { getPostedToDashboardTerm } from "./academicTermService.js";
 import { getAccountingLedgerPayload } from "./studentLedgerService.js";
 import { chargeAuthorizeOpaqueData } from "./authorizeNetGatewayService.js";
 import { recordAuthorizeNetPayment } from "../repositories/studentAuthorizePaymentRepository.js";
 import { inferCardFundingFromBinPrefix, normalizeCardBinPrefix, } from "./cardFundingFromBin.js";
 import { totalChargeWithProcessingFee } from "./creditCardProcessingFee.js";
 export { proportionalProcessingFeeRefund } from "./creditCardProcessingFee.js";
-import { hasSystemLateFeeForQuarter, insertSystemLateFee, } from "../repositories/adminFinanceRepository.js";
+import { getFinanceQuarterDdlFromAcademicTerms, } from "../repositories/adminFinanceRepository.js";
 import { revokeExpiredClinicalBooking } from "./clinicalBookingPaymentHoldService.js";
 import { getLatestClinicalBookingPaymentHoldStatusForStudentQuarter } from "../repositories/clinicalBookingPaymentHoldRepository.js";
 import { isClinicBucketCharge, isExamFeeMemo, isLateFeeRow, isTuitionBucketCharge, } from "./billingChargeBuckets.js";
@@ -46,18 +45,6 @@ function isInstallmentEligible(chargeType) {
 }
 function isoToday() {
     return new Date().toISOString().slice(0, 10);
-}
-function normalizeTermName(raw) {
-    const t = raw.trim().toUpperCase();
-    if (t.startsWith("SPR"))
-        return "SPRING";
-    if (t.startsWith("SUM"))
-        return "SUMMER";
-    if (t.startsWith("FAL"))
-        return "FALL";
-    if (t.startsWith("WIN"))
-        return "WINTER";
-    return t;
 }
 function parseTermCode(raw) {
     const input = raw.trim();
@@ -216,17 +203,6 @@ function distributeUnassignedPayments(chargeTotals, paymentTotals, unassignedPay
     }
     return paid;
 }
-function resolvePaymentDeadlineForSummary(args) {
-    if (args.postedTerm == null)
-        return null;
-    if (Math.trunc(args.postedTerm.year) !== Math.trunc(args.year))
-        return null;
-    const target = normalizeTermName(args.term);
-    const posted = normalizeTermName(args.postedTerm.term_name);
-    if (target !== posted)
-        return null;
-    return args.postedTerm.payment_due_date;
-}
 function deadlineHasPassed(deadline) {
     const due = typeof deadline === "string" ? deadline.trim() : "";
     if (due === "")
@@ -261,29 +237,6 @@ async function resolveClinicFeeStatus(args) {
         return "registration_cancelled";
     }
     return "registration_cancelled";
-}
-export async function evaluateLateFeeForCurrentTerm(studentId, term, year, paymentDeadline) {
-    const due = typeof paymentDeadline === "string" ? paymentDeadline.trim() : "";
-    if (due === "" || isoToday() <= due)
-        return false;
-    const ledger = await getAccountingLedgerPayload(studentId, term, year);
-    if (!ledger)
-        return false;
-    const summarized = summarizeTermChargesFromLedger(ledger.rows);
-    const paid = distributeUnassignedPayments(summarized.chargeTotals, summarized.paymentTotals, summarized.unassignedPayments);
-    const requiredDue = roundToMoney(Math.max(0, summarized.chargeTotals.tuition - paid.tuition));
-    if (requiredDue <= 0)
-        return false;
-    const exists = await hasSystemLateFeeForQuarter(pool, studentId, term, year);
-    if (exists)
-        return false;
-    await insertSystemLateFee(pool, {
-        studentExternalId: studentId,
-        term,
-        year,
-        amount: 30,
-    });
-    return true;
 }
 async function buildCurrentTermBillingSummary(args) {
     const ledger = await getAccountingLedgerPayload(args.studentId, args.term, args.year);
@@ -322,26 +275,12 @@ export async function getCurrentTermBillingSummary(input) {
     if (!parsed) {
         throw new Error("term must be in `YYYY-TERM` format (example: 2027-SPR).");
     }
-    const postedTerm = await getPostedToDashboardTerm();
-    const paymentDeadline = resolvePaymentDeadlineForSummary({
-        term: parsed.term,
-        year: parsed.year,
-        postedTerm,
-    });
-    const createdLateFee = await evaluateLateFeeForCurrentTerm(input.studentId, parsed.term, parsed.year, paymentDeadline);
-    const summary = await buildCurrentTermBillingSummary({
-        studentId: input.studentId,
-        term: parsed.term,
-        year: parsed.year,
-        paymentDeadline,
-    });
-    if (!createdLateFee)
-        return summary;
+    const { paymentDueDate } = await getFinanceQuarterDdlFromAcademicTerms(pool, parsed.term, parsed.year);
     return buildCurrentTermBillingSummary({
         studentId: input.studentId,
         term: parsed.term,
         year: parsed.year,
-        paymentDeadline,
+        paymentDeadline: paymentDueDate,
     });
 }
 export async function getTuitionOnlyBillingSummary(input) {

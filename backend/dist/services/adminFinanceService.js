@@ -2,6 +2,7 @@ import { pool } from "../lib/db.js";
 import { academicTermsPaymentDueDateColumnExists, deleteManualBillingAdjustment, deletePortalPayment, getBillingAdjustmentById, getFinanceQuarterDdlFromAcademicTerms, getPortalPaymentById, hasSystemLateFeeForQuarter, insertPortalBillingAdjustment, insertPortalPayment, insertSystemLateFee, listAdminFinanceRosterPage, countAdminFinanceRosterPage, listGlobalFinanceQuarters, listStudentIdsWithPortalQuarterActivity, setFinanceQuarterDdlOnAcademicTerms, updateManualBillingAdjustment, updatePortalPayment, } from "../repositories/adminFinanceRepository.js";
 import { loadLegacyAccountingRows } from "../repositories/studentLegacyAccountRepository.js";
 import { getAccountingLedgerPayload, getAccountingQuartersPayload, } from "./studentLedgerService.js";
+import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
 const CHARGE_CATEGORIES = [
     "fees",
     "other",
@@ -443,8 +444,7 @@ export async function runLateFeeCheckForQuarter(term, year) {
             message: "No payment due date configured for this quarter; nothing to do.",
         };
     }
-    const today = todayIsoDate();
-    if (today <= paymentDueDate) {
+    if (!isPastSchoolLocalDueDate(paymentDueDate)) {
         return {
             ok: true,
             insertedCount: 0,

@@ -48,7 +48,6 @@ export type CurrentTermBillingSummary = {
     requiredBalanceDue: number;
     totalBalanceDue: number;
 };
-export declare function evaluateLateFeeForCurrentTerm(studentId: string, term: string, year: number, paymentDeadline: string | null): Promise<boolean>;
 export declare function getCurrentTermBillingSummary(input: {
     studentId: string;
     termInput: string;

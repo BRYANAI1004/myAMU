@@ -486,15 +486,44 @@ export async function insertSystemLateFee(
     amount: number;
   },
 ): Promise<void> {
-  await insertPortalBillingAdjustment(pool, {
-    studentExternalId: params.studentExternalId,
-    term: params.term,
-    year: params.year,
-    description: LATE_FEE_DESCRIPTION,
-    amount: params.amount,
-    category: "fees",
-    adjustmentSource: "system_late_fee",
-  });
+  const studentId = params.studentExternalId.trim();
+  const term = params.term.trim();
+  const year = Math.trunc(params.year);
+  try {
+    await pool.execute(
+      `INSERT INTO portal_billing_adjustments
+        (student_external_id, term, year, description, amount, category, adjustment_source)
+       SELECT ?, ?, ?, ?, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM portal_billing_adjustments
+         WHERE student_external_id = ?
+           AND term = ?
+           AND year = ?
+           AND adjustment_source = 'system_late_fee'
+         LIMIT 1
+       )`,
+      [
+        studentId,
+        term,
+        year,
+        LATE_FEE_DESCRIPTION,
+        params.amount,
+        "fees",
+        "system_late_fee",
+        studentId,
+        term,
+        year,
+      ],
+    );
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    // Secondary safeguard: ignore race duplicates once unique DB constraint exists.
+    if (code === "ER_DUP_ENTRY") {
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function insertPortalPayment(

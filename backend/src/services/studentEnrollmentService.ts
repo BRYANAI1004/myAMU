@@ -13,6 +13,7 @@ import {
 } from "../repositories/studentEnrollmentRepository.js";
 import { InvalidAcademicTermError } from "./courseSectionService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
+import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
 
 export type { EnrollSectionInput };
 
@@ -31,10 +32,6 @@ export class RegistrationLockedOverdueBalanceError extends Error {
     );
     this.name = "RegistrationLockedOverdueBalanceError";
   }
-}
-
-function utcTodayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function normalizeLookupKey(value: string | null | undefined): string | null {
@@ -156,8 +153,7 @@ export async function enrollStudentForAcademicTerm(
     const due = row.payment_due_date?.trim() ?? "";
     if (due.length >= 10) {
       const dueDay = due.slice(0, 10);
-      const today = utcTodayIsoDate();
-      if (today > dueDay) {
+      if (isPastSchoolLocalDueDate(dueDay)) {
         const balance = await getStudentQuarterBalance(
           studentId.trim(),
           row.term_name,
