@@ -1,6 +1,9 @@
 /// <reference types="vite/client" />
 /// <reference types="vite-plugin-pwa/client" />
 
+/** Injected in `vite.config.ts` for deploy/debug correlation (console only). */
+declare const __MYAMU_BUILD_ID__: string
+
 interface ImportMetaEnv {
   /**
    * Backend origin without a trailing slash and without `/api` (see `.env.development` / `.env.production`).
