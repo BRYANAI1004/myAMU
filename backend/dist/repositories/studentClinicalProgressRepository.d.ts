@@ -1,6 +1,6 @@
 /**
- * Student-facing clinical completion rows from legacy `clinic` (non-empty grade + hours),
- * plus fixed clinical exam history from legacy `marks` (transcript source — not `clinic`).
+ * Clinical progress rows for student/admin clinical progress tabs.
+ * Source of truth is `clinical_assignments`; exam history merges requests + legacy signals.
  */
 import type { Pool } from "mysql2/promise";
 export type StudentClinicalProgressRecord = {
@@ -20,10 +20,9 @@ export type StudentClinicalExamHistoryItem = {
     year: number | null;
 };
 /**
- * Lists completed clinical rows (any non-empty grade) and hours from `clinic`;
- * exam history from `marks` only.
+ * Clinical progress for student/admin tabs using `clinical_assignments` as the primary source.
  */
-export declare function loadStudentClinicalProgressFromClinic(pool: Pool, studentId: string): Promise<{
+export declare function loadStudentClinicalProgressFromClinic(pool: Pool, studentRouteParam: string): Promise<{
     completedCount: number;
     totalHours: number;
     records: StudentClinicalProgressRecord[];
