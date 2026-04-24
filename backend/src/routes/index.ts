@@ -113,6 +113,7 @@ import {
   postStudentClinicalRequestHandler,
 } from "../controllers/clinicalRequestController.js";
 import {
+  postAdminClinicalSlotAddStudentHandler,
   deleteAdminClinicalSlotEnrollmentHandler,
   deleteStudentClinicalEnrollmentHandler,
   getAdminClinicalSlotRosterHandler,
@@ -307,6 +308,10 @@ adminRouter.delete(
 adminRouter.post(
   "/clinical/slots/:timetableId/students",
   postAdminClinicalSlotStudentHandler,
+);
+adminRouter.post(
+  "/clinical/slots/:timetableId/add-student",
+  postAdminClinicalSlotAddStudentHandler,
 );
 adminRouter.post(
   "/clinical/slots/:timetableId/enrollments/:enrollmentId/grade",

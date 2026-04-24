@@ -3396,6 +3396,52 @@ export async function postAdminClinicalSlotStudent(params: {
   }
 }
 
+export async function postAdminClinicalSlotAddStudent(params: {
+  timetableId: number
+  studentId: string
+  seatBucket?: '100' | '200' | '300' | '123' | 'all' | 'ALL' | null
+  signal?: AbortSignal
+}): Promise<{
+  ok: true
+  enrollment: { enrollmentId: number; assignmentId: number }
+}> {
+  const normalizedSeatBucket =
+    params.seatBucket === 'ALL' ? 'all' : (params.seatBucket ?? null)
+  const path = `/api/admin/clinical/slots/${encodeURIComponent(String(params.timetableId))}/add-student`
+  const data = (await fetchApiJson(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      studentId: params.studentId.trim(),
+      seatBucket: normalizedSeatBucket,
+    }),
+    signal: params.signal,
+  })) as unknown
+  if (
+    data == null ||
+    typeof data !== 'object' ||
+    (data as { ok?: unknown }).ok !== true ||
+    (data as { enrollment?: unknown }).enrollment == null ||
+    typeof (data as { enrollment?: unknown }).enrollment !== 'object'
+  ) {
+    throw new Error('Unexpected add student response')
+  }
+  const enrollment = (data as { enrollment: Record<string, unknown> }).enrollment
+  if (
+    typeof enrollment.enrollmentId !== 'number' ||
+    typeof enrollment.assignmentId !== 'number'
+  ) {
+    throw new Error('Unexpected add student response')
+  }
+  return {
+    ok: true,
+    enrollment: {
+      enrollmentId: enrollment.enrollmentId,
+      assignmentId: enrollment.assignmentId,
+    },
+  }
+}
+
 /** GET /api/students/:studentId/clinical-requests */
 export type StudentClinicalRequestItem = {
   id: number

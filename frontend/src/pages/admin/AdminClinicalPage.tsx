@@ -9,7 +9,7 @@ import {
   fetchAdminClinicalSlots,
   fetchAdminClinicalSlotRoster,
   postAdminClinicalExamRequestAssign,
-  postAdminClinicalSlotStudent,
+  postAdminClinicalSlotAddStudent,
   postAdminClinicalSlotEnrollmentGrade,
   updateAdminClinicalSlot,
   type AcademicTerm,
@@ -229,6 +229,9 @@ export function AdminClinicalPage() {
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [rosterRemovingKey, setRosterRemovingKey] = useState<string | null>(null)
   const [rosterAddStudentId, setRosterAddStudentId] = useState('')
+  const [rosterAddSeatBucket, setRosterAddSeatBucket] = useState<
+    '100' | '200' | '300' | 'ALL' | ''
+  >('')
   const [rosterAddBusy, setRosterAddBusy] = useState(false)
   const [rosterAddMessage, setRosterAddMessage] = useState<string | null>(null)
   const [rosterAddError, setRosterAddError] = useState<string | null>(null)
@@ -311,6 +314,7 @@ export function AdminClinicalPage() {
       setRosterError(null)
       setRosterLoading(false)
       setRosterAddStudentId('')
+      setRosterAddSeatBucket('')
       setRosterAddBusy(false)
       setRosterAddMessage(null)
       setRosterAddError(null)
@@ -1578,6 +1582,32 @@ export function AdminClinicalPage() {
                     setRosterAddError(null)
                   }}
                 />
+                <select
+                  aria-label="Seat bucket"
+                  className="admin-input"
+                  value={rosterAddSeatBucket}
+                  disabled={rosterAddBusy}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (
+                      value === '' ||
+                      value === '100' ||
+                      value === '200' ||
+                      value === '300' ||
+                      value === 'ALL'
+                    ) {
+                      setRosterAddSeatBucket(value)
+                      setRosterAddMessage(null)
+                      setRosterAddError(null)
+                    }
+                  }}
+                >
+                  <option value="">Auto bucket</option>
+                  <option value="100">100</option>
+                  <option value="200">200</option>
+                  <option value="300">300</option>
+                  <option value="ALL">ALL</option>
+                </select>
                 <button
                   type="button"
                   className="portal-btn portal-btn--primary"
@@ -1594,15 +1624,19 @@ export function AdminClinicalPage() {
                     setRosterAddMessage(null)
                     ;(async () => {
                       try {
-                        await postAdminClinicalSlotStudent({
+                        await postAdminClinicalSlotAddStudent({
                           timetableId: rosterSlot.id,
                           studentId: normalizedStudentId,
-                          seatBucket: null,
+                          seatBucket:
+                            rosterAddSeatBucket === ''
+                              ? null
+                              : rosterAddSeatBucket,
                         })
                         const list = await fetchAdminClinicalSlotRoster(rosterSlot.id)
                         setRosterRows(list)
                         setSlotsReloadKey((k) => k + 1)
                         setRosterAddStudentId('')
+                        setRosterAddSeatBucket('')
                         setRosterAddMessage(
                           `Added ${normalizedStudentId} to this slot.`,
                         )
