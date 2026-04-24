@@ -45,26 +45,8 @@ type MarksExamRow = {
   year: number | null;
 };
 
-type ClinicalExamRequestRow = {
-  examCode: string;
-  examName: string;
-  status: string;
-  term: string | null;
-  year: number | null;
-  createdAt: Date | string | null;
-};
-
 function lower(v: unknown): string {
   return str(v).toLowerCase();
-}
-
-function formatTermYear(termRaw: unknown, yearRaw: unknown): {
-  term: string | null;
-  year: number | null;
-} {
-  const term = str(termRaw);
-  const year = optionalYearNum(yearRaw);
-  return { term: term === "" ? null : term, year };
 }
 
 function termLabel(termRaw: unknown, yearRaw: unknown): { term: string; year: number } {
@@ -116,42 +98,40 @@ function dedupeKey(
  */
 export async function loadStudentClinicalProgressFromClinic(
   pool: Pool,
-  studentRouteParam: string,
+  requestedStudentId: string,
 ): Promise<{
   completedCount: number;
   totalHours: number;
   records: StudentClinicalProgressRecord[];
   exams: StudentClinicalExamHistoryItem[];
 }> {
-  const requested = studentRouteParam.trim();
+  const requested = requestedStudentId.trim();
   const [studentRows] = await pool.query<RowDataPacket[]>(
-    `SELECT seqNum AS student_seq_num,
-            TRIM(id) AS student_id,
-            TRIM(name) AS student_name,
+    `SELECT seqNum,
+            id,
+            name,
             exam,
             level1exam,
             level2exam,
             level3exam
        FROM students
-      WHERE CAST(seqNum AS CHAR) = TRIM(?)
-         OR TRIM(id) = TRIM(?)
-      ORDER BY CASE WHEN TRIM(id) = TRIM(?) THEN 0 ELSE 1 END
+      WHERE TRIM(id) = TRIM(?)
+         OR CAST(seqNum AS CHAR) = TRIM(?)
+         OR TRIM(CAST(seqNum AS CHAR)) = REPLACE(TRIM(?), 'C', '')
       LIMIT 1`,
     [requested, requested, requested],
   );
   const student = (studentRows[0] ?? null) as Record<string, unknown> | null;
   if (student == null) {
+    console.log("[clinical-progress] student not resolved", {
+      requestedStudentId,
+    });
     return { completedCount: 0, totalHours: 0, records: [], exams: [] };
   }
 
-  const resolvedStudentId = str(student.student_id);
-  const resolvedSeqNum = Number(student.student_seq_num);
-  const examRaw = str(student.exam);
-  const level1ExamRaw = str(student.level1exam);
-  const level2ExamRaw = str(student.level2exam);
-  const level3ExamRaw = str(student.level3exam);
+  const resolvedStudentCode = str(student.id);
 
-  const [legacyClinicRowsResult, assignmentRowsResult, examRequestRowsResult] =
+  const [legacyClinicRowsResult, assignmentRowsResult] =
     await Promise.all([
       pool.query<RowDataPacket[]>(
         `SELECT seqNumber,
@@ -169,54 +149,73 @@ export async function loadStudentClinicalProgressFromClinic(
            FROM clinic
           WHERE TRIM(id) = TRIM(?)
           ORDER BY year DESC, term DESC, code ASC`,
-        [resolvedStudentId],
+        [resolvedStudentCode],
       ),
       pool.query<RowDataPacket[]>(
-        `SELECT ca.id,
-                ca.course_code,
-                ca.session_date,
-                ca.session_name,
-                ca.term,
-                ca.year,
-                ca.status,
-                ca.timetable_id,
-                ca.created_at,
-                CASE
-                  WHEN ca.session_date = '1900-01-01' THEN NULL
-                  WHEN ca.timetable_id IS NULL THEN NULL
-                  WHEN ct.time_from IS NULL OR ct.time_to IS NULL THEN NULL
-                  ELSE GREATEST(
-                    0,
-                    TIMESTAMPDIFF(MINUTE, ct.time_from, ct.time_to) / 60
-                  )
-                END AS derived_hours
-           FROM clinical_assignments ca
-           LEFT JOIN clinic_timetable ct
-             ON ca.timetable_id = ct.seqNum
-          WHERE TRIM(ca.student_id) = TRIM(?)
-            AND LOWER(TRIM(COALESCE(ca.status, ''))) NOT IN ('dropped', 'cancelled')
-          ORDER BY ca.session_date DESC, ca.created_at DESC`,
-        [resolvedStudentId],
-      ),
-      pool.query<RowDataPacket[]>(
-        `SELECT exam_code,
-                exam_name,
-                status,
-                term,
-                year,
-                created_at
-           FROM clinical_exam_requests
-          WHERE TRIM(student_id) = TRIM(?)
-          ORDER BY created_at DESC`,
-        [resolvedStudentId],
+        `SELECT
+            id,
+            course_code,
+            session_date,
+            session_name,
+            term,
+            year,
+            status,
+            timetable_id
+         FROM clinical_assignments
+         WHERE TRIM(student_id) = TRIM(?)
+           AND LOWER(status) NOT IN ('dropped', 'cancelled')
+         ORDER BY session_date DESC, created_at DESC`,
+        [resolvedStudentCode],
       ),
     ]);
 
   const legacyClinicRows = legacyClinicRowsResult[0] as RowDataPacket[];
   const assignmentRows = assignmentRowsResult[0] as RowDataPacket[];
+  const assignmentTimetableIds = Array.from(
+    new Set(
+      assignmentRows
+        .map((r) => Number((r as Record<string, unknown>).timetable_id))
+        .filter((id) => Number.isFinite(id) && id > 0)
+        .map((id) => Math.trunc(id)),
+    ),
+  );
+  const derivedHoursByTimetableId = new Map<number, number>();
+  if (assignmentTimetableIds.length > 0) {
+    const placeholders = assignmentTimetableIds.map(() => "?").join(",");
+    const [timetableRows] = await pool.query<RowDataPacket[]>(
+      `SELECT seqNum, time_from, time_to
+         FROM clinic_timetable
+        WHERE seqNum IN (${placeholders})`,
+      assignmentTimetableIds,
+    );
+    for (const r of timetableRows) {
+      const row = r as Record<string, unknown>;
+      const seqNum = Number(row.seqNum);
+      if (!Number.isFinite(seqNum) || seqNum <= 0) continue;
+      const timeFrom = str(row.time_from);
+      const timeTo = str(row.time_to);
+      const timeMatchFrom = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(timeFrom);
+      const timeMatchTo = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(timeTo);
+      if (!timeMatchFrom || !timeMatchTo) continue;
+      const fromMinutes = Number(timeMatchFrom[1]) * 60 + Number(timeMatchFrom[2]);
+      const toMinutes = Number(timeMatchTo[1]) * 60 + Number(timeMatchTo[2]);
+      const durationHours = Math.max(0, (toMinutes - fromMinutes) / 60);
+      derivedHoursByTimetableId.set(Math.trunc(seqNum), durationHours);
+    }
+  }
+
+  console.log("[clinical-progress] requested/resolved", {
+    requestedStudentId,
+    resolvedSeqNum: Number(student.seqNum),
+    resolvedStudentCode: student.id,
+    studentName: student.name,
+  });
+
   const records: StudentClinicalProgressRecord[] = [];
   const seen = new Set<string>();
-  let dedupedAssignmentCompletedCount = 0;
+  let assignmentCompletedCount = 0;
+  let legacyHoursSum = 0;
+  let assignmentDerivedHoursSum = 0;
 
   for (const r of legacyClinicRows) {
     const row = r as Record<string, unknown>;
@@ -231,6 +230,7 @@ export async function loadStudentClinicalProgressFromClinic(
       grade: str(row.grade) || str(row.grade2) || "Completed",
       hours: numHours(row.hours),
     });
+    legacyHoursSum += numHours(row.hours);
   }
 
   for (const r of assignmentRows) {
@@ -244,40 +244,21 @@ export async function loadStudentClinicalProgressFromClinic(
     }
     seen.add(byCodeTermYear);
     seen.add(byCodeTermYearTimetable);
+    const timetableId = Number(row.timetable_id);
+    const derivedHours = Number.isFinite(timetableId)
+      ? numHours(derivedHoursByTimetableId.get(Math.trunc(timetableId)))
+      : 0;
     records.push({
       code: code || str(row.timetable_id) || str(row.id),
       courseTitle: str(row.session_name),
       term: label.term,
       year: label.year,
       grade: str(row.status),
-      hours: numHours(row.derived_hours),
+      hours: derivedHours,
     });
     if (shouldCountCompletedStatus(row.status)) {
-      dedupedAssignmentCompletedCount += 1;
-    }
-  }
-
-  const examRequestRows: ClinicalExamRequestRow[] = (
-    examRequestRowsResult[0] as RowDataPacket[]
-  ).map((r) => {
-    const row = r as Record<string, unknown>;
-    const termYear = formatTermYear(row.term, row.year);
-    return {
-      examCode: str(row.exam_code),
-      examName: str(row.exam_name),
-      status: str(row.status),
-      term: termYear.term,
-      year: termYear.year,
-      createdAt: (row.created_at ?? null) as Date | string | null,
-    };
-  });
-
-  const latestRequestByExamCode = new Map<string, ClinicalExamRequestRow>();
-  for (const row of examRequestRows) {
-    const code = str(row.examCode).toUpperCase();
-    if (code === "") continue;
-    if (!latestRequestByExamCode.has(code)) {
-      latestRequestByExamCode.set(code, row);
+      assignmentCompletedCount += 1;
+      assignmentDerivedHoursSum += derivedHours;
     }
   }
 
@@ -309,22 +290,7 @@ export async function loadStudentClinicalProgressFromClinic(
   ];
 
   const exams: StudentClinicalExamHistoryItem[] = examsDefinition.map((exam) => {
-    const req = latestRequestByExamCode.get(exam.code);
-    const requestStatus = lower(req?.status);
-    const isRequestSupplemental =
-      requestStatus === "requested" || requestStatus === "cancelled";
     const legacy = exam.signal;
-    const hasCompletedLegacy = legacy.code.toUpperCase() === "P" || legacy.code.toUpperCase() === "F";
-    if (isRequestSupplemental && !hasCompletedLegacy && legacy.status === "Not Taken") {
-      return {
-        code: exam.code,
-        examName: exam.examName,
-        status: requestStatus === "cancelled" ? "Cancelled" : "Requested",
-        grade: "-",
-        term: req?.term ?? null,
-        year: req?.year ?? null,
-      };
-    }
     const grade = legacy.status === "Not Taken" ? "-" : legacy.code;
     return {
       code: exam.code,
@@ -337,21 +303,19 @@ export async function loadStudentClinicalProgressFromClinic(
   });
 
   const legacyCompletedCount = legacyClinicRows.length;
-  const assignmentCompletedCount = dedupedAssignmentCompletedCount;
   const completedCount = legacyCompletedCount + assignmentCompletedCount;
-  const totalHours = records.reduce((sum, row) => sum + numHours(row.hours), 0);
+  const totalHours = legacyHoursSum + assignmentDerivedHoursSum;
 
-  console.debug("[clinical-progress] resolved source", {
-    requestedParam: requested,
-    resolvedStudentsSeqNum: Number.isFinite(resolvedSeqNum) ? resolvedSeqNum : null,
-    resolvedStudentCode: resolvedStudentId,
+  console.log("[clinical-progress] source counts", {
     legacyClinicRowCount: legacyClinicRows.length,
     clinicalAssignmentRowCount: assignmentRows.length,
-    studentsExamFields: {
-      exam: examRaw,
-      level1exam: level1ExamRaw,
-      level2exam: level2ExamRaw,
-      level3exam: level3ExamRaw,
+    completedCount,
+    totalHours,
+    examFields: {
+      exam: student.exam,
+      level1exam: student.level1exam,
+      level2exam: student.level2exam,
+      level3exam: student.level3exam,
     },
   });
 
