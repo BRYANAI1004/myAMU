@@ -65,6 +65,30 @@ export async function insertClinicalBookingPaymentHold(params) {
         throw err;
     }
 }
+export async function insertClinicalBookingPaymentHoldInConn(conn, params) {
+    const eid = Math.trunc(params.clinicalEnrollmentId);
+    const [res] = await conn.execute(`INSERT INTO clinical_booking_payment_holds
+      (clinical_enrollment_id, student_id, billing_adjustment_id, term, year,
+       charge_amount, balance_before_charge, hold_expires_at, status)
+     SELECT ?, ?, ?, ?, ?, ?, ?, DATE_ADD(UTC_TIMESTAMP(), INTERVAL ${CLINICAL_BOOKING_PAYMENT_WINDOW_HOURS} HOUR), 'active'
+       FROM DUAL
+      WHERE NOT EXISTS (
+        SELECT 1
+          FROM clinical_booking_payment_holds cbph
+         WHERE cbph.clinical_enrollment_id = ?
+           AND cbph.status = 'active'
+      )`, [
+        eid,
+        params.studentId.trim(),
+        Math.trunc(params.billingAdjustmentId),
+        params.term.trim(),
+        Math.trunc(params.year),
+        params.chargeAmount,
+        params.balanceBeforeCharge,
+        eid,
+    ]);
+    return Math.trunc(Number(res.insertId));
+}
 export async function cancelActiveClinicalBookingPaymentHoldsForEnrollment(conn, clinicalEnrollmentId, reason) {
     const status = reason === "superseded" ? "cancelled_superseded" : "cancelled_manual_drop";
     await conn.execute(`UPDATE clinical_booking_payment_holds

@@ -207,6 +207,16 @@ export function totalClinicTimetableCapacityCaps(row) {
     const d = Math.max(0, Math.trunc(Number(row.cap_123)));
     return a + b + c + d;
 }
+export async function studentExistsByExternalId(studentId) {
+    const sid = studentId.trim();
+    if (sid === "")
+        return false;
+    const [rows] = await pool.query(`SELECT 1 AS ok
+       FROM students
+      WHERE TRIM(id) = TRIM(?)
+      LIMIT 1`, [sid]);
+    return rows.length > 0;
+}
 function slotLabelFromTimetableFields(r) {
     return buildClinicTimetableSlotLabel({
         weekday: r.weekday,
@@ -691,10 +701,19 @@ function resolveChosenSeatBucketForEnrollment(args) {
     }
     const b = parseExplicitSeatBucket(requestedSeatBucket);
     if (b == null) {
-        return {
-            ok: false,
-            error: "seatBucket is required for this slot (100, 200, 300, or all).",
-        };
+        if (caps.c100 > 0 && used.n100 < caps.c100) {
+            return { ok: true, seatBucket: "100" };
+        }
+        if (caps.c200 > 0 && used.n200 < caps.c200) {
+            return { ok: true, seatBucket: "200" };
+        }
+        if (caps.c300 > 0 && used.n300 < caps.c300) {
+            return { ok: true, seatBucket: "300" };
+        }
+        if (caps.cAll > 0 && used.nAll < caps.cAll) {
+            return { ok: true, seatBucket: "all" };
+        }
+        return { ok: false, error: "This slot is full." };
     }
     if (b === "100") {
         if (caps.c100 <= 0) {
@@ -746,7 +765,7 @@ function resolveChosenSeatBucketForEnrollment(args) {
 /**
  * Transaction-safe enroll: lock, capacity check, insert or reactivate row. Caller supplies assignment insert.
  */
-export async function createClinicalEnrollment(studentId, timetableId, term, year, requestedSeatBucket, insertAssignment) {
+export async function createClinicalEnrollment(studentId, timetableId, term, year, requestedSeatBucket, insertAssignment, afterEnrollmentInTxn) {
     const sid = studentId.trim();
     const te = normalizeEnrollmentTerm(term);
     if (sid === "" || !Number.isFinite(timetableId) || timetableId <= 0) {
@@ -884,6 +903,18 @@ export async function createClinicalEnrollment(studentId, timetableId, term, yea
             timeTo: normalizeSqlTimeHms(tt.time_to),
             instructor: trimOrEmpty(tt.instructor),
         });
+        if (afterEnrollmentInTxn != null) {
+            await afterEnrollmentInTxn({
+                conn,
+                enrollmentId,
+                assignmentId,
+                seatBucket: bucketEnforced ? chosenBucket : null,
+                wasReactivation,
+                isNewEnrollmentRow,
+                term: te,
+                year,
+            });
+        }
         await conn.commit();
         return {
             ok: true,

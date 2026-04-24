@@ -9,6 +9,7 @@ import {
   fetchAdminClinicalSlots,
   fetchAdminClinicalSlotRoster,
   postAdminClinicalExamRequestAssign,
+  postAdminClinicalSlotStudent,
   postAdminClinicalSlotEnrollmentGrade,
   updateAdminClinicalSlot,
   type AcademicTerm,
@@ -227,6 +228,10 @@ export function AdminClinicalPage() {
   const [rosterLoading, setRosterLoading] = useState(false)
   const [rosterError, setRosterError] = useState<string | null>(null)
   const [rosterRemovingKey, setRosterRemovingKey] = useState<string | null>(null)
+  const [rosterAddStudentId, setRosterAddStudentId] = useState('')
+  const [rosterAddBusy, setRosterAddBusy] = useState(false)
+  const [rosterAddMessage, setRosterAddMessage] = useState<string | null>(null)
+  const [rosterAddError, setRosterAddError] = useState<string | null>(null)
   const [gradeModal, setGradeModal] = useState<ClinicalRosterGradeModalState | null>(null)
   const [gradeSaving, setGradeSaving] = useState(false)
   const [gradeModalError, setGradeModalError] = useState<string | null>(null)
@@ -305,6 +310,10 @@ export function AdminClinicalPage() {
       setRosterRows(null)
       setRosterError(null)
       setRosterLoading(false)
+      setRosterAddStudentId('')
+      setRosterAddBusy(false)
+      setRosterAddMessage(null)
+      setRosterAddError(null)
       setGradeModal(null)
       setGradeModalError(null)
       setGradeSaving(false)
@@ -1541,6 +1550,86 @@ export function AdminClinicalPage() {
                 {rosterError}
               </p>
             ) : null}
+            <div
+              className="portal-course-feedback-modal__field"
+              style={{ marginTop: '0.75rem' }}
+            >
+              <label htmlFor="admin-clinical-roster-add-student-id">
+                Add student by ID
+              </label>
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <input
+                  id="admin-clinical-roster-add-student-id"
+                  className="admin-input"
+                  style={{ minWidth: '16rem' }}
+                  placeholder="Student ID, e.g. E26103"
+                  value={rosterAddStudentId}
+                  disabled={rosterAddBusy}
+                  onChange={(e) => {
+                    setRosterAddStudentId(e.target.value)
+                    setRosterAddMessage(null)
+                    setRosterAddError(null)
+                  }}
+                />
+                <button
+                  type="button"
+                  className="portal-btn portal-btn--primary"
+                  disabled={rosterAddBusy}
+                  onClick={() => {
+                    const normalizedStudentId = rosterAddStudentId.trim().toUpperCase()
+                    if (normalizedStudentId === '') {
+                      setRosterAddError('Student ID is required.')
+                      setRosterAddMessage(null)
+                      return
+                    }
+                    setRosterAddBusy(true)
+                    setRosterAddError(null)
+                    setRosterAddMessage(null)
+                    ;(async () => {
+                      try {
+                        await postAdminClinicalSlotStudent({
+                          timetableId: rosterSlot.id,
+                          studentId: normalizedStudentId,
+                          seatBucket: null,
+                        })
+                        const list = await fetchAdminClinicalSlotRoster(rosterSlot.id)
+                        setRosterRows(list)
+                        setSlotsReloadKey((k) => k + 1)
+                        setRosterAddStudentId('')
+                        setRosterAddMessage(
+                          `Added ${normalizedStudentId} to this slot.`,
+                        )
+                      } catch (e) {
+                        setRosterAddError(
+                          e instanceof Error ? e.message : 'Could not add student.',
+                        )
+                      } finally {
+                        setRosterAddBusy(false)
+                      }
+                    })()
+                  }}
+                >
+                  {rosterAddBusy ? 'Adding…' : 'Add Student'}
+                </button>
+              </div>
+              {rosterAddError ? (
+                <p className="portal-page-lede" role="alert">
+                  {rosterAddError}
+                </p>
+              ) : null}
+              {rosterAddMessage ? (
+                <p className="portal-card-note" role="status">
+                  {rosterAddMessage}
+                </p>
+              ) : null}
+            </div>
             {!rosterLoading && rosterRows != null && rosterRows.length === 0 ? (
               <p className="portal-card-note">
                 No students with a non-dropped enrollment for this slot.

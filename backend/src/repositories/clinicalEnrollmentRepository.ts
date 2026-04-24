@@ -352,6 +352,21 @@ export type ClinicalSlotRosterAdminRow = {
   createdAt: string;
 };
 
+export async function studentExistsByExternalId(
+  studentId: string,
+): Promise<boolean> {
+  const sid = studentId.trim();
+  if (sid === "") return false;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT 1 AS ok
+       FROM students
+      WHERE TRIM(id) = TRIM(?)
+      LIMIT 1`,
+    [sid],
+  );
+  return rows.length > 0;
+}
+
 function slotLabelFromTimetableFields(r: {
   weekday: string;
   time_from: unknown;
@@ -975,10 +990,19 @@ function resolveChosenSeatBucketForEnrollment(args: {
   }
   const b = parseExplicitSeatBucket(requestedSeatBucket);
   if (b == null) {
-    return {
-      ok: false,
-      error: "seatBucket is required for this slot (100, 200, 300, or all).",
-    };
+    if (caps.c100 > 0 && used.n100 < caps.c100) {
+      return { ok: true, seatBucket: "100" };
+    }
+    if (caps.c200 > 0 && used.n200 < caps.c200) {
+      return { ok: true, seatBucket: "200" };
+    }
+    if (caps.c300 > 0 && used.n300 < caps.c300) {
+      return { ok: true, seatBucket: "300" };
+    }
+    if (caps.cAll > 0 && used.nAll < caps.cAll) {
+      return { ok: true, seatBucket: "all" };
+    }
+    return { ok: false, error: "This slot is full." };
   }
   if (b === "100") {
     if (caps.c100 <= 0) {
@@ -1038,6 +1062,16 @@ export async function createClinicalEnrollment(
   year: number,
   requestedSeatBucket: ClinicalSeatBucket | null,
   insertAssignment: (conn: PoolConnection) => Promise<number>,
+  afterEnrollmentInTxn?: (args: {
+    conn: PoolConnection;
+    enrollmentId: number;
+    assignmentId: number;
+    seatBucket: ClinicalSeatBucket | null;
+    wasReactivation: boolean;
+    isNewEnrollmentRow: boolean;
+    term: string;
+    year: number;
+  }) => Promise<void>,
 ): Promise<
   | {
       ok: true;
@@ -1208,6 +1242,19 @@ export async function createClinicalEnrollment(
       timeTo: normalizeSqlTimeHms(tt.time_to),
       instructor: trimOrEmpty(tt.instructor),
     });
+
+    if (afterEnrollmentInTxn != null) {
+      await afterEnrollmentInTxn({
+        conn,
+        enrollmentId,
+        assignmentId,
+        seatBucket: bucketEnforced ? chosenBucket : null,
+        wasReactivation,
+        isNewEnrollmentRow,
+        term: te,
+        year,
+      });
+    }
 
     await conn.commit();
     return {

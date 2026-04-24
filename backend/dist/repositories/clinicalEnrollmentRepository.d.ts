@@ -62,6 +62,7 @@ export type ClinicalSlotRosterAdminRow = {
     seatBucket: ClinicalSeatBucket | null;
     createdAt: string;
 };
+export declare function studentExistsByExternalId(studentId: string): Promise<boolean>;
 /**
  * Open slots from `clinic_timetable` with enrollment counts from `clinical_enrollments` (status enrolled).
  */
@@ -120,7 +121,16 @@ export declare function countActiveClinicalEnrollmentsForSlot(timetableId: numbe
 /**
  * Transaction-safe enroll: lock, capacity check, insert or reactivate row. Caller supplies assignment insert.
  */
-export declare function createClinicalEnrollment(studentId: string, timetableId: number, term: string, year: number, requestedSeatBucket: ClinicalSeatBucket | null, insertAssignment: (conn: PoolConnection) => Promise<number>): Promise<{
+export declare function createClinicalEnrollment(studentId: string, timetableId: number, term: string, year: number, requestedSeatBucket: ClinicalSeatBucket | null, insertAssignment: (conn: PoolConnection) => Promise<number>, afterEnrollmentInTxn?: (args: {
+    conn: PoolConnection;
+    enrollmentId: number;
+    assignmentId: number;
+    seatBucket: ClinicalSeatBucket | null;
+    wasReactivation: boolean;
+    isNewEnrollmentRow: boolean;
+    term: string;
+    year: number;
+}) => Promise<void>): Promise<{
     ok: true;
     enrollmentId: number;
     assignmentId: number;

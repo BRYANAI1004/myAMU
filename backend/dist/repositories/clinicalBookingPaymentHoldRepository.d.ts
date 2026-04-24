@@ -23,6 +23,15 @@ export declare function insertClinicalBookingPaymentHold(params: {
     chargeAmount: number;
     balanceBeforeCharge: number;
 }): Promise<number>;
+export declare function insertClinicalBookingPaymentHoldInConn(conn: PoolConnection, params: {
+    clinicalEnrollmentId: number;
+    studentId: string;
+    billingAdjustmentId: number;
+    term: string;
+    year: number;
+    chargeAmount: number;
+    balanceBeforeCharge: number;
+}): Promise<number>;
 export declare function cancelActiveClinicalBookingPaymentHoldsForEnrollment(conn: PoolConnection, clinicalEnrollmentId: number, reason: "manual_drop" | "superseded"): Promise<void>;
 export declare function cancelActiveClinicalBookingPaymentHoldsForEnrollmentPool(clinicalEnrollmentId: number, reason: "manual_drop" | "superseded"): Promise<void>;
 export declare function voidSystemClinicalChargesForEnrollmentPool(clinicalEnrollmentId: number, reason?: ClinicalChargeVoidReason): Promise<number>;

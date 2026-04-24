@@ -118,6 +118,7 @@ import {
   getAdminClinicalSlotRosterHandler,
   getStudentClinicalEnrollmentsHandler,
   getStudentOpenClinicalEnrollmentSlotsHandler,
+  postAdminClinicalSlotStudentHandler,
   postAdminClinicalSlotEnrollmentGradeHandler,
   postAdminClinicalPaymentHoldCleanupHandler,
   postStudentClinicalEnrollmentHandler,
@@ -302,6 +303,10 @@ adminRouter.get(
 adminRouter.delete(
   "/clinical/slots/:timetableId/enrollments/:enrollmentId",
   deleteAdminClinicalSlotEnrollmentHandler,
+);
+adminRouter.post(
+  "/clinical/slots/:timetableId/students",
+  postAdminClinicalSlotStudentHandler,
 );
 adminRouter.post(
   "/clinical/slots/:timetableId/enrollments/:enrollmentId/grade",

@@ -1,5 +1,5 @@
 import { env } from "../config/env.js";
-import { adminDropClinicalEnrollmentForSlot, dropStudentClinicalEnrollment, enrollStudentInClinicalSlot, listAdminClinicalSlotRoster, listOpenClinicalSlotsForStudent, listStudentClinicalEnrollmentRows, } from "../services/clinicalEnrollmentService.js";
+import { adminAddStudentToClinicalSlot, adminDropClinicalEnrollmentForSlot, dropStudentClinicalEnrollment, enrollStudentInClinicalSlot, listAdminClinicalSlotRoster, listOpenClinicalSlotsForStudent, listStudentClinicalEnrollmentRows, } from "../services/clinicalEnrollmentService.js";
 import { setAdminClinicalEnrollmentGrade } from "../services/adminMarksService.js";
 import { getStudentPortalClinicalBookingHold, runClinicalBookingPaymentHoldCleanup, } from "../services/clinicalBookingPaymentHoldService.js";
 import { ClinicalScheduleValidationError } from "../services/clinicalScheduleService.js";
@@ -122,6 +122,47 @@ export async function deleteAdminClinicalSlotEnrollmentHandler(req, res) {
         console.error("[admin clinical slot enrollment DELETE] failed:", e);
         const body = {
             error: "Could not remove student from this slot.",
+        };
+        if (env.nodeEnv === "development")
+            body.message = devMessage(e);
+        res.status(500).json(body);
+    }
+}
+/**
+ * POST /api/admin/clinical/slots/:timetableId/students
+ * Body: { studentId: string, seatBucket?: '100'|'200'|'300'|'123'|'all'|null }
+ */
+export async function postAdminClinicalSlotStudentHandler(req, res) {
+    try {
+        const tid = pathTimetableId(req);
+        if (!Number.isInteger(tid) || tid <= 0) {
+            res.status(400).json({ error: "Invalid timetable id" });
+            return;
+        }
+        const body = req.body;
+        if (body == null || typeof body !== "object") {
+            res.status(400).json({ error: "JSON body is required" });
+            return;
+        }
+        const sid = typeof body.studentId === "string" ? body.studentId.trim() : "";
+        if (sid === "") {
+            res.status(400).json({ error: "studentId is required" });
+            return;
+        }
+        const seatBucketRaw = body.seatBucket !== undefined && body.seatBucket !== null
+            ? body.seatBucket
+            : body.seat_bucket;
+        const result = await adminAddStudentToClinicalSlot(tid, sid, seatBucketRaw);
+        if (!result.ok) {
+            res.status(result.status).json({ error: result.error });
+            return;
+        }
+        res.status(201).json(result);
+    }
+    catch (e) {
+        console.error("[admin clinical slot student POST] failed:", e);
+        const body = {
+            error: "Could not add student to this slot.",
         };
         if (env.nodeEnv === "development")
             body.message = devMessage(e);
@@ -297,12 +338,7 @@ export async function postStudentClinicalEnrollmentHandler(req, res) {
             res.status(result.status).json({ error: result.error });
             return;
         }
-        res.status(201).json({
-            ok: true,
-            enrollmentId: result.enrollmentId,
-            assignmentId: result.assignmentId,
-            billingChargePosted: result.billingChargePosted,
-        });
+        res.status(201).json(result);
     }
     catch (e) {
         console.error("[clinical-enrollments POST] failed:", e);

@@ -1,4 +1,4 @@
-import { type ClinicalEnrollmentSlotRow, type ClinicalEnrollmentStudentRow, type ClinicalSlotRosterAdminRow } from "../repositories/clinicalEnrollmentRepository.js";
+import { type ClinicalEnrollmentSlotRow, type ClinicalEnrollmentStudentRow, type ClinicalSeatBucket, type ClinicalSlotRosterAdminRow } from "../repositories/clinicalEnrollmentRepository.js";
 export type OpenClinicalSlotForStudentDto = ClinicalEnrollmentSlotRow & {
     alreadyEnrolled: boolean;
 };
@@ -24,17 +24,33 @@ export declare function listStudentClinicalEnrollmentRows(studentId: string, que
     term?: string | null;
     year?: string | number | null;
 }): Promise<ClinicalEnrollmentStudentRow[]>;
-export declare function enrollStudentInClinicalSlot(studentId: string, timetableId: number, seatBucketFromRequest: unknown): Promise<{
+export type ClinicalEnrollmentWithBillingResult = {
     ok: true;
-    enrollmentId: number;
-    assignmentId: number;
-    /** True when a new `portal_billing_adjustments` clinical charge was posted for this booking. */
-    billingChargePosted: boolean;
+    enrollment: {
+        enrollmentId: number;
+        assignmentId: number;
+        studentId: string;
+        timetableId: number;
+        term: string;
+        year: number;
+        seatBucket: ClinicalSeatBucket | null;
+    };
+    billingAdjustment: {
+        id: number;
+        amount: number;
+        category: "clinical";
+        adjustmentSource: "system_clinical";
+    } | null;
+    paymentHold: {
+        created: boolean;
+    } | null;
 } | {
     ok: false;
     error: string;
     status: number;
-}>;
+};
+export declare function enrollStudentInClinicalSlot(studentId: string, timetableId: number, seatBucketFromRequest: unknown): Promise<ClinicalEnrollmentWithBillingResult>;
+export declare function adminAddStudentToClinicalSlot(timetableId: number, studentId: string, seatBucketFromRequest: unknown): Promise<ClinicalEnrollmentWithBillingResult>;
 export declare function listAdminClinicalSlotRoster(timetableId: number): Promise<AdminClinicalSlotRosterDto[]>;
 /**
  * Admin removes a student from a slot: same non-destructive drop as student self-serve.

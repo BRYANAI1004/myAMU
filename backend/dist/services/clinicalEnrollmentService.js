@@ -1,8 +1,7 @@
-import { pool } from "../lib/db.js";
 import { insertPortalBillingAdjustment } from "../repositories/adminFinanceRepository.js";
-import { clinicalBookingPaymentHoldsTableExists, insertClinicalBookingPaymentHold, cancelActiveClinicalBookingPaymentHoldsForEnrollmentPool, voidSystemClinicalChargesForEnrollmentPool, } from "../repositories/clinicalBookingPaymentHoldRepository.js";
+import { clinicalBookingPaymentHoldsTableExists, insertClinicalBookingPaymentHoldInConn, cancelActiveClinicalBookingPaymentHoldsForEnrollment, voidSystemClinicalChargesForEnrollmentInConn, } from "../repositories/clinicalBookingPaymentHoldRepository.js";
 import { getClinicTimetableById, } from "../repositories/clinicalTimetableRepository.js";
-import { createClinicalEnrollment, dropClinicalEnrollment, getClinicalEnrollmentSlotBinding, listActiveClinicalRosterForTimetable, listAvailableClinicalEnrollmentSlots, listStudentClinicalEnrollments, } from "../repositories/clinicalEnrollmentRepository.js";
+import { createClinicalEnrollment, dropClinicalEnrollment, getClinicalEnrollmentSlotBinding, listActiveClinicalRosterForTimetable, listAvailableClinicalEnrollmentSlots, listStudentClinicalEnrollments, studentExistsByExternalId, } from "../repositories/clinicalEnrollmentRepository.js";
 import { insertClinicalAssignment } from "../repositories/clinicalScheduleRepository.js";
 import { buildClinicTimetableSlotLabel, buildTimetableClinicalAssignmentPayload, ClinicalScheduleValidationError, formatClinicTimeHm, } from "./clinicalScheduleService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
@@ -100,8 +99,11 @@ function normalizeSeatBucketFromBody(raw) {
         return null;
     }
     const s = String(raw).trim().toLowerCase();
-    if (s === "100" || s === "200" || s === "300" || s === "all") {
+    if (s === "100" || s === "200" || s === "300") {
         return s;
+    }
+    if (s === "all" || s === "123") {
+        return "all";
     }
     return "invalid";
 }
@@ -137,99 +139,92 @@ export async function enrollStudentInClinicalSlot(studentId, timetableId, seatBu
             status: 400,
         };
     }
-    if (bucketEnforced && normalized == null) {
-        return {
-            ok: false,
-            error: "seatBucket is required for this slot (100, 200, 300, or all).",
-            status: 400,
-        };
-    }
+    const resultMeta = {};
     const result = await createClinicalEnrollment(sid, timetableId, term, year, bucketEnforced ? normalized : null, async (conn) => {
         const payload = buildTimetableClinicalAssignmentPayload(sid, tt, null);
         return insertClinicalAssignment(payload, conn);
-    });
-    if (!result.ok) {
-        return { ok: false, error: result.error, status: 400 };
-    }
-    const shouldPostClinicalCharge = result.isNewEnrollmentRow || result.wasReactivation;
-    if (!shouldPostClinicalCharge) {
-        console.log("[HOLD_DEBUG] enrollStudentInClinicalSlot: hold path skipped (shouldPostClinicalCharge=false)", {
-            studentId: sid,
-            clinicalEnrollmentId: result.enrollmentId,
-            isNewEnrollmentRow: result.isNewEnrollmentRow,
-            wasReactivation: result.wasReactivation,
-        });
-    }
-    let billingChargePosted = false;
-    if (shouldPostClinicalCharge) {
-        if (result.wasReactivation) {
-            await voidSystemClinicalChargesForEnrollmentPool(result.enrollmentId);
-            await cancelActiveClinicalBookingPaymentHoldsForEnrollmentPool(result.enrollmentId, "superseded");
+    }, async ({ conn, enrollmentId, isNewEnrollmentRow, wasReactivation, term, year, assignmentId, seatBucket, }) => {
+        const shouldPostClinicalCharge = isNewEnrollmentRow || wasReactivation;
+        if (!shouldPostClinicalCharge)
+            return;
+        if (wasReactivation) {
+            await voidSystemClinicalChargesForEnrollmentInConn(conn, enrollmentId, "superseded");
+            if (await clinicalBookingPaymentHoldsTableExists()) {
+                await cancelActiveClinicalBookingPaymentHoldsForEnrollment(conn, enrollmentId, "superseded");
+            }
         }
         const balanceBeforeCharge = await getStudentQuarterBalance(sid, term, year);
         const desc = clinicalSlotBookingLedgerDescription(tt);
         const amount = roundClinicalBookingMoney(CLINICAL_SLOT_BOOKING_CHARGE_USD);
-        try {
-            const adjustmentId = await insertPortalBillingAdjustment(pool, {
-                studentExternalId: sid,
+        const adjustmentId = await insertPortalBillingAdjustment(conn, {
+            studentExternalId: sid,
+            term,
+            year,
+            description: desc,
+            amount,
+            category: "clinical",
+            adjustmentSource: "system_clinical",
+            clinicalEnrollmentId: enrollmentId,
+        });
+        let holdCreated = false;
+        if (await clinicalBookingPaymentHoldsTableExists()) {
+            await insertClinicalBookingPaymentHoldInConn(conn, {
+                clinicalEnrollmentId: enrollmentId,
+                studentId: sid,
+                billingAdjustmentId: adjustmentId,
                 term,
                 year,
-                description: desc,
-                amount,
-                category: "clinical",
-                adjustmentSource: "system_clinical",
-                clinicalEnrollmentId: result.enrollmentId,
+                chargeAmount: amount,
+                balanceBeforeCharge,
             });
-            billingChargePosted = true;
-            const holdsTableOk = await clinicalBookingPaymentHoldsTableExists();
-            console.log("[HOLD_DEBUG] enrollStudentInClinicalSlot: service-layer table-exists guard", { holdsTableOk });
-            if (!holdsTableOk) {
-                console.log("[HOLD_DEBUG] insertClinicalBookingPaymentHold not called: table missing per information_schema");
-            }
-            if (holdsTableOk) {
-                console.log("[HOLD_DEBUG] immediately before insertClinicalBookingPaymentHold", {
-                    studentId: sid,
-                    clinicalEnrollmentId: result.enrollmentId,
-                    billingAdjustmentId: adjustmentId,
-                    term,
-                    year,
-                });
-                try {
-                    await insertClinicalBookingPaymentHold({
-                        clinicalEnrollmentId: result.enrollmentId,
-                        studentId: sid,
-                        billingAdjustmentId: adjustmentId,
-                        term,
-                        year,
-                        chargeAmount: amount,
-                        balanceBeforeCharge,
-                    });
-                }
-                catch (holdErr) {
-                    console.error("[clinical enrollment] payment hold row insert failed after billing adjustment:", holdErr);
-                }
-            }
+            holdCreated = true;
         }
-        catch (e) {
-            console.error("[clinical enrollment] portal billing adjustment failed after enroll:", e);
-            const dropped = await dropClinicalEnrollment(sid, result.enrollmentId);
-            if (!dropped.ok) {
-                console.error("[clinical enrollment] billing failure and enrollment rollback failed", { studentId: sid, enrollmentId: result.enrollmentId });
-                throw e instanceof Error ? e : new Error(String(e));
-            }
-            return {
-                ok: false,
-                error: "Your spot could not be billed, so the booking was cancelled. Please try again or contact the office.",
-                status: 503,
-            };
-        }
+        resultMeta.billingAdjustmentId = adjustmentId;
+        resultMeta.billingAmount = amount;
+        resultMeta.paymentHoldCreated = holdCreated;
+        resultMeta.term = term;
+        resultMeta.year = year;
+        resultMeta.assignmentId = assignmentId;
+        resultMeta.seatBucket = seatBucket;
+    });
+    if (!result.ok) {
+        return { ok: false, error: result.error, status: 400 };
     }
     return {
         ok: true,
-        enrollmentId: result.enrollmentId,
-        assignmentId: result.assignmentId,
-        billingChargePosted,
+        enrollment: {
+            enrollmentId: result.enrollmentId,
+            assignmentId: result.assignmentId,
+            studentId: sid,
+            timetableId,
+            term: resultMeta.term ?? term,
+            year: resultMeta.year ?? year,
+            seatBucket: resultMeta.seatBucket ?? result.seatBucket,
+        },
+        billingAdjustment: resultMeta.billingAdjustmentId != null
+            ? {
+                id: resultMeta.billingAdjustmentId,
+                amount: resultMeta.billingAmount ??
+                    roundClinicalBookingMoney(CLINICAL_SLOT_BOOKING_CHARGE_USD),
+                category: "clinical",
+                adjustmentSource: "system_clinical",
+            }
+            : null,
+        paymentHold: resultMeta.billingAdjustmentId != null
+            ? { created: resultMeta.paymentHoldCreated === true }
+            : null,
     };
+}
+export async function adminAddStudentToClinicalSlot(timetableId, studentId, seatBucketFromRequest) {
+    const sid = String(studentId ?? "").trim().toUpperCase();
+    if (sid === "") {
+        return { ok: false, error: "Student id is required", status: 400 };
+    }
+    const exists = await studentExistsByExternalId(sid);
+    if (!exists) {
+        return { ok: false, error: "Student not found.", status: 404 };
+    }
+    return enrollStudentInClinicalSlot(sid, timetableId, seatBucketFromRequest);
 }
 export async function listAdminClinicalSlotRoster(timetableId) {
     if (!Number.isFinite(timetableId) || timetableId <= 0) {
