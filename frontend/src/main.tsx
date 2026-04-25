@@ -1,13 +1,12 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
+import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.tsx'
 import { AdminAuthProvider } from './context/AdminAuthContext'
-import { logFrontendBuildId, registerMyAmuServiceWorker } from './registerServiceWorker'
 
-logFrontendBuildId()
-registerMyAmuServiceWorker()
+registerSW({ immediate: true })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -7,7 +7,7 @@ import { apiRouter } from "./routes/index.js";
 export const app = express();
 
 /** Browser origins allowed for CORS (production + local Vite; env merges extra hosts). */
-const corsOriginList = [
+const requiredCorsOrigins = new Set([
   "https://myamu.wanpanel.ai",
   "https://myamu-api.wanpanel.ai",
   "http://localhost:3000",
@@ -20,11 +20,20 @@ const corsOriginList = [
   "http://127.0.0.1:5174",
   "http://127.0.0.1:5175",
   "http://127.0.0.1:5176",
-  ...(env.corsOrigins ?? []),
-];
+]);
+
+for (const origin of env.corsOrigins ?? []) {
+  requiredCorsOrigins.add(origin);
+}
 
 const corsOptions: cors.CorsOptions = {
-  origin: [...new Set(corsOriginList.filter((o) => o.trim() !== ""))],
+  origin(origin, callback) {
+    if (!origin || requiredCorsOrigins.has(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],

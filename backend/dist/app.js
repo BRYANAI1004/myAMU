@@ -4,6 +4,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { apiRouter } from "./routes/index.js";
 export const app = express();
+/** Browser origins allowed for CORS (production + local Vite; env merges extra hosts). */
 const requiredCorsOrigins = new Set([
     "https://myamu.wanpanel.ai",
     "https://myamu-api.wanpanel.ai",
@@ -34,7 +35,8 @@ const corsOptions = {
     allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
-app.options("*", cors());
+/** Same options as `app.use(cors)` so preflight gets Allow-Credentials + explicit origin (not `*`). */
+app.options("*", cors(corsOptions));
 app.use(cookieParser());
 app.use(express.json());
 app.use("/api", apiRouter);
