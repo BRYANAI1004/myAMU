@@ -21,10 +21,13 @@
     "pw:generate-initial": "tsx scripts/generate-initial-passwords.ts",
     "pw:audit-amu-2026": "tsx scripts/audit-amu-2026-password-migration.ts",
     "pw:repair-amu-2026": "tsx scripts/audit-amu-2026-password-migration.ts --repair",
-    "job:clinical-hold-cleanup": "tsx scripts/runClinicalPaymentHoldCleanup.ts"
+    "job:clinical-hold-cleanup": "tsx scripts/runClinicalPaymentHoldCleanup.ts",
+    "admin:create": "tsx scripts/create-admin.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -37,6 +40,8 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/cookie-parser": "^1.4.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.0.0",

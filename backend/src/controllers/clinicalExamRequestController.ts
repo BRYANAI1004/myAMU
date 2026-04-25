@@ -20,11 +20,6 @@ function parseQueryStudentId(req: Request): string | null {
   return t === "" ? null : t;
 }
 
-function readAdminEmailHeader(req: Request): string | null {
-  const idRaw = req.headers["x-admin-email"];
-  return typeof idRaw === "string" && idRaw.trim() !== "" ? idRaw.trim() : null;
-}
-
 function pathExamRequestId(req: Request): number {
   const v = req.params.id;
   const raw = Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
@@ -204,7 +199,7 @@ export async function postAdminClinicalExamRequestAssignHandler(
       patch.year = n;
     }
 
-    const assignedBy = readAdminEmailHeader(req);
+    const assignedBy = req.adminUser?.email ?? null;
     const result = await assignClinicalExamRequest(id, patch, assignedBy);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error });

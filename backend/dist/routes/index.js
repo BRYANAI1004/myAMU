@@ -16,6 +16,8 @@ import { getStudentTranscriptPreview } from "../controllers/studentTranscriptCon
 import { getDemoAccount, getDemoActivity, getStudentAccount, getStudentActivity, getStudentProfile, putStudentProfile, } from "../controllers/studentAccountController.js";
 import { getStudentMyPhotoUrlHandler, postStudentMyPhotoHandler, uploadStudentMyPhotoMiddleware, } from "../controllers/studentPhotoController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
+import { getAdminAuthMe, postAdminAuthLogin, postAdminAuthLogout, } from "../controllers/adminAuthController.js";
+import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import { getStudentEnrolledSections, postStudentEnroll, postStudentWithdraw, } from "../controllers/studentEnrollmentController.js";
 import { getAdminStudentClinicalProgressHandler, getStudentClinicalProgressHandler, } from "../controllers/studentClinicalProgressController.js";
 import { deleteAdminAcademicTerm, getAcademicTerms, getAcademicTermsCurrent, getAcademicTermsCurrentPosted, getAcademicTermsRecent, patchAdminAcademicTerm, postAdminAcademicTerm, postAdminAcademicTermPost, } from "../controllers/academicTermController.js";
@@ -59,8 +61,12 @@ apiRouter.get("/clinical/offered-timetable", getClinicalOfferedTimetableHandler)
 apiRouter.get("/course-bin/:studentId", getCourseBin);
 apiRouter.post("/course-bin/:studentId", postCourseBin);
 apiRouter.delete("/course-bin/:studentId/:itemId", deleteCourseBinItemHandler);
-/** Admin section CRUD: protect with auth / role checks before exposing publicly. */
+/** Admin section CRUD: protected by `requireAdminAuth` (except `/auth/*`). */
 const adminRouter = Router();
+adminRouter.post("/auth/login", postAdminAuthLogin);
+adminRouter.post("/auth/logout", postAdminAuthLogout);
+adminRouter.get("/auth/me", getAdminAuthMe);
+adminRouter.use(requireAdminAuth);
 adminRouter.get("/students", getAdminStudents);
 adminRouter.get("/students/next-id", getNextAdminStudentId);
 adminRouter.post("/students", postAdminStudent);

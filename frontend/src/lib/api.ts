@@ -81,7 +81,10 @@ export async function apiFetch(
 ): Promise<Response> {
   const url = buildApiUrl(path)
   console.debug('[api] request', url)
-  const res = await fetch(url, init)
+  const res = await fetch(url, {
+    ...init,
+    credentials: init?.credentials ?? 'include',
+  })
   const ct = res.headers.get('content-type') ?? ''
   console.debug('[api] response', res.status, ct || '(no content-type)')
   return res
@@ -1120,13 +1123,9 @@ export async function uploadAdminStudentPhoto(
   const path = `/api/admin/students/${encodeURIComponent(studentId)}/photo`
   const form = new FormData()
   form.set('photo', photoFile)
-  const headers: Record<string, string> = {}
-  const adminHeaders = readAdminSessionHeaders()
-  if (adminHeaders) Object.assign(headers, adminHeaders)
   const data = await fetchApiJson(path, {
     method: 'POST',
     body: form,
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
     signal: options?.signal,
   })
   return parseAdminStudentPhotoPayload(data)
@@ -2542,25 +2541,6 @@ export async function fetchStudentClinicalExamRequests(
   return data
 }
 
-function readAdminSessionHeaders(): Record<string, string> | undefined {
-  if (typeof window === 'undefined') return undefined
-  try {
-    const raw = window.sessionStorage.getItem('amu_admin_session')
-    if (!raw) return undefined
-    const parsed = JSON.parse(raw) as { role?: unknown; email?: unknown }
-    const headers: Record<string, string> = {}
-    if (typeof parsed.role === 'string' && parsed.role.trim() !== '') {
-      headers['X-Admin-Role'] = parsed.role.trim()
-    }
-    if (typeof parsed.email === 'string' && parsed.email.trim() !== '') {
-      headers['X-Admin-Email'] = parsed.email.trim()
-    }
-    return Object.keys(headers).length > 0 ? headers : undefined
-  } catch {
-    return undefined
-  }
-}
-
 /** GET /api/admin/clinical/exam-requests */
 export async function fetchAdminClinicalExamRequests(options?: {
   signal?: AbortSignal
@@ -2595,8 +2575,6 @@ export async function postAdminClinicalExamRequestAssign(
 ): Promise<ClinicalExamRequestDto> {
   const path = `/api/admin/clinical/exam-requests/${encodeURIComponent(String(requestId))}/assign`
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  const adminH = readAdminSessionHeaders()
-  if (adminH) Object.assign(headers, adminH)
   const data = (await fetchApiJson(path, {
     method: 'POST',
     headers,
@@ -3230,26 +3208,8 @@ export async function deleteAdminClinicalSlot(
   }
   const qs = params.toString()
   const path = `/api/admin/clinical/slots/${encodeURIComponent(String(id))}${qs ? `?${qs}` : ''}`
-  const headers: Record<string, string> = {}
-  if (options?.forceDelete === true && typeof window !== 'undefined') {
-    try {
-      const raw = window.sessionStorage.getItem('amu_admin_session')
-      if (raw) {
-        const parsed = JSON.parse(raw) as { role?: unknown; email?: unknown }
-        if (typeof parsed.role === 'string' && parsed.role.trim() !== '') {
-          headers['X-Admin-Role'] = parsed.role.trim()
-        }
-        if (typeof parsed.email === 'string' && parsed.email.trim() !== '') {
-          headers['X-Admin-Email'] = parsed.email.trim()
-        }
-      }
-    } catch {
-      // best effort metadata for backend force-delete audit and role gate
-    }
-  }
   const data = (await fetchApiJson(path, {
     method: 'DELETE',
-    headers: Object.keys(headers).length > 0 ? headers : undefined,
     signal: options?.signal,
   })) as unknown
   if (data == null || typeof data !== 'object') {

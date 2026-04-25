@@ -1,5 +1,6 @@
 import { Server } from "socket.io";
 import { env } from "../config/env.js";
+import { verifyAdminAccessToken, verifyAdminAccessTokenFromCookieHeader } from "./adminAuthToken.js";
 import { verifyStudentAccessToken } from "./studentAuthToken.js";
 const REQUIRED_CORS_ORIGINS = new Set([
     "https://myamu.wanpanel.ai",
@@ -49,24 +50,35 @@ export function initSocket(server) {
     });
     io.use((socket, next) => {
         const auth = readSocketAuth(socket.handshake.auth);
-        const adminRole = readNonEmptyString(auth.adminRole) ??
-            readNonEmptyString(socket.handshake.headers["x-admin-role"]);
-        const adminEmail = readNonEmptyString(auth.adminEmail) ??
-            readNonEmptyString(socket.handshake.headers["x-admin-email"]);
+        const cookieHeader = socket.handshake.headers.cookie;
+        const cookieStr = typeof cookieHeader === "string" ? cookieHeader : undefined;
+        const adminUser = verifyAdminAccessTokenFromCookieHeader(cookieStr) ??
+            verifyAdminAccessToken(typeof socket.handshake.headers.authorization === "string"
+                ? socket.handshake.headers.authorization
+                : undefined);
+        if (adminUser != null) {
+            socket.data = {
+                isAdmin: true,
+                adminRole: adminUser.role,
+                adminEmail: adminUser.email,
+                studentId: null,
+            };
+            next();
+            return;
+        }
         const token = readNonEmptyString(auth.token) ??
             readNonEmptyString(auth.authorization) ??
             readNonEmptyString(socket.handshake.headers.authorization);
         const studentAuth = token != null ? verifyStudentAccessToken(toAuthorizationHeader(token)) : null;
-        const isAdmin = adminRole != null;
         const studentId = studentAuth?.studentId ?? null;
-        if (!isAdmin && studentId == null) {
+        if (studentId == null) {
             next(new Error("Unauthorized socket connection"));
             return;
         }
         socket.data = {
-            isAdmin,
-            adminRole,
-            adminEmail,
+            isAdmin: false,
+            adminRole: null,
+            adminEmail: null,
             studentId,
         };
         next();

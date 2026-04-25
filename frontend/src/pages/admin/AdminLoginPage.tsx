@@ -6,20 +6,20 @@ import { useAdminAuth } from '../../context/AdminAuthContext'
 
 export function AdminLoginPage() {
   const navigate = useNavigate()
-  const { isAuthenticated, login } = useAdminAuth()
+  const { isAuthenticated, isHydrated, login } = useAdminAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isHydrated && isAuthenticated) {
       navigate('/admin', { replace: true })
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, isHydrated, navigate])
 
-  function handleSignIn() {
+  async function handleSignIn() {
     setFormError(null)
-    const result = login(username, password)
+    const result = await login(username, password)
     if (!result.ok) {
       setFormError(result.error)
       return

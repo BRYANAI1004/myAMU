@@ -2,20 +2,13 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
+import { buildApiUrl } from '../lib/api'
 import { type AdminRole, isAdminRole } from '../lib/adminAccess'
-
-const ADMIN_SESSION_KEY = 'amu_admin_session'
-
-type AdminAccount = {
-  email: string
-  password: string
-  role: AdminRole
-  loginIds?: readonly string[]
-}
 
 type AdminLoginResult =
   | { ok: true }
@@ -27,133 +20,114 @@ type StoredAdminSession = {
 }
 
 type AdminAuthContextValue = {
+  isHydrated: boolean
   isAuthenticated: boolean
   role: AdminRole | null
-  login: (email: string, password: string) => AdminLoginResult
-  logout: () => void
+  login: (identifier: string, password: string) => Promise<AdminLoginResult>
+  logout: () => Promise<void>
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
-const ADMIN_ACCOUNTS: readonly AdminAccount[] = [
-  {
-    email: 'deanjiang@amu',
-    password: 'deanjiang123',
-    role: 'super_admin',
-    loginIds: ['deanjiang'],
-  },
-  {
-    email: 'wanpanelami@gmail.com',
-    password: 'amuadmin123',
-    role: 'admin',
-  },
-  {
-    email: 'bingchen.li@wanpanel.ai',
-    password: 'amuadmin123',
-    role: 'admin',
-  },
-  {
-    email: 'clinic@amu.edu',
-    password: 'amuadmin123',
-    role: 'admin',
-  },
-  {
-    email: 'clinicdean@amu.edu',
-    password: 'amuadmin123',
-    role: 'admin',
-  },
-  {
-    email: 'teacher@amu.edu',
-    password: 'teacher123',
-    role: 'teacher',
-  },
-  {
-    email: 'clinical@amu.edu',
-    password: 'clinical123',
-    role: 'clinical_teacher',
-  },
-  {
-    email: 'clinicaladmin@amu',
-    password: 'clinicaladmin',
-    role: 'clinical_admin',
-    loginIds: ['clinicaladmin'],
-  },
-] as const
+type MeResponse =
+  | { ok: true; user: { email: string; role: AdminRole } }
+  | { ok: false }
 
-function normalizeLoginId(value: string): string {
-  return value.trim().toLowerCase()
-}
-
-const ADMIN_ACCOUNT_MAP = new Map<string, AdminAccount>()
-for (const account of ADMIN_ACCOUNTS) {
-  const ids = [account.email, ...(account.loginIds ?? [])]
-  for (const id of ids) {
-    const normalized = normalizeLoginId(id)
-    if (normalized) {
-      ADMIN_ACCOUNT_MAP.set(normalized, account)
-    }
-  }
-}
-
-function readSession(): StoredAdminSession | null {
-  try {
-    const raw = sessionStorage.getItem(ADMIN_SESSION_KEY)
-    if (raw === '1') {
-      return {
-        email: '',
-        role: 'admin',
-      }
-    }
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<StoredAdminSession>
-    if (typeof parsed.role === 'string' && isAdminRole(parsed.role)) {
-      return {
-        email: typeof parsed.email === 'string' ? parsed.email : '',
-        role: parsed.role,
-      }
-    }
-    return null
-  } catch {
-    return null
-  }
+function parseMeResponse(data: unknown): MeResponse {
+  if (data == null || typeof data !== 'object') return { ok: false }
+  const o = data as Record<string, unknown>
+  if (o.ok !== true) return { ok: false }
+  const user = o.user
+  if (user == null || typeof user !== 'object') return { ok: false }
+  const u = user as Record<string, unknown>
+  const email = typeof u.email === 'string' ? u.email : ''
+  const roleRaw = typeof u.role === 'string' ? u.role : ''
+  if (email.trim() === '' || !isAdminRole(roleRaw)) return { ok: false }
+  return { ok: true, user: { email, role: roleRaw } }
 }
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<StoredAdminSession | null>(readSession)
-  const isAuthenticated = session !== null
+  const [session, setSession] = useState<StoredAdminSession | null>(null)
+  const [isHydrated, setIsHydrated] = useState(false)
 
-  const login = useCallback((email: string, password: string): AdminLoginResult => {
-    const normalizedLoginId = normalizeLoginId(email)
-    if (!normalizedLoginId) {
-      return { ok: false, error: 'Username or Email is required' }
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch(buildApiUrl('/api/admin/auth/me'), {
+          method: 'GET',
+          credentials: 'include',
+        })
+        const data: unknown = await res.json().catch(() => null)
+        if (cancelled) return
+        const parsed = parseMeResponse(data)
+        if (parsed.ok === true) {
+          setSession({ email: parsed.user.email, role: parsed.user.role })
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setIsHydrated(true)
+      }
+    })()
+    return () => {
+      cancelled = true
     }
-    if (password === '') {
-      return { ok: false, error: 'Password is required' }
-    }
-    const normalizedPassword = password.trim()
-    const account = ADMIN_ACCOUNT_MAP.get(normalizedLoginId)
-    if (!account) {
-      return { ok: false, error: 'Invalid email or password.' }
-    }
-    if (password !== account.password && normalizedPassword !== account.password) {
-      return { ok: false, error: 'Invalid email or password.' }
-    }
-    const nextSession: StoredAdminSession = {
-      email: account.email,
-      role: account.role,
-    }
-    try {
-      sessionStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(nextSession))
-    } catch {
-      /* ignore */
-    }
-    setSession(nextSession)
-    return { ok: true }
   }, [])
 
-  const logout = useCallback(() => {
+  const isAuthenticated = session !== null
+
+  const login = useCallback(
+    async (identifier: string, password: string): Promise<AdminLoginResult> => {
+      const idTrim = identifier.trim().toLowerCase()
+      if (idTrim === '') {
+        return { ok: false, error: 'Username or Email is required' }
+      }
+      if (password === '') {
+        return { ok: false, error: 'Password is required' }
+      }
+      try {
+        const res = await fetch(buildApiUrl('/api/admin/auth/login'), {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier: idTrim, password }),
+        })
+        const data: unknown = await res.json().catch(() => null)
+        if (res.ok && data != null && typeof data === 'object') {
+          const o = data as Record<string, unknown>
+          if (o.ok === true) {
+            const user = o.user
+            if (user != null && typeof user === 'object') {
+              const u = user as Record<string, unknown>
+              const email = typeof u.email === 'string' ? u.email : ''
+              const roleRaw = typeof u.role === 'string' ? u.role : ''
+              if (email.trim() !== '' && isAdminRole(roleRaw)) {
+                setSession({ email, role: roleRaw })
+                return { ok: true }
+              }
+            }
+          }
+        }
+        const errBody = data as { error?: unknown } | null
+        const msg =
+          typeof errBody?.error === 'string' && errBody.error.trim() !== ''
+            ? errBody.error
+            : 'Invalid email or password.'
+        return { ok: false, error: msg }
+      } catch {
+        return { ok: false, error: 'Login failed. Please try again.' }
+      }
+    },
+    [],
+  )
+
+  const logout = useCallback(async () => {
     try {
-      sessionStorage.removeItem(ADMIN_SESSION_KEY)
+      await fetch(buildApiUrl('/api/admin/auth/logout'), {
+        method: 'POST',
+        credentials: 'include',
+      })
     } catch {
       /* ignore */
     }
@@ -161,8 +135,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const value = useMemo(
-    () => ({ isAuthenticated, role: session?.role ?? null, login, logout }),
-    [isAuthenticated, login, logout, session?.role],
+    () => ({
+      isHydrated,
+      isAuthenticated,
+      role: session?.role ?? null,
+      login,
+      logout,
+    }),
+    [isHydrated, isAuthenticated, login, logout, session?.role],
   )
 
   return (

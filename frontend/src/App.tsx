@@ -65,9 +65,12 @@ function RequireAuth() {
 }
 
 function RequireAdminAuth() {
-  const { isAuthenticated } = useAdminAuth()
+  const { isAuthenticated, isHydrated } = useAdminAuth()
   if (process.env.NODE_ENV === 'development') {
     return <Outlet />
+  }
+  if (!isHydrated) {
+    return null
   }
   if (!isAuthenticated) {
     return <Navigate to="/admin/login" replace />
@@ -76,9 +79,12 @@ function RequireAdminAuth() {
 }
 
 function RequireAdminModule({ module }: { module: AdminModuleKey }) {
-  const { isAuthenticated, role } = useAdminAuth()
+  const { isAuthenticated, isHydrated, role } = useAdminAuth()
   if (process.env.NODE_ENV === 'development' && !isAuthenticated) {
     return <Outlet />
+  }
+  if (process.env.NODE_ENV !== 'development' && !isHydrated) {
+    return null
   }
   if (!role) {
     return <Navigate to="/admin/login" replace />
@@ -90,9 +96,12 @@ function RequireAdminModule({ module }: { module: AdminModuleKey }) {
 }
 
 function AdminIndexRedirect() {
-  const { isAuthenticated, role } = useAdminAuth()
+  const { isAuthenticated, isHydrated, role } = useAdminAuth()
   if (process.env.NODE_ENV === 'development' && !isAuthenticated) {
     return <Navigate to="/admin/students" replace />
+  }
+  if (process.env.NODE_ENV !== 'development' && !isHydrated) {
+    return null
   }
   if (!role) {
     return <Navigate to="/admin/login" replace />

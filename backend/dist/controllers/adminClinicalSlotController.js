@@ -26,13 +26,11 @@ function parseForceDeleteQuery(req) {
     return s === "1" || s === "true" || s === "yes";
 }
 function parseForceDeleteActor(req) {
-    const roleRaw = req.headers["x-admin-role"];
-    const idRaw = req.headers["x-admin-email"];
-    const role = typeof roleRaw === "string" && roleRaw.trim() !== ""
-        ? roleRaw.trim()
-        : null;
-    const adminIdentifier = typeof idRaw === "string" && idRaw.trim() !== "" ? idRaw.trim() : null;
-    return { adminRole: role, adminIdentifier };
+    const user = req.adminUser;
+    if (user == null) {
+        return { adminRole: null, adminIdentifier: null };
+    }
+    return { adminRole: user.role, adminIdentifier: user.email };
 }
 function parseCreateBody(body) {
     if (!body || typeof body !== "object")

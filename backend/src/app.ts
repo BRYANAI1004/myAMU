@@ -1,3 +1,4 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { env } from "./config/env.js";
@@ -34,12 +35,7 @@ const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Admin-Role",
-    "X-Admin-Email",
-  ],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 
 app.use(
@@ -47,5 +43,6 @@ app.use(
 );
 
 app.options("*", cors());
+app.use(cookieParser());
 app.use(express.json());
 app.use("/api", apiRouter);

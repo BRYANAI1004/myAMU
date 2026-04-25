@@ -86,6 +86,12 @@ import {
 } from "../controllers/studentPhotoController.js";
 import { postStudentLogin } from "../controllers/studentAuthController.js";
 import {
+  getAdminAuthMe,
+  postAdminAuthLogin,
+  postAdminAuthLogout,
+} from "../controllers/adminAuthController.js";
+import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
+import {
   getStudentEnrolledSections,
   postStudentEnroll,
   postStudentWithdraw,
@@ -209,8 +215,12 @@ apiRouter.delete(
   deleteCourseBinItemHandler,
 );
 
-/** Admin section CRUD: protect with auth / role checks before exposing publicly. */
+/** Admin section CRUD: protected by `requireAdminAuth` (except `/auth/*`). */
 const adminRouter = Router();
+adminRouter.post("/auth/login", postAdminAuthLogin);
+adminRouter.post("/auth/logout", postAdminAuthLogout);
+adminRouter.get("/auth/me", getAdminAuthMe);
+adminRouter.use(requireAdminAuth);
 adminRouter.get("/students", getAdminStudents);
 adminRouter.get("/students/next-id", getNextAdminStudentId);
 adminRouter.post("/students", postAdminStudent);
