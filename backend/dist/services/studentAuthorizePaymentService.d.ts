@@ -51,6 +51,7 @@ export type CurrentTermBillingSummary = {
 export declare function getCurrentTermBillingSummary(input: {
     studentId: string;
     termInput: string;
+    emitTuitionSummaryDebugLog?: boolean;
 }): Promise<CurrentTermBillingSummary>;
 export type TuitionOnlyBillingSummary = {
     term: string;

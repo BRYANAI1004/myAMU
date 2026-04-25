@@ -15,7 +15,10 @@ import {
 import { revokeExpiredClinicalBooking } from "./clinicalBookingPaymentHoldService.js";
 import { getLatestClinicalBookingPaymentHoldStatusForStudentQuarter } from "../repositories/clinicalBookingPaymentHoldRepository.js";
 import { resolveCanonicalStudentExternalId } from "../repositories/studentIdentityRepository.js";
-import { computeTuitionBalanceSnapshot } from "./tuitionBalanceService.js";
+import {
+  computeTuitionBalanceSnapshot,
+  logTuitionSummaryBreakdown,
+} from "./tuitionBalanceService.js";
 import type { LedgerRowForTuitionFlow } from "./ledgerTuitionFlowMath.js";
 
 type OpaqueDataInput = {
@@ -312,18 +315,12 @@ async function buildCurrentTermBillingSummary(args: {
   );
   const totalBalanceDue = roundToMoney(requiredBalanceDue + lateFeeCharge.amountDue);
   if (args.emitTuitionSummaryDebugLog === true) {
-    console.log("[tuition-summary]", {
-      requestedStudentId: args.requestedStudentId,
-      resolvedStudentId: args.studentId,
+    logTuitionSummaryBreakdown({
+      studentId: args.studentId,
       term: args.term,
       year: args.year,
-      tuitionCharges: details.tuitionCharges,
-      tuitionAdjustments: details.tuitionAdjustments,
-      tuitionPayments: details.tuitionPayments,
-      lateFees: details.lateFees,
-      excludedClinical: details.excludedClinical,
-      excludedExam: details.excludedExam,
-      tuitionBalanceDue: details.tuitionBalanceDue,
+      rows,
+      snapshot: details,
     });
   }
   return {

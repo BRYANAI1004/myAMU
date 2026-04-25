@@ -87,6 +87,15 @@ export declare function getAdminFinanceQuarters(studentId: string): Promise<{
 }>;
 export declare function getAdminFinanceLedger(studentId: string, term: string, year: number): Promise<{
     studentId: string;
+    tuitionPayFlowSummary: {
+        tuitionCharges: number;
+        lateFees: number;
+        tuitionPaymentsApplied: number;
+        lateFeePaymentsApplied: number;
+        tuitionBalanceDue: number;
+        tuitionChargeAmountDue: number;
+        lateFeeChargeAmountDue: number;
+    } | null;
     term: string;
     year: number;
     rows: import("./studentLedgerService.js").LedgerRowDto[];

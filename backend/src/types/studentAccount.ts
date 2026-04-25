@@ -157,6 +157,7 @@ export type BillingAdjustmentSource =
   | "admin_manual_charge"
   | "system_late_fee"
   | "system_clinical"
+  | "system_exam"
   | "system_late_fee_reversal";
 
 export type BillingAdjustmentRecord = {

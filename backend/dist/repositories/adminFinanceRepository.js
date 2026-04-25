@@ -571,7 +571,7 @@ export async function updateManualBillingAdjustment(pool, id, params) {
     const [res] = await pool.execute(`UPDATE portal_billing_adjustments
      SET description = ?, amount = ?, category = ?
      WHERE id = ?
-       AND adjustment_source = 'manual'`, [
+       AND adjustment_source IN ('manual', 'admin_manual_charge')`, [
         params.description.trim(),
         params.amount,
         params.category,
@@ -585,7 +585,7 @@ export async function updateManualBillingAdjustment(pool, id, params) {
 export async function deleteManualBillingAdjustment(pool, id) {
     const [res] = await pool.execute(`DELETE FROM portal_billing_adjustments
      WHERE id = ?
-       AND adjustment_source = 'manual'`, [Math.trunc(id)]);
+       AND adjustment_source IN ('manual', 'admin_manual_charge')`, [Math.trunc(id)]);
     const ok = res.affectedRows ?? 0;
     if (ok === 0) {
         throw new Error("NOT_MANUAL_OR_MISSING");

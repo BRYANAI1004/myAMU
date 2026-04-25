@@ -1,7 +1,7 @@
 import type { Pool, PoolConnection } from "mysql2/promise";
 /** Pool or transaction connection for inserts. */
 export type PortalBillingSqlExecutor = Pool | PoolConnection;
-export type PortalBillingCategory = "tuition" | "clinical" | "fees" | "other";
+export type PortalBillingCategory = "tuition" | "clinical" | "fees" | "other" | "exam";
 export declare const LATE_FEE_DESCRIPTION = "Late Payment Fee";
 export type FinanceRosterRow = {
     studentId: string;
@@ -71,7 +71,7 @@ export declare function insertPortalBillingAdjustment(pool: PortalBillingSqlExec
     description: string;
     amount: number;
     category: PortalBillingCategory;
-    adjustmentSource?: "manual" | "system_late_fee" | "system_clinical" | "system_late_fee_reversal";
+    adjustmentSource?: "manual" | "admin_manual_charge" | "system_late_fee" | "system_clinical" | "system_late_fee_reversal";
     /** When set, links a `system_clinical` slot booking charge to `clinical_enrollments.id`. */
     clinicalEnrollmentId?: number | null;
     /** When set, links this row as a compensating reversal of another adjustment row. */

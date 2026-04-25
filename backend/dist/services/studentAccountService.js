@@ -11,7 +11,7 @@ import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { pool } from "../lib/db.js";
 import { listMarksForStudent } from "../repositories/studentAcademicsRepository.js";
 import { findLatestLegacyTermYear, listLegacyRegistrationTermsForStudent, loadLegacyAccountSnapshot, loadLegacyAccountingRows, } from "../repositories/studentLegacyAccountRepository.js";
-import { findLatestTermYearForStudent, listPortalScheduleTermsForStudent, loadAccountContext, } from "../repositories/studentAccountRepository.js";
+import { findLatestTermYearForStudent, listPortalFinanceActivityTermsForStudent, loadAccountContext, } from "../repositories/studentAccountRepository.js";
 import { findLatestPortalEnrollmentTermYear, listPortalEnrollmentRowsForStudentAcademics, } from "../repositories/studentEnrollmentRepository.js";
 import { loadCoursesTranscriptLookup } from "../repositories/studentTranscriptRepository.js";
 import { getCatalogDemoAccountPayload } from "./demoAccountService.js";
@@ -142,7 +142,7 @@ function augmentPayloadScheduleMeta(payload, args) {
     };
 }
 async function getDemoStudentAccountPayload(studentId, termYear) {
-    const listedPairs = await listPortalScheduleTermsForStudent(pool, studentId).catch(() => []);
+    const listedPairs = await listPortalFinanceActivityTermsForStudent(pool, studentId).catch(() => []);
     const listedOptions = toScheduleTermOptions(listedPairs);
     let term;
     let year;
@@ -210,7 +210,7 @@ async function getRealStudentAccountPayload(studentId, termYear) {
         listLegacyRegistrationTermsForStudent(pool, studentId),
         listPortalEnrollmentRowsForStudentAcademics(studentId),
         findLatestPortalEnrollmentTermYear(studentId),
-        listPortalScheduleTermsForStudent(pool, studentId).catch(() => []),
+        listPortalFinanceActivityTermsForStudent(pool, studentId).catch(() => []),
         findLatestLegacyTermYear(pool, studentId),
         listMarksForStudent(pool, studentId),
     ]);

@@ -4,119 +4,18 @@ import { batchLoadPortalTermBillingContextsForQuarter } from "../repositories/st
 import { loadLegacyAccountingRows, sumLegacyAccountingBalanceByStudentForQuarter, } from "../repositories/studentLegacyAccountRepository.js";
 import { computePortalOnlyQuarterNetBalance, getAccountingLedgerPayload, getAccountingQuartersPayload, } from "./studentLedgerService.js";
 import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
-import { isClinicBucketCharge, isExamFeeMemo, isLateFeeRow, isTuitionBucketCharge, } from "./billingChargeBuckets.js";
+import { distributeUnassignedPaymentsToBuckets, summarizeLedgerRowsIntoChargeBuckets, } from "./ledgerTuitionFlowMath.js";
+import { computeTuitionBalanceSnapshot } from "./tuitionBalanceService.js";
+import { resolveCanonicalStudentExternalId } from "../repositories/studentIdentityRepository.js";
 const CHARGE_CATEGORIES = [
     "fees",
     "other",
     "tuition",
     "clinical",
+    "exam",
 ];
 function roundMoney(n) {
     return Math.round(n * 100) / 100;
-}
-function inferPaymentChargeTypeFromMemo(memo) {
-    const m = memo.trim().toLowerCase();
-    const explicit = /authorize\.net\s+(tuition|clinic_fee|exam_fee|late_fee)\b/.exec(m);
-    if (explicit) {
-        return explicit[1];
-    }
-    if (/\btuition\b/.test(m))
-        return "tuition";
-    if (/clinic/.test(m))
-        return "clinic_fee";
-    if (/exam/.test(m))
-        return "exam_fee";
-    if (/late\s*payment\s*fee|late\s*fee/.test(m))
-        return "late_fee";
-    return null;
-}
-function summarizeTermChargesFromLedger(rows) {
-    const chargeTotals = {
-        tuition: 0,
-        clinic_fee: 0,
-        exam_fee: 0,
-        late_fee: 0,
-    };
-    const paymentTotals = {
-        tuition: 0,
-        clinic_fee: 0,
-        exam_fee: 0,
-        late_fee: 0,
-    };
-    let totalCredits = 0;
-    for (const row of rows) {
-        const debit = roundMoney(Math.max(0, Number(row.debit) || 0));
-        const credit = roundMoney(Math.max(0, Number(row.credit) || 0));
-        const memo = String(row.memo ?? "").trim();
-        const type = String(row.type ?? "").trim();
-        const code = String(row.code ?? "").trim();
-        if (debit > 0) {
-            if (isLateFeeRow({ type, memo, sourceType: row.sourceType })) {
-                chargeTotals.late_fee = roundMoney(chargeTotals.late_fee + debit);
-            }
-            else if (isExamFeeMemo(memo)) {
-                chargeTotals.exam_fee = roundMoney(chargeTotals.exam_fee + debit);
-            }
-            else if (isClinicBucketCharge({
-                type,
-                code,
-                memo,
-                sourceType: row.sourceType,
-            })) {
-                chargeTotals.clinic_fee = roundMoney(chargeTotals.clinic_fee + debit);
-            }
-            else if (isTuitionBucketCharge({
-                type,
-                code,
-                memo,
-                sourceType: row.sourceType,
-            })) {
-                chargeTotals.tuition = roundMoney(chargeTotals.tuition + debit);
-            }
-        }
-        if (credit > 0) {
-            totalCredits = roundMoney(totalCredits + credit);
-            const inferred = inferPaymentChargeTypeFromMemo(memo);
-            if (inferred != null) {
-                paymentTotals[inferred] = roundMoney(paymentTotals[inferred] + credit);
-            }
-        }
-    }
-    const typedPayments = roundMoney(paymentTotals.tuition +
-        paymentTotals.clinic_fee +
-        paymentTotals.exam_fee +
-        paymentTotals.late_fee);
-    return {
-        chargeTotals,
-        paymentTotals,
-        unassignedPayments: roundMoney(Math.max(0, totalCredits - typedPayments)),
-    };
-}
-function distributeUnassignedPayments(chargeTotals, paymentTotals, unassignedPayments) {
-    const paid = {
-        tuition: 0,
-        clinic_fee: 0,
-        exam_fee: 0,
-        late_fee: 0,
-    };
-    let carry = roundMoney(Math.max(0, unassignedPayments));
-    const order = [
-        "tuition",
-        "clinic_fee",
-        "exam_fee",
-        "late_fee",
-    ];
-    for (const key of order) {
-        const target = roundMoney(Math.max(0, chargeTotals[key]));
-        if (target <= 0)
-            continue;
-        const direct = roundMoney(Math.max(0, paymentTotals[key]));
-        const remainingAfterDirect = roundMoney(Math.max(0, target - direct));
-        const allocation = roundMoney(Math.min(remainingAfterDirect, carry));
-        carry = roundMoney(Math.max(0, carry - allocation));
-        paid[key] = roundMoney(Math.min(target, direct + allocation));
-    }
-    return paid;
 }
 function formatQuarterLabel(term, year) {
     const t = term.trim();
@@ -200,9 +99,9 @@ async function evaluateLateFeeEligibility(studentId, term, year, paymentDueDate)
         skipExpiredClinicalBookingReconciliation: true,
         skipLateFeeEvaluation: true,
     });
-    const rows = ledger?.rows ?? [];
-    const summarized = summarizeTermChargesFromLedger(rows);
-    const paid = distributeUnassignedPayments(summarized.chargeTotals, summarized.paymentTotals, summarized.unassignedPayments);
+    const rows = (ledger?.rows ?? []);
+    const summarized = summarizeLedgerRowsIntoChargeBuckets(rows);
+    const paid = distributeUnassignedPaymentsToBuckets(summarized.chargeTotals, summarized.paymentTotals, summarized.unassignedPayments);
     const tuitionOutstanding = roundMoney(Math.max(0, summarized.chargeTotals.tuition - paid.tuition));
     const lateFeeOutstanding = roundMoney(Math.max(0, summarized.chargeTotals.late_fee - paid.late_fee));
     if (tuitionOutstanding <= 0) {
@@ -543,22 +442,67 @@ export async function listAdminFinanceStudentsPaginated(term, year, query) {
     }
 }
 export async function getAdminFinanceQuarters(studentId) {
-    return getAccountingQuartersPayload(studentId);
+    const canonical = (await resolveCanonicalStudentExternalId(pool, studentId)) ?? studentId.trim();
+    return getAccountingQuartersPayload(canonical);
 }
 export async function getAdminFinanceLedger(studentId, term, year) {
-    return getAccountingLedgerPayload(studentId, term.trim(), year);
+    const requested = studentId.trim();
+    const canonical = (await resolveCanonicalStudentExternalId(pool, requested)) ?? requested;
+    const payload = await getAccountingLedgerPayload(canonical, term.trim(), year);
+    if (payload == null) {
+        return null;
+    }
+    const presentation = await getAccountingLedgerPayload(canonical, term.trim(), year, {
+        studentPortalLedgerPresentation: true,
+        skipExpiredClinicalBookingReconciliation: true,
+        skipLateFeeEvaluation: true,
+    });
+    const tuitionSnap = presentation == null
+        ? null
+        : computeTuitionBalanceSnapshot({
+            requestedStudentId: requested,
+            resolvedStudentId: canonical,
+            term: presentation.term.trim() || term.trim(),
+            year: presentation.year,
+            rows: (presentation.rows ?? []),
+        });
+    console.log("[admin-ledger-summary]", {
+        studentId: canonical,
+        requestedStudentId: requested,
+        term: payload.term,
+        year: payload.year,
+        totalCharges: payload.summary.totalCharges,
+        totalPayments: payload.summary.totalPayments,
+        balance: payload.summary.balance,
+        tuitionPayFlowBalance: tuitionSnap?.tuitionBalanceDue ?? null,
+    });
+    return {
+        ...payload,
+        studentId: canonical,
+        tuitionPayFlowSummary: tuitionSnap == null
+            ? null
+            : {
+                tuitionCharges: tuitionSnap.tuitionCharges,
+                lateFees: tuitionSnap.lateFees,
+                tuitionPaymentsApplied: tuitionSnap.tuitionPayments,
+                lateFeePaymentsApplied: tuitionSnap.lateFeePayments,
+                tuitionBalanceDue: tuitionSnap.tuitionBalanceDue,
+                tuitionChargeAmountDue: tuitionSnap.tuitionChargeAmountDue,
+                lateFeeChargeAmountDue: tuitionSnap.lateFeeChargeAmountDue,
+            },
+    };
 }
 function todayIsoDate() {
     return new Date().toISOString().slice(0, 10);
 }
 function parseCategory(raw) {
     if (raw === undefined || raw === null)
-        return "fees";
+        return "tuition";
     if (typeof raw !== "string")
         return null;
     const s = raw.trim().toLowerCase();
     if (s === "")
-        return "fees";
+        return "tuition";
     if (CHARGE_CATEGORIES.includes(s)) {
         return s;
     }
@@ -600,7 +544,7 @@ export function validatePostChargeBody(raw) {
     if (category == null) {
         return {
             ok: false,
-            error: "category must be one of: fees, other, tuition, clinical (or omit for fees).",
+            error: "category must be one of: fees, other, tuition, clinical, exam (or omit for tuition).",
         };
     }
     return {
@@ -686,25 +630,33 @@ export function validatePostPaymentBody(raw) {
     };
 }
 export async function postAdminFinanceCharge(input) {
+    const canonical = (await resolveCanonicalStudentExternalId(pool, input.studentId)) ??
+        input.studentId.trim();
     await insertPortalBillingAdjustment(pool, {
-        studentExternalId: input.studentId,
+        studentExternalId: canonical,
         term: input.term,
         year: input.year,
         description: input.description,
         amount: input.amount,
-        category: input.category ?? "fees",
-        adjustmentSource: "manual",
+        category: input.category ?? "tuition",
+        adjustmentSource: "admin_manual_charge",
     });
 }
 export async function postAdminFinancePayment(input) {
+    const canonical = (await resolveCanonicalStudentExternalId(pool, input.studentId)) ??
+        input.studentId.trim();
+    const baseDesc = (input.description ?? "Admin recorded payment").trim();
+    const desc = baseDesc.startsWith("[admin_manual_payment]")
+        ? baseDesc.slice(0, 255)
+        : `[admin_manual_payment] ${baseDesc}`.slice(0, 255);
     await insertPortalPayment(pool, {
-        studentExternalId: input.studentId,
+        studentExternalId: canonical,
         term: input.term,
         year: input.year,
         amount: input.amount,
         paidAt: input.paidAt ?? todayIsoDate(),
         method: input.method ?? "admin",
-        description: input.description ?? "Admin recorded payment",
+        description: desc,
     });
 }
 export function validatePutChargeBody(raw) {
@@ -729,7 +681,7 @@ export function validatePutChargeBody(raw) {
     if (category == null) {
         return {
             ok: false,
-            error: "category must be one of: fees, other, tuition, clinical (or omit for fees).",
+            error: "category must be one of: fees, other, tuition, clinical, exam (or omit for tuition).",
         };
     }
     return {
@@ -837,20 +789,23 @@ export async function deleteAdminFinancePayment(id) {
     }
 }
 export async function verifyManualChargeForStudentTerm(id, studentId, term, year) {
+    const canonical = (await resolveCanonicalStudentExternalId(pool, studentId)) ?? studentId.trim();
     const row = await getBillingAdjustmentById(pool, id);
     if (row == null)
         return false;
-    if (row.adjustmentSource !== "manual")
+    const src = String(row.adjustmentSource ?? "").trim().toLowerCase();
+    if (src !== "manual" && src !== "admin_manual_charge")
         return false;
-    return (row.studentExternalId === studentId.trim() &&
+    return (row.studentExternalId.trim() === canonical &&
         row.term.trim().toLowerCase() === term.trim().toLowerCase() &&
         row.year === Math.trunc(year));
 }
 export async function verifyPaymentForStudentTerm(id, studentId, term, year) {
+    const canonical = (await resolveCanonicalStudentExternalId(pool, studentId)) ?? studentId.trim();
     const row = await getPortalPaymentById(pool, id);
     if (row == null)
         return false;
-    return (row.studentExternalId === studentId.trim() &&
+    return (row.studentExternalId.trim() === canonical &&
         row.term.trim().toLowerCase() === term.trim().toLowerCase() &&
         row.year === Math.trunc(year));
 }

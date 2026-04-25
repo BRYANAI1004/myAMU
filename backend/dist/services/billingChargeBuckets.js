@@ -9,7 +9,10 @@ export function isLateFeeRow(args) {
     return new RegExp(`^${LATE_FEE_DESCRIPTION}$`, "i").test(args.memo.trim());
 }
 export function isExamFeeMemo(memo) {
-    return /exam\s*fee|exam/i.test(memo);
+    const m = memo.trim();
+    if (/\badditional\s+exam\b/i.test(m))
+        return true;
+    return /exam\s*fee|\bexam\b/i.test(m);
 }
 /**
  * Clinical **booking / reservation** charges (Pay Clinic Fee), not didactic tuition rows.

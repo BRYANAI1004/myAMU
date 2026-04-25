@@ -1,4 +1,4 @@
-export type BillingCategory = "tuition" | "clinical" | "fees" | "other";
+export type BillingCategory = "tuition" | "clinical" | "fees" | "other" | "exam";
 export type BillingLineItem = {
     description: string;
     amount: number;
@@ -133,7 +133,7 @@ export type CourseRecord = {
     units?: number;
     hours?: number;
 };
-export type BillingAdjustmentSource = "manual" | "system_late_fee" | "system_clinical" | "system_late_fee_reversal";
+export type BillingAdjustmentSource = "manual" | "admin_manual_charge" | "system_late_fee" | "system_clinical" | "system_exam" | "system_late_fee_reversal";
 export type BillingAdjustmentRecord = {
     id?: number;
     description: string;

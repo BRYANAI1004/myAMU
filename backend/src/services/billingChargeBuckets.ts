@@ -26,7 +26,9 @@ export function isLateFeeRow(args: {
 }
 
 export function isExamFeeMemo(memo: string): boolean {
-  return /exam\s*fee|exam/i.test(memo);
+  const m = memo.trim();
+  if (/\badditional\s+exam\b/i.test(m)) return true;
+  return /exam\s*fee|\bexam\b/i.test(m);
 }
 
 /**

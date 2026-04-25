@@ -17,6 +17,14 @@ export declare function listPortalScheduleTermsForStudent(pool: Pool, studentExt
     year: number;
 }[]>;
 /**
+ * Distinct term/year pairs from portal enrollments, billing adjustments, and payments.
+ * Ensures admin-posted charges appear in student quarter pickers even without enrollments.
+ */
+export declare function listPortalFinanceActivityTermsForStudent(pool: Pool, studentExternalId: string): Promise<{
+    term: string;
+    year: number;
+}[]>;
+/**
  * `portal_billing_adjustments` for one student + quarter (no dependency on portal course rows).
  * Used when merging portal-side charges into the student ledger alongside legacy `accounting`.
  */

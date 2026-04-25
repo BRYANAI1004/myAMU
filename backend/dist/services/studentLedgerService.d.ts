@@ -1,4 +1,4 @@
-import type { AccountContext, BillingAdjustmentSource } from "../types/studentAccount.js";
+import type { AccountContext, BillingAdjustmentSource, BillingCategory } from "../types/studentAccount.js";
 export type LedgerQuarterOption = {
     term: string;
     year: number;
@@ -27,6 +27,8 @@ export type LedgerRowDto = {
     clinicalBookingPaymentHold?: LedgerClinicalBookingPaymentHoldDto | null;
     /** From `portal_billing_adjustments` when the row was synthesized from that table. */
     billingAdjustmentSource?: BillingAdjustmentSource;
+    /** From `portal_billing_adjustments.category` when the row was synthesized from that table. */
+    billingAdjustmentCategory?: BillingCategory;
     /** Populated for `system_late_fee_reversal` when `reversal_of_adjustment_id` exists. */
     reversalOfAdjustmentId?: number | null;
 };

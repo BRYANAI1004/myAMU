@@ -1,0 +1,30 @@
+/**
+ * Resolves `students.id` (portal / finance canonical external id) from either
+ * `students.id` or `students.seqNum`.
+ */
+export async function resolveCanonicalStudentExternalId(pool, rawStudentKey) {
+    const raw = rawStudentKey.trim();
+    if (raw === "")
+        return null;
+    const numericSeq = /^\d+$/.test(raw) ? Math.trunc(Number(raw)) : null;
+    if (numericSeq != null && Number.isFinite(numericSeq)) {
+        const [rows] = await pool.query(`SELECT TRIM(s.id) AS canonicalId
+       FROM students s
+       WHERE TRIM(s.id) = ? OR s.seqNum = ?
+       LIMIT 1`, [raw, numericSeq]);
+        const id = rows[0]?.canonicalId;
+        if (id != null && String(id).trim() !== "") {
+            return String(id).trim();
+        }
+    }
+    const [rows] = await pool.query(`SELECT TRIM(s.id) AS canonicalId
+     FROM students s
+     WHERE TRIM(s.id) = ?
+     LIMIT 1`, [raw]);
+    const id = rows[0]?.canonicalId;
+    if (id != null && String(id).trim() !== "") {
+        return String(id).trim();
+    }
+    return null;
+}
+//# sourceMappingURL=studentIdentityRepository.js.map

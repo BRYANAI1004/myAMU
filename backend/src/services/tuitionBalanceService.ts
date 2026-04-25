@@ -4,6 +4,7 @@ import { getAccountingLedgerPayload } from "./studentLedgerService.js";
 import {
   classifyDebitChargeBucket,
   distributeUnassignedPaymentsToBuckets,
+  inferPaymentBucketForCredit,
   summarizeLedgerRowsIntoChargeBuckets,
   type LedgerRowForTuitionFlow,
   type PaymentChargeBucket,
@@ -11,6 +12,69 @@ import {
 
 function roundMoney(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+/** Operator-facing Pay Tuition balance composition (single `[tuition-summary breakdown]` log line). */
+export function logTuitionSummaryBreakdown(args: {
+  studentId: string;
+  term: string;
+  year: number;
+  rows: LedgerRowForTuitionFlow[];
+  snapshot: TuitionBalanceSnapshotDetails;
+}): void {
+  let baseTuitionCharges = 0;
+  let tuitionFeeCharges = 0;
+  let tuitionAdjustmentsIncluded = 0;
+  let examAdjustmentsExcluded = 0;
+  let clinicalAdjustmentsExcluded = 0;
+  let examPaymentsExcluded = 0;
+  let clinicalPaymentsExcluded = 0;
+
+  for (const row of args.rows) {
+    const debit = roundMoney(Math.max(0, Number(row.debit) || 0));
+    if (debit > 0) {
+      const bucket = classifyDebitChargeBucket(row);
+      const typeLower = String(row.type ?? "").trim().toLowerCase();
+      if (bucket === "tuition") {
+        if (typeLower === "tuition") {
+          baseTuitionCharges = roundMoney(baseTuitionCharges + debit);
+        } else if (typeLower === "fee") {
+          tuitionFeeCharges = roundMoney(tuitionFeeCharges + debit);
+        } else if (typeLower === "adjustment") {
+          tuitionAdjustmentsIncluded = roundMoney(tuitionAdjustmentsIncluded + debit);
+        }
+      } else if (bucket === "exam_fee") {
+        examAdjustmentsExcluded = roundMoney(examAdjustmentsExcluded + debit);
+      } else if (bucket === "clinic_fee") {
+        clinicalAdjustmentsExcluded = roundMoney(clinicalAdjustmentsExcluded + debit);
+      }
+    }
+
+    const credit = roundMoney(Math.max(0, Number(row.credit) || 0));
+    if (credit > 0) {
+      const payBucket = inferPaymentBucketForCredit(row);
+      if (payBucket === "exam_fee") {
+        examPaymentsExcluded = roundMoney(examPaymentsExcluded + credit);
+      } else if (payBucket === "clinic_fee") {
+        clinicalPaymentsExcluded = roundMoney(clinicalPaymentsExcluded + credit);
+      }
+    }
+  }
+
+  console.log("[tuition-summary breakdown]", {
+    studentId: args.studentId,
+    term: args.term,
+    year: args.year,
+    baseTuitionCharges,
+    tuitionFeeCharges,
+    tuitionAdjustmentsIncluded,
+    examAdjustmentsExcluded,
+    clinicalAdjustmentsExcluded,
+    tuitionPaymentsIncluded: args.snapshot.tuitionPayments,
+    examPaymentsExcluded,
+    clinicalPaymentsExcluded,
+    tuitionTotalDue: args.snapshot.tuitionBalanceDue,
+  });
 }
 
 export type TuitionBalanceForTermResult = {
@@ -150,18 +214,12 @@ export async function getTuitionBalanceForTerm(
   };
 
   if (input.logLabel === "tuition-summary") {
-    console.log("[tuition-summary]", {
-      requestedStudentId,
-      resolvedStudentId: out.resolvedStudentId,
+    logTuitionSummaryBreakdown({
+      studentId: out.resolvedStudentId,
       term: out.term,
       year: out.year,
-      tuitionCharges: out.tuitionCharges,
-      tuitionAdjustments: out.tuitionAdjustments,
-      tuitionPayments: out.tuitionPayments,
-      lateFees: out.lateFees,
-      excludedClinical: out.excludedClinical,
-      excludedExam: out.excludedExam,
-      tuitionBalanceDue: out.tuitionBalanceDue,
+      rows: (ledger.rows ?? []) as LedgerRowForTuitionFlow[],
+      snapshot: details,
     });
   }
 
