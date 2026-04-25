@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { AdminRole } from '../lib/adminAccess'
+import { type AdminRole, isAdminRole } from '../lib/adminAccess'
 
 const ADMIN_SESSION_KEY = 'amu_admin_session'
 
@@ -36,6 +36,12 @@ type AdminAuthContextValue = {
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
 const ADMIN_ACCOUNTS: readonly AdminAccount[] = [
+  {
+    email: 'deanjiang@amu',
+    password: 'deanjiang123',
+    role: 'super_admin',
+    loginIds: ['deanjiang'],
+  },
   {
     email: 'wanpanelami@gmail.com',
     password: 'amuadmin123',
@@ -100,13 +106,7 @@ function readSession(): StoredAdminSession | null {
     }
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<StoredAdminSession>
-    if (
-      typeof parsed.role === 'string' &&
-      (parsed.role === 'admin' ||
-        parsed.role === 'teacher' ||
-        parsed.role === 'clinical_teacher' ||
-        parsed.role === 'clinical_admin')
-    ) {
+    if (typeof parsed.role === 'string' && isAdminRole(parsed.role)) {
       return {
         email: typeof parsed.email === 'string' ? parsed.email : '',
         role: parsed.role,

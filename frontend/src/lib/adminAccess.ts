@@ -1,8 +1,21 @@
 export type AdminRole =
+  | 'super_admin'
   | 'admin'
   | 'teacher'
   | 'clinical_teacher'
   | 'clinical_admin'
+
+const ADMIN_ROLE_SET: ReadonlySet<string> = new Set<AdminRole>([
+  'super_admin',
+  'admin',
+  'teacher',
+  'clinical_teacher',
+  'clinical_admin',
+])
+
+export function isAdminRole(value: string): value is AdminRole {
+  return ADMIN_ROLE_SET.has(value)
+}
 
 export type AdminModuleKey =
   | 'students'
@@ -42,8 +55,13 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
   { key: 'finance', label: 'Finance', path: '/admin/finance' },
 ] as const
 
+const ALL_ADMIN_MODULE_KEYS: readonly AdminModuleKey[] = ADMIN_MODULES.map(
+  (module) => module.key,
+)
+
 const ROLE_MODULE_ACCESS: Record<AdminRole, readonly AdminModuleKey[]> = {
-  admin: ADMIN_MODULES.map((module) => module.key),
+  super_admin: ALL_ADMIN_MODULE_KEYS,
+  admin: ALL_ADMIN_MODULE_KEYS,
   teacher: ['courses', 'course_sections', 'scheduling_timetable'],
   clinical_teacher: ['clinical', 'finance'],
   clinical_admin: ['students', 'clinical', 'finance'],
