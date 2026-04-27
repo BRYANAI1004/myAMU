@@ -8,6 +8,7 @@ import {
   answerLocalSearchQuestion,
   answerSchoolFactQuestion,
   answerStudentRecordQuestionFromFacts,
+  plainTextFormatter,
   planShortConversationMemory,
 } from "../services/ragService.js";
 import {
@@ -23,7 +24,6 @@ import {
 import {
   buildStudentRecordFactsForQuestion,
 } from "../services/studentRecordAiService.js";
-import { evaluateEligibilityQuestion } from "../services/courseEligibilityService.js";
 import { getStudentAcademicsPayload } from "../services/studentAcademicsService.js";
 import { getLegacyStudentProfile } from "../services/studentProfileService.js";
 import { getStudentTranscriptPreviewPayload } from "../services/studentTranscriptService.js";
@@ -31,64 +31,20 @@ import {
   buildSafeLoggedInUserContext,
   sanitizeConversationFacts,
 } from "../services/conversationFactsService.js";
-import { CHAT_MODEL, client as OPENAI_CLIENT } from "../config/openai.js";
 import type { StudentAcademicsResponse } from "../types/studentAcademics.js";
 
-async function answerWithGptFallback(
-  question: string,
-  reason: string,
-): Promise<string> {
-  const response = await OPENAI_CLIENT.responses.create({
-    model: CHAT_MODEL,
-    input: `User question: ${question}
-
-System context: ${reason}
-Please still provide a helpful answer.`,
-  });
-  console.log("[AI RESPONSE SOURCE]: GPT");
-  return response.output_text?.trim() ?? "(no response)";
+function formatResponseAnswer<T extends { answer: string }>(result: T): T {
+  return {
+    ...result,
+    answer: plainTextFormatter(result.answer),
+  };
 }
 
-function buildEligibilityResponseText(question: string, result: NonNullable<Awaited<ReturnType<typeof evaluateEligibilityQuestion>>>): string {
+function buildEvidenceUnavailableMessage(question: string): string {
   const zh = /[\u4E00-\u9FFF]/.test(question);
-  if (result.resolvedCourse == null) {
-    if (result.ambiguousMatches.length > 0) {
-      const names = result.ambiguousMatches
-        .slice(0, 3)
-        .map((c) => c.chiName ?? c.engName ?? c.code)
-        .join("、");
-      return zh
-        ? `我找到了多个可能匹配的课程：${names}。请提供更具体的课程代码或英文课程名，我再为你准确判断先修资格。`
-        : `I found multiple possible course matches: ${names}. Please share the exact course code or full course name so I can evaluate eligibility accurately.`;
-    }
-    return zh
-      ? "我还无法准确定位你要查询的课程。请提供课程代码、中文名或英文名，我再帮你判断是否满足先修条件。"
-      : "I could not confidently resolve the target course. Please provide the course code, Chinese name, or English title so I can evaluate prerequisites.";
-  }
-
-  const courseLabel =
-    result.resolvedCourse.chiName ??
-    result.resolvedCourse.engName ??
-    result.resolvedCourse.code;
-  if (result.result.eligible === true) {
-    return zh
-      ? `根据你目前的已修课程记录，你已经满足${courseLabel}的先修要求，可以继续注册。最终结果仍以学校系统审核为准。`
-      : `Based on your completed course records, you currently meet the prerequisite requirements for ${courseLabel} and may proceed with registration. Final approval still depends on the official school system review.`;
-  }
-
-  if (result.result.eligible === false) {
-    const missing =
-      result.result.missingPrerequisites.length > 0
-        ? result.result.missingPrerequisites.join("、")
-        : (zh ? "先修课程" : "required prerequisite courses");
-    return zh
-      ? `你目前还不能选${courseLabel}。根据课程先修要求，你还需要先完成${missing}。我在当前可用的已修记录中没有看到这些课程已完成，因此暂时不满足注册条件。建议你完成这些课程后再尝试选课，或联系 Academic Advising 确认。`
-      : `You are not yet eligible to take ${courseLabel}. Based on the prerequisite rules, you still need to complete ${missing}. I do not see these prerequisites completed in the available academic records, so registration criteria are not currently met. Please complete them first or confirm with Academic Advising.`;
-  }
-
   return zh
-    ? `我找到了${courseLabel}，但目前可用的 AMU 课程资料没有清楚列出可判定的先修规则，因此无法准确判断你是否符合条件。建议联系 Academic Advising 做最终确认。`
-    : `I found ${courseLabel}, but the available AMU course materials do not provide clear prerequisite rules that allow a deterministic eligibility decision. Please confirm with Academic Advising for final guidance.`;
+    ? "我目前缺少完成此问题所需的 AMU 证据。请提供更具体的课程代码、项目（如 MAHM 或 DAHM）或目录年份，我可以基于可检索到的 AMU 目录和你的可用学业记录重新判断。"
+    : "I do not currently have enough AMU evidence to answer this reliably. Please share a specific course code, program (such as MAHM or DAHM), or catalog year, and I can re-check using available AMU catalog context and your student record evidence.";
 }
 
 function readQuestion(req: Request): unknown {
@@ -240,13 +196,9 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
           courseRecordCount: academics.courseRecords.length,
           transcriptPreviewCount,
         });
-        const answer = await answerWithGptFallback(
-          q,
-          "Verified student academic records were unavailable for this request.",
-        );
         res.status(200).json({
           question: q,
-          answer,
+          answer: buildEvidenceUnavailableMessage(q),
           sources: [],
         });
         return;
@@ -278,26 +230,8 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         graduationEvaluation: structuredEvaluation,
         identityContext,
       });
-      res.status(200).json(result);
+      res.status(200).json(formatResponseAnswer(result));
       return;
-    }
-
-    if (isCourseEligibilityQuestion) {
-      const eligibility = await evaluateEligibilityQuestion(authStudent.studentId, q);
-      if (eligibility != null) {
-        console.debug("[ai/ask] pipeline used", {
-          pipeline: "course_eligibility",
-          resolvedCourse: eligibility.resolvedCourse?.code ?? null,
-          eligible: eligibility.result.eligible,
-          missingPrereqCount: eligibility.result.missingPrerequisites.length,
-        });
-        res.status(200).json({
-          question: q,
-          answer: buildEligibilityResponseText(q, eligibility),
-          sources: [],
-        });
-        return;
-      }
     }
 
     if (routedIntent === "general") {
@@ -308,21 +242,21 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       const result = await answerGeneralQuestion(q, memoryPlan.history, {
         identityContext,
       });
-      res.status(200).json(result);
+      res.status(200).json(formatResponseAnswer(result));
       return;
     }
 
     if (routedIntent === "school_fact") {
       console.debug("[ai/ask] pipeline used", { pipeline: "school_fact" });
       const result = await answerSchoolFactQuestion(q);
-      res.status(200).json(result);
+      res.status(200).json(formatResponseAnswer(result));
       return;
     }
 
     if (routedIntent === "local_search") {
       console.debug("[ai/ask] pipeline used", { pipeline: "local_search" });
       const result = await answerLocalSearchQuestion(q);
-      res.status(200).json(result);
+      res.status(200).json(formatResponseAnswer(result));
       return;
     }
 
@@ -343,7 +277,7 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
           recordFacts.contextText,
           identityContext,
         );
-        res.status(200).json(result);
+        res.status(200).json(formatResponseAnswer(result));
         return;
       }
       console.debug("[ai/ask] pipeline used", {
@@ -355,13 +289,9 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         studentId: authStudent.studentId,
         question: q,
       });
-      const answer = await answerWithGptFallback(
-        q,
-        "Deterministic student-record facts could not be assembled from backend data.",
-      );
       res.status(200).json({
         question: q,
-        answer,
+        answer: buildEvidenceUnavailableMessage(q),
         sources: [],
       });
       return;
@@ -376,7 +306,7 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         pipeline: "policy",
         identityContext,
       });
-      res.status(200).json(result);
+      res.status(200).json(formatResponseAnswer(result));
       return;
     }
 
@@ -389,13 +319,9 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
         studentId: authStudent.studentId,
         question: q,
       });
-      const answer = await answerWithGptFallback(
-        q,
-        "Mixed question required student facts, but verified student-record facts were unavailable.",
-      );
       res.status(200).json({
         question: q,
-        answer,
+        answer: buildEvidenceUnavailableMessage(q),
         sources: [],
       });
       return;
@@ -415,24 +341,16 @@ export async function postAiAsk(req: Request, res: Response): Promise<void> {
       studentContext: studentContextText,
       identityContext,
     });
-    res.status(200).json(result);
+    res.status(200).json(formatResponseAnswer(result));
   } catch (e) {
     if (e instanceof RagQuestionValidationError) {
       res.status(400).json({ error: e.message });
       return;
     }
     console.error("[AI ERROR]", e);
-    const fallback = await OPENAI_CLIENT.responses.create({
-      model: CHAT_MODEL,
-      input: `The system encountered an error.
-User question: ${q}
-Please still provide a helpful answer.`,
-    });
-    const answer = fallback.output_text?.trim() ?? "(no response)";
-    console.log("[AI RESPONSE SOURCE]: GPT");
     res.status(200).json({
       question: q,
-      answer,
+      answer: buildEvidenceUnavailableMessage(q),
       sources: [],
     });
   }

@@ -45,6 +45,7 @@ export type AnswerGraduationQuestionOptions = {
 export declare class RagQuestionValidationError extends Error {
     constructor(message: string);
 }
+export declare function plainTextFormatter(text: string): string;
 /**
  * Normalize optional client-supplied history: drop invalid entries, trim, cap length and count.
  */
