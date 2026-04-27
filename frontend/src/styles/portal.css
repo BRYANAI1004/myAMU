@@ -8721,17 +8721,6 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   hyphens: auto;
 }
 
-.admin-course-sections-page .admin-course-sections-table th:nth-child(3),
-.admin-course-sections-page .admin-course-sections-table td:nth-child(3) {
-  width: 7.5rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.admin-course-sections-page .admin-course-sections-table th:nth-child(4),
-.admin-course-sections-page .admin-course-sections-table td:nth-child(4) {
-  width: 5rem;
-}
-
 .admin-course-sections-page .admin-course-sections-table th:nth-child(5),
 .admin-course-sections-page .admin-course-sections-table td:nth-child(5) {
   width: 6.25rem;
@@ -10507,58 +10496,31 @@ select.admin-student-edit-control {
 }
 
 .admin-course-sections-page .admin-course-sections-table {
-  width: max-content !important;
-  min-width: 1420px;
   table-layout: fixed;
+  min-width: 1780px;
 }
 
 .admin-course-sections-page .admin-course-sections-table th,
 .admin-course-sections-page .admin-course-sections-table td {
-  box-sizing: border-box;
+  text-align: center;
+  vertical-align: middle;
   white-space: normal;
-  overflow-wrap: anywhere;
-  word-break: normal;
   line-height: 1.25;
-}
-
-.admin-course-sections-page .admin-course-sections-table th {
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: normal;
-  letter-spacing: 0.08em;
 }
 
 .admin-course-sections-page .admin-course-sections-table th:nth-child(3),
 .admin-course-sections-page .admin-course-sections-table td:nth-child(3) {
-  width: 130px;
-  min-width: 130px;
-}
-
-.admin-course-sections-page .admin-course-sections-table th:nth-child(3) {
-  text-align: center;
-  padding-right: 24px;
+  width: 170px;
+  min-width: 170px;
+  padding-left: 16px;
+  padding-right: 20px;
   border-right: 1px solid #e5e7eb;
 }
 
 .admin-course-sections-page .admin-course-sections-table th:nth-child(4),
 .admin-course-sections-page .admin-course-sections-table td:nth-child(4) {
-  width: 90px;
-  min-width: 90px;
-  text-align: center;
-}
-
-.admin-course-sections-page .admin-course-sections-table th:nth-child(4) {
-  text-align: center;
-  padding-left: 24px;
-}
-
-.admin-course-sections-page .admin-course-sections-table td:nth-child(3) {
-  text-align: center;
-  padding-right: 24px;
-  border-right: 1px solid #f0f0f0;
-}
-
-.admin-course-sections-page .admin-course-sections-table td:nth-child(4) {
-  text-align: center;
-  padding-left: 24px;
+  width: 110px;
+  min-width: 110px;
+  padding-left: 20px;
+  padding-right: 16px;
 }
