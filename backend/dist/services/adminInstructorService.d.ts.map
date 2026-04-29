@@ -1,1 +1,0 @@
-{"version":3,"file":"adminInstructorService.d.ts","sourceRoot":"","sources":["../../src/services/adminInstructorService.ts"],"names":[],"mappings":"AAEA,MAAM,MAAM,kBAAkB,GAAG;IAC/B,EAAE,EAAE,MAAM,CAAC;IACX,YAAY,EAAE,MAAM,CAAC;IACrB,IAAI,EAAE,MAAM,CAAC;CACd,CAAC;AAEF,wBAAsB,oBAAoB,IAAI,OAAO,CAAC,kBAAkB,EAAE,CAAC,CAO1E"}

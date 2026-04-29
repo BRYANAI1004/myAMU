@@ -1,1 +1,0 @@
-{"version":3,"file":"clinicalExams.d.ts","sourceRoot":"","sources":["../../src/constants/clinicalExams.ts"],"names":[],"mappings":"AAAA,eAAO,MAAM,cAAc;;;;;;;;;;;;;;;EAMjB,CAAC;AAEX,MAAM,MAAM,gBAAgB,GAAG,CAAC,OAAO,cAAc,CAAC,CAAC,MAAM,CAAC,CAAC,MAAM,CAAC,CAAC;AAMvE,wBAAgB,mBAAmB,CACjC,WAAW,EAAE,MAAM,GAClB;IAAE,IAAI,EAAE,gBAAgB,CAAC;IAAC,IAAI,EAAE,MAAM,CAAA;CAAE,GAAG,IAAI,CAKjD"}
