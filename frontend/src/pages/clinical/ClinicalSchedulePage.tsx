@@ -6,6 +6,7 @@ import { useAccount } from '../../context/AccountContext'
 import {
   fetchClinicalOfferedTimetable,
   fetchCurrentAcademicTerm,
+  fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   fetchStudentClinicalEnrollments,
   postStudentClinicalEnrollment,
@@ -23,7 +24,10 @@ import {
 } from '../../lib/timetableBlockLayout'
 import type { StudentPortalKey } from '../../lib/i18n'
 import type { WeekdayFull } from '../../lib/weekdaySchedule'
-import { mergeTermOptions } from '../registration/registrationTermSearch'
+import {
+  mergeTermOptions,
+  resolveSelectedRegistrationTermId,
+} from '../registration/registrationTermSearch'
 
 const CLINICAL_OFFERED_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 const CLINICAL_WEEKDAYS: WeekdayFull[] = [
@@ -189,7 +193,8 @@ export function ClinicalSchedulePage() {
   const sid = currentStudentId?.trim() ?? ''
 
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
-  const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
+  const [postedTerm, setPostedTerm] = useState<AcademicTerm | null>(null)
+  const [registrationOpenTerm, setRegistrationOpenTerm] = useState<AcademicTerm | null>(null)
   const [termsReady, setTermsReady] = useState(false)
   const [selectedTermId, setSelectedTermId] = useState('')
 
@@ -213,8 +218,8 @@ export function ClinicalSchedulePage() {
   const [reloadKey, setReloadKey] = useState(0)
 
   const options = useMemo(
-    () => mergeTermOptions(recentTerms, currentTerm),
-    [recentTerms, currentTerm],
+    () => mergeTermOptions(recentTerms, postedTerm, registrationOpenTerm),
+    [recentTerms, postedTerm, registrationOpenTerm],
   )
   const selectedTerm = useMemo(
     () => options.find((x) => x.id === selectedTermId) ?? null,
@@ -237,17 +242,20 @@ export function ClinicalSchedulePage() {
     const ac = new AbortController()
     void (async () => {
       try {
-        const [recentR, currentR] = await Promise.all([
+        const [recentR, postedR, openR] = await Promise.all([
           fetchRecentAcademicTerms(6, { signal: ac.signal }),
+          fetchPostedCurrentAcademicTerm({ signal: ac.signal }),
           fetchCurrentAcademicTerm({ signal: ac.signal }),
         ])
         if (ac.signal.aborted) return
         setRecentTerms(recentR)
-        setCurrentTerm(currentR)
+        setPostedTerm(postedR)
+        setRegistrationOpenTerm(openR)
       } catch {
         if (ac.signal.aborted) return
         setRecentTerms([])
-        setCurrentTerm(null)
+        setPostedTerm(null)
+        setRegistrationOpenTerm(null)
       } finally {
         if (!ac.signal.aborted) setTermsReady(true)
       }
@@ -264,8 +272,14 @@ export function ClinicalSchedulePage() {
     if (selectedTermId && options.some((x) => x.id === selectedTermId)) {
       return
     }
-    setSelectedTermId(options[0]!.id)
-  }, [termsReady, options, selectedTermId])
+    const next = resolveSelectedRegistrationTermId(
+      null,
+      options,
+      postedTerm,
+      registrationOpenTerm,
+    )
+    if (next !== '') setSelectedTermId(next)
+  }, [termsReady, options, selectedTermId, postedTerm, registrationOpenTerm])
 
   useEffect(() => {
     if (!termsReady || selectedTerm == null) {

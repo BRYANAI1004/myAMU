@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import {
   fetchCurrentAcademicTerm,
+  fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   type AcademicTerm,
 } from '../../lib/api'
@@ -18,13 +19,13 @@ export function RegistrationHomePage() {
     () =>
       [
         {
-          to: 'course-bin' as const,
-          titleKey: 'regActionAddDropTitle' as const,
-          descKey: 'regActionAddDropDesc' as const,
+          to: 'offered-timetable' as const,
+          titleKey: 'registrationPlanHomeTitle' as const,
+          descKey: 'registrationPlanHomeDesc' as const,
           appendTermQuery: true as const,
         },
         {
-          to: 'offered-timetable' as const,
+          to: 'course-search' as const,
           titleKey: 'regActionCourseSearchTitle' as const,
           descKey: 'regActionCourseSearchDesc' as const,
           appendTermQuery: true as const,
@@ -52,14 +53,15 @@ export function RegistrationHomePage() {
   )
 
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
-  const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
+  const [postedTerm, setPostedTerm] = useState<AcademicTerm | null>(null)
+  const [registrationOpenTerm, setRegistrationOpenTerm] = useState<AcademicTerm | null>(null)
   const [selectedId, setSelectedId] = useState<string>('')
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const options = useMemo(
-    () => mergeTermOptions(recentTerms, currentTerm),
-    [recentTerms, currentTerm],
+    () => mergeTermOptions(recentTerms, postedTerm, registrationOpenTerm),
+    [recentTerms, postedTerm, registrationOpenTerm],
   )
 
   useEffect(() => {
@@ -68,12 +70,14 @@ export function RegistrationHomePage() {
     setLoadError(null)
     void (async () => {
       const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
-      const currentP = fetchCurrentAcademicTerm({ signal: ac.signal })
-      const [recentR, currentR] = await Promise.allSettled([recentP, currentP])
+      const postedP = fetchPostedCurrentAcademicTerm({ signal: ac.signal })
+      const openP = fetchCurrentAcademicTerm({ signal: ac.signal })
+      const [recentR, postedR, openR] = await Promise.allSettled([recentP, postedP, openP])
       if (ac.signal.aborted) return
 
       let recent: AcademicTerm[] = []
-      let current: AcademicTerm | null = null
+      let posted: AcademicTerm | null = null
+      let open: AcademicTerm | null = null
       let anyRejected = false
 
       if (recentR.status === 'fulfilled') {
@@ -82,17 +86,24 @@ export function RegistrationHomePage() {
         anyRejected = true
         console.error('[registration/home] recent terms failed', recentR.reason)
       }
-      if (currentR.status === 'fulfilled') {
-        current = currentR.value
+      if (postedR.status === 'fulfilled') {
+        posted = postedR.value
       } else {
         anyRejected = true
-        console.error('[registration/home] current term failed', currentR.reason)
+        console.error('[registration/home] posted current term failed', postedR.reason)
+      }
+      if (openR.status === 'fulfilled') {
+        open = openR.value
+      } else {
+        anyRejected = true
+        console.error('[registration/home] registration_open current term failed', openR.reason)
       }
 
       setRecentTerms(recent)
-      setCurrentTerm(current)
-      const merged = mergeTermOptions(recent, current)
-      setSelectedId(pickDefaultRegistrationTermId(merged, current))
+      setPostedTerm(posted)
+      setRegistrationOpenTerm(open)
+      const merged = mergeTermOptions(recent, posted, open)
+      setSelectedId(pickDefaultRegistrationTermId(merged, posted, open))
 
       const haveAnyTerm = merged.length > 0
       if (!haveAnyTerm && anyRejected) {

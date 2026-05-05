@@ -6,6 +6,7 @@ import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import {
   fetchClinicalOfferedTimetable,
   fetchCurrentAcademicTerm,
+  fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   type AcademicTerm,
 } from '../../lib/api'
@@ -53,19 +54,25 @@ export function ClinicalOfferedTimetablePage({
   const t = useStudentPortalT()
   const [searchParams] = useSearchParams()
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
-  const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
+  const [postedTerm, setPostedTerm] = useState<AcademicTerm | null>(null)
+  const [registrationOpenTerm, setRegistrationOpenTerm] = useState<AcademicTerm | null>(null)
   const [termsReady, setTermsReady] = useState(false)
   const [slots, setSlots] = useState<Awaited<ReturnType<typeof fetchClinicalOfferedTimetable>>>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const options = useMemo(
-    () => mergeTermOptions(recentTerms, currentTerm),
-    [recentTerms, currentTerm],
+    () => mergeTermOptions(recentTerms, postedTerm, registrationOpenTerm),
+    [recentTerms, postedTerm, registrationOpenTerm],
   )
 
   const urlTerm = readRegistrationTermIdFromSearch(searchParams)
-  const selectedTermId = resolveSelectedRegistrationTermId(urlTerm, options, currentTerm)
+  const selectedTermId = resolveSelectedRegistrationTermId(
+    urlTerm,
+    options,
+    postedTerm,
+    registrationOpenTerm,
+  )
   const selectedTerm = useMemo(
     () => options.find((x) => x.id === selectedTermId) ?? null,
     [options, selectedTermId],
@@ -75,17 +82,20 @@ export function ClinicalOfferedTimetablePage({
     const ac = new AbortController()
     void (async () => {
       try {
-        const [recentR, currentR] = await Promise.all([
+        const [recentR, postedR, openR] = await Promise.all([
           fetchRecentAcademicTerms(3, { signal: ac.signal }),
+          fetchPostedCurrentAcademicTerm({ signal: ac.signal }),
           fetchCurrentAcademicTerm({ signal: ac.signal }),
         ])
         if (ac.signal.aborted) return
         setRecentTerms(recentR)
-        setCurrentTerm(currentR)
+        setPostedTerm(postedR)
+        setRegistrationOpenTerm(openR)
       } catch {
         if (ac.signal.aborted) return
         setRecentTerms([])
-        setCurrentTerm(null)
+        setPostedTerm(null)
+        setRegistrationOpenTerm(null)
       } finally {
         if (!ac.signal.aborted) setTermsReady(true)
       }

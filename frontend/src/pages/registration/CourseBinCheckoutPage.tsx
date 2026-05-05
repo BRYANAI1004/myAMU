@@ -2,9 +2,9 @@ import { useCallback, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
-import { postStudentEnroll } from '../../lib/api'
 import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { useCourseBin } from './CourseBinContext'
+import { registerFromCourseBinItems } from './registerFromCourseBinItems'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 
 export function CourseBinCheckoutPage() {
@@ -12,7 +12,7 @@ export function CourseBinCheckoutPage() {
   const registrationTermId = useRegistrationTermSearchParam()
   const { currentStudentId, isAuthenticated, reload: reloadStudentAccount } =
     useAccount()
-  const { items, clearCourseBin } = useCourseBin()
+  const { items } = useCourseBin()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -30,34 +30,19 @@ export function CourseBinCheckoutPage() {
       )
       return
     }
-    const sections = items
-      .map((i) => {
-        const schedule_track: 'EN' | 'CN' =
-          i.schedule_track === 'CN' ? 'CN' : 'EN'
-        return {
-          course_code: i.course_code.trim(),
-          section_code: i.section.trim(),
-          schedule_track,
-        }
-      })
-      .filter(
-        (s) =>
-          s.course_code !== '' &&
-          s.section_code !== '' &&
-          s.section_code !== '—',
-      )
-    if (sections.length === 0) {
-      setError(t('checkoutErrorAddSections'))
-      return
-    }
+
     setBusy(true)
     try {
-      const res = await postStudentEnroll({
+      const res = await registerFromCourseBinItems({
         studentId: currentStudentId,
-        academic_term_id: registrationTermId.trim(),
-        sections,
+        academicTermId: registrationTermId.trim(),
+        items,
+        t,
       })
-      clearCourseBin()
+      if (!res.ok) {
+        setError(res.message)
+        return
+      }
       const msg =
         res.insertedCount === 0
           ? t('checkoutSuccessAlreadyEnrolled')
@@ -65,20 +50,24 @@ export function CourseBinCheckoutPage() {
       setSuccess(msg)
       reloadStudentAccount()
       window.dispatchEvent(new Event(PORTAL_STUDENT_ENROLLMENT_CHANGED))
-      const termQs =
+      const termSearch =
         registrationTermId != null && registrationTermId.trim() !== ''
-          ? `?term=${encodeURIComponent(registrationTermId.trim())}`
+          ? `term=${encodeURIComponent(registrationTermId.trim())}`
           : ''
       window.setTimeout(() => {
-        navigate({ pathname: '/registration/course-bin', search: termQs }, { replace: true })
+        navigate(
+          {
+            pathname: '/registration/offered-timetable',
+            search: termSearch,
+            hash: 'registration-class-plan',
+          },
+          { replace: true },
+        )
       }, 1200)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('registrationFailedGeneric'))
     } finally {
       setBusy(false)
     }
   }, [
-    clearCourseBin,
     currentStudentId,
     items,
     navigate,
@@ -150,10 +139,11 @@ export function CourseBinCheckoutPage() {
           </button>
           <Link
             to={{
-              pathname: '/registration/course-bin',
+              pathname: '/registration/offered-timetable',
               search: registrationTermId
-                ? `?term=${encodeURIComponent(registrationTermId.trim())}`
+                ? `term=${encodeURIComponent(registrationTermId.trim())}`
                 : '',
+              hash: 'registration-class-plan',
             }}
             className="portal-btn portal-btn--secondary"
           >

@@ -11,6 +11,7 @@ import {
   type StudentTranscriptPreviewResponse,
   type StudentProgramProgressResponse,
 } from '../../lib/api'
+import { currentTermLabel } from '../../lib/academicCourseRecordsDisplay'
 import { ProgramProgressPanel } from '../../components/academics/ProgramProgressPanel'
 import { CourseFeedbackCell } from '../../components/academics/CourseFeedbackCell'
 import { CourseFeedbackModal } from '../../components/academics/CourseFeedbackModal'
@@ -66,6 +67,21 @@ function canShowWithdraw(row: EnrollmentHistoryRow): boolean {
   if (hasFinalGrade(row.grade)) return false
   const status = (row.status ?? '').trim().toLowerCase()
   return !['completed', 'withdrawn', 'dropped'].includes(status)
+}
+
+function formatWithdrawDeadlineForDisplay(
+  raw: string | null | undefined,
+  locale: PortalLocale,
+): string | null {
+  const ymd = raw?.trim().slice(0, 10) ?? ''
+  if (ymd === '' || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return null
+  const d = new Date(`${ymd}T12:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString(locale === 'zh' ? 'zh-TW' : 'en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 }
 
 export function AcademicsPortalPage() {
@@ -221,7 +237,7 @@ export function AcademicsPortalPage() {
         course_section_id: sectionId,
       })
       if (!res.success || res.removedCount < 1) {
-        setWithdrawError(t('withdrawalFailedGeneric'))
+        setWithdrawError(t('addDropWithdrawNoEnrollment'))
         return
       }
       setWithdrawTarget(null)
@@ -289,15 +305,65 @@ export function AcademicsPortalPage() {
             if (e.target === e.currentTarget && !withdrawing) setWithdrawTarget(null)
           }}
         >
-          <div className="portal-offered-section-modal" role="dialog" aria-modal="true">
-            <h2 className="portal-offered-section-modal__title">
-              Withdraw from {withdrawTarget.courseCode} - {courseRowDisplayTitle(withdrawTarget)}?
+          <div
+            className="portal-offered-section-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="academics-withdraw-modal-title"
+          >
+            <h2
+              id="academics-withdraw-modal-title"
+              className="portal-offered-section-modal__title"
+            >
+              {t('addDropWithdrawConfirm').replace(
+                '{code}',
+                withdrawTarget.courseCode.trim() || '—',
+              )}
             </h2>
+            <dl className="portal-offered-section-modal__dl">
+              <div>
+                <dt>{t('dropCourseModalCourseLabel')}</dt>
+                <dd>{withdrawTarget.courseCode.trim() || '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('dropCourseModalSectionLabel')}</dt>
+                <dd>{(withdrawTarget.sectionCode ?? '').trim() || '—'}</dd>
+              </div>
+              <div>
+                <dt>{t('dropCourseModalTermLabel')}</dt>
+                <dd>{currentTermLabel({ term: withdrawTarget.term, year: withdrawTarget.year })}</dd>
+              </div>
+              <div>
+                <dt>{t('dropCourseModalUnitsLabel')}</dt>
+                <dd>
+                  {withdrawTarget.credits != null && Number.isFinite(withdrawTarget.credits)
+                    ? String(withdrawTarget.credits)
+                    : '—'}
+                </dd>
+              </div>
+              <div>
+                <dt>{t('dropCourseModalWithdrawDeadlineLabel')}</dt>
+                <dd>
+                  {(() => {
+                    const wd = formatWithdrawDeadlineForDisplay(
+                      withdrawTarget.withdrawDeadline,
+                      locale,
+                    )
+                    return wd != null && wd !== ''
+                      ? wd
+                      : t('dropCourseModalWithdrawDeadlineNotSet')
+                  })()}
+                </dd>
+              </div>
+            </dl>
             <p className="portal-text-muted" style={{ margin: '0.75rem 0 0' }}>
-              This will update the registration status and record a W grade if applicable.
+              {t('academicsWithdrawModalBody')}
+            </p>
+            <p className="portal-text-muted" style={{ margin: '0.5rem 0 0' }}>
+              {t('dropCourseModalWWarning')}
             </p>
             {withdrawError ? (
-              <p className="portal-text-muted" style={{ margin: '0.75rem 0 0' }}>
+              <p className="portal-text-muted" style={{ margin: '0.75rem 0 0' }} role="alert">
                 {withdrawError}
               </p>
             ) : null}
@@ -312,11 +378,11 @@ export function AcademicsPortalPage() {
               </button>
               <button
                 type="button"
-                className="portal-btn portal-btn--secondary portal-btn--compact"
+                className="portal-btn portal-btn--primary portal-btn--compact"
                 disabled={withdrawing}
                 onClick={() => void confirmWithdraw()}
               >
-                {withdrawing ? t('droppingEllipsis') : 'Withdraw'}
+                {withdrawing ? t('withdrawingEllipsis') : t('withdrawButton')}
               </button>
             </div>
           </div>

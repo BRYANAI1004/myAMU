@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
 import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import {
   fetchAdminCourseSections,
   fetchApiJson,
+  fetchStudentEnrolledSections,
   type AdminCourseSection,
 } from '../../lib/api'
+import { useAccount } from '../../context/AccountContext'
+import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { formatDeliveryModeForDisplay } from '../../lib/deliveryMode'
 import { formatTimeHmsForDisplay, formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import {
   buildTimetablePlacedBlocksByDay,
-  STUDENT_REGISTRATION_TIMETABLE_GRID,
+  resolveOfferedTimetableGridOptions,
   timetableBodyHeightPx,
 } from '../../lib/timetableBlockLayout'
 import { formatWeekdaysLongFromStored, type WeekdayFull } from '../../lib/weekdaySchedule'
@@ -25,6 +29,7 @@ import {
   scheduleTrackDetailLabel,
 } from '../../lib/scheduleTrack'
 import {
+  courseBinKeyFromSectionFields,
   courseBinSectionKey,
   useCourseBin,
   type CourseBinItem,
@@ -33,9 +38,9 @@ import {
   adminSectionToCourseBinItem,
   type CatalogCourseLite,
 } from './sectionToCourseBinItem'
+import { ClassPlanPanel } from './ClassPlanPanel'
+import { RegistrationPlanCatalogSearch } from './RegistrationPlanCatalogSearch'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
-
-const OFFERED_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 
 type TimetableLangTab = 'en' | 'cn'
 
@@ -58,10 +63,40 @@ function cellText(value: string | number | null | undefined): string {
   return String(value).trim()
 }
 
+function sectionKey(sec: AdminCourseSection): string {
+  return courseBinKeyFromSectionFields({
+    course_code: sec.course_code,
+    section_code: sec.section_code,
+    schedule_track: sec.schedule_track,
+  })
+}
+
 function isSectionInBin(items: CourseBinItem[], sec: AdminCourseSection): boolean {
-  const k = courseBinSectionKey(sec.course_code, sec.section_code, sec.schedule_track)
+  const k = sectionKey(sec)
   return items.some(
     (x) => courseBinSectionKey(x.course_code, x.section, x.schedule_track) === k,
+  )
+}
+
+function isSectionEnrolledForTerm(enrolledKeys: Set<string>, sec: AdminCourseSection): boolean {
+  return enrolledKeys.has(sectionKey(sec))
+}
+
+/** Weekly grid: planned = in class planner; enrolled = on official schedule; available = neither. */
+function matchesWeeklyScheduleFilters(
+  sec: AdminCourseSection,
+  binItems: CourseBinItem[],
+  enrolledKeys: Set<string>,
+  showPlanned: boolean,
+  showAvailable: boolean,
+  showEnrolled: boolean,
+): boolean {
+  if (!showPlanned && !showAvailable && !showEnrolled) return true
+  const inBin = isSectionInBin(binItems, sec)
+  const enrolled = isSectionEnrolledForTerm(enrolledKeys, sec)
+  const available = !inBin && !enrolled
+  return (
+    (showPlanned && inBin) || (showEnrolled && enrolled) || (showAvailable && available)
   )
 }
 
@@ -71,6 +106,7 @@ type OfferedWeekGridProps = {
   bodyHeightPx: number
   catalogByCode: Map<string, CatalogCourseLite>
   binItems: CourseBinItem[]
+  enrolledKeys: Set<string>
   onSelectSection: (sec: AdminCourseSection) => void
   t: (key: StudentPortalKey) => string
 }
@@ -81,6 +117,7 @@ function OfferedTimetableWeekGrid({
   bodyHeightPx,
   catalogByCode,
   binItems,
+  enrolledKeys,
   onSelectSection,
   t,
 }: OfferedWeekGridProps) {
@@ -97,6 +134,8 @@ function OfferedTimetableWeekGrid({
           const colW = 100 / b.colCount
           const insetPx = 3
           const inBin = isSectionInBin(binItems, sec)
+          const enrolledOnly = !inBin && isSectionEnrolledForTerm(enrolledKeys, sec)
+          const reserved = inBin || enrolledOnly
           const cat = catalogByCode.get(cellText(sec.course_code).toUpperCase())
           const preferredTitle = getPreferredCourseTitle(
             cat ?? {
@@ -108,6 +147,7 @@ function OfferedTimetableWeekGrid({
           )
           const labelCore = `${sec.course_code} ${sec.section_code}. ${preferredTitle}`
           const ariaInBin = t('offeredInCourseBinOpenDetails').replace('{label}', labelCore)
+          const ariaEnrolled = t('offeredRegisteredOpenDetails').replace('{label}', labelCore)
           const ariaDefault = t('offeredViewDetailsFor').replace('{label}', labelCore)
           return (
             <button
@@ -116,7 +156,7 @@ function OfferedTimetableWeekGrid({
               className={[
                 'admin-timetable-v2__block',
                 'portal-offered-timetable__block',
-                inBin ? 'portal-offered-timetable__block--in-bin' : '',
+                reserved ? 'portal-offered-timetable__block--in-bin' : '',
               ]
                 .filter(Boolean)
                 .join(' ')}
@@ -127,12 +167,17 @@ function OfferedTimetableWeekGrid({
                 width: `calc(${colW}% - ${insetPx * 2}px)`,
               }}
               onClick={() => onSelectSection(sec)}
-              aria-label={inBin ? ariaInBin : ariaDefault}
+              aria-label={inBin ? ariaInBin : enrolledOnly ? ariaEnrolled : ariaDefault}
             >
               <span className="admin-timetable-v2__block-title">
                 {sec.course_code} {sec.section_code}
                 {inBin ? (
                   <span className="portal-offered-timetable__badge">{t('offeredAddedBadge')}</span>
+                ) : null}
+                {enrolledOnly ? (
+                  <span className="portal-offered-timetable__badge">
+                    {t('offeredRegisteredBadge')}
+                  </span>
                 ) : null}
               </span>
               <span className="admin-timetable-v2__block-subtitle">{preferredTitle}</span>
@@ -152,7 +197,9 @@ function OfferedTimetableWeekGrid({
 
 export function OfferedTimetablePage() {
   const t = useStudentPortalT()
+  const location = useLocation()
   const registrationTermId = useRegistrationTermSearchParam()
+  const { currentStudentId, isAuthenticated } = useAccount()
   const { items: binItems, addToCourseBin, removeFromCourseBin } = useCourseBin()
   const [detailSection, setDetailSection] = useState<AdminCourseSection | null>(null)
   const [sections, setSections] = useState<AdminCourseSection[] | null>(null)
@@ -161,6 +208,11 @@ export function OfferedTimetablePage() {
   const [error, setError] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [langTab, setLangTab] = useState<TimetableLangTab>('en')
+  const [weeklyFilterPlanned, setWeeklyFilterPlanned] = useState(true)
+  const [weeklyFilterAvailable, setWeeklyFilterAvailable] = useState(false)
+  const [weeklyFilterEnrolled, setWeeklyFilterEnrolled] = useState(false)
+  const [enrolledRefreshKey, setEnrolledRefreshKey] = useState(0)
+  const [enrolledSections, setEnrolledSections] = useState<AdminCourseSection[]>([])
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const showToast = useCallback((message: string) => {
@@ -177,6 +229,59 @@ export function OfferedTimetablePage() {
       if (toastTimerRef.current) clearTimeout(toastTimerRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    const onEnrollmentChanged = () => {
+      setEnrolledRefreshKey((k) => k + 1)
+    }
+    window.addEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    return () => {
+      window.removeEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (location.hash !== '#registration-class-plan') return
+    const el = document.getElementById('registration-class-plan')
+    if (el == null) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.hash, location.key])
+
+  const studentKey = currentStudentId?.trim() ?? ''
+  const termKey = registrationTermId?.trim() ?? ''
+
+  useEffect(() => {
+    if (!isAuthenticated || studentKey === '' || termKey === '') {
+      setEnrolledSections([])
+      return
+    }
+    const ac = new AbortController()
+    void (async () => {
+      try {
+        const { sections: rows } = await fetchStudentEnrolledSections(studentKey, termKey, {
+          signal: ac.signal,
+        })
+        if (!ac.signal.aborted) setEnrolledSections(rows)
+      } catch {
+        if (!ac.signal.aborted) setEnrolledSections([])
+      }
+    })()
+    return () => ac.abort()
+  }, [isAuthenticated, studentKey, termKey, enrolledRefreshKey])
+
+  const enrolledKeys = useMemo(() => {
+    const s = new Set<string>()
+    for (const row of enrolledSections) {
+      s.add(
+        courseBinKeyFromSectionFields({
+          course_code: row.course_code,
+          section_code: row.section_code,
+          schedule_track: row.schedule_track,
+        }),
+      )
+    }
+    return s
+  }, [enrolledSections])
 
   useEffect(() => {
     const ac = new AbortController()
@@ -239,11 +344,16 @@ export function OfferedTimetablePage() {
     return () => ac.abort()
   }, [registrationTermId, t])
 
+  const offeredGridOpts = useMemo(
+    () => resolveOfferedTimetableGridOptions(sections),
+    [sections],
+  )
+
   const hourRows = useMemo(() => {
-    const sh = OFFERED_GRID.startHour ?? 8
-    const eh = OFFERED_GRID.endHour ?? 18
+    const sh = offeredGridOpts.startHour ?? 8
+    const eh = offeredGridOpts.endHour ?? 12
     return Array.from({ length: eh - sh + 1 }, (_, i) => sh + i)
-  }, [])
+  }, [offeredGridOpts])
 
   const englishSections = useMemo(
     () =>
@@ -260,25 +370,73 @@ export function OfferedTimetablePage() {
     [sections],
   )
 
-  const placedEn = useMemo(
-    () => buildTimetablePlacedBlocksByDay(englishSections, OFFERED_GRID),
-    [englishSections],
+  const englishSectionsForGrid = useMemo(
+    () =>
+      englishSections.filter((s) =>
+        matchesWeeklyScheduleFilters(
+          s,
+          binItems,
+          enrolledKeys,
+          weeklyFilterPlanned,
+          weeklyFilterAvailable,
+          weeklyFilterEnrolled,
+        ),
+      ),
+    [
+      englishSections,
+      binItems,
+      enrolledKeys,
+      weeklyFilterPlanned,
+      weeklyFilterAvailable,
+      weeklyFilterEnrolled,
+    ],
   )
-  const placedCn = useMemo(
-    () => buildTimetablePlacedBlocksByDay(chineseSections, OFFERED_GRID),
-    [chineseSections],
+  const chineseSectionsForGrid = useMemo(
+    () =>
+      chineseSections.filter((s) =>
+        matchesWeeklyScheduleFilters(
+          s,
+          binItems,
+          enrolledKeys,
+          weeklyFilterPlanned,
+          weeklyFilterAvailable,
+          weeklyFilterEnrolled,
+        ),
+      ),
+    [
+      chineseSections,
+      binItems,
+      enrolledKeys,
+      weeklyFilterPlanned,
+      weeklyFilterAvailable,
+      weeklyFilterEnrolled,
+    ],
   )
 
-  const bodyHeightPx = timetableBodyHeightPx(OFFERED_GRID)
+  const placedEn = useMemo(
+    () => buildTimetablePlacedBlocksByDay(englishSectionsForGrid, offeredGridOpts),
+    [englishSectionsForGrid, offeredGridOpts],
+  )
+  const placedCn = useMemo(
+    () => buildTimetablePlacedBlocksByDay(chineseSectionsForGrid, offeredGridOpts),
+    [chineseSectionsForGrid, offeredGridOpts],
+  )
+
+  const bodyHeightPx = timetableBodyHeightPx(offeredGridOpts)
 
   const handleConfirmAddFromModal = useCallback(() => {
     if (detailSection == null) return
     if (isSectionInBin(binItems, detailSection)) return
+    if (isSectionEnrolledForTerm(enrolledKeys, detailSection)) {
+      showToast(t('offeredAlreadyEnrolledToast'))
+      setDetailSection(null)
+      return
+    }
     const cat = catalogByCode.get(cellText(detailSection.course_code).toUpperCase())
     addToCourseBin(adminSectionToCourseBinItem(detailSection, cat))
     showToast(t('toastAddedToCourseBin'))
     setDetailSection(null)
-  }, [addToCourseBin, binItems, catalogByCode, detailSection, showToast, t])
+  }, [addToCourseBin, binItems, catalogByCode, detailSection, enrolledKeys, showToast, t])
 
   const handleConfirmRemoveFromModal = useCallback(() => {
     if (detailSection == null) return
@@ -320,6 +478,8 @@ export function OfferedTimetablePage() {
       : ''
   const detailInBin =
     detailSection != null && isSectionInBin(binItems, detailSection)
+  const detailEnrolled =
+    detailSection != null && isSectionEnrolledForTerm(enrolledKeys, detailSection)
   const detailPrerequisiteDisplay = formatPrerequisiteCourseDisplay({
     courseCode: detailSection?.prerequisite_course_code,
     courseTitle: detailSection?.prerequisite_course_title,
@@ -333,7 +493,7 @@ export function OfferedTimetablePage() {
 
   return (
     <main
-      className="portal-page portal-offered-timetable"
+      className="portal-page portal-offered-timetable portal-registration-plan-page"
       data-registration-term={registrationTermId ?? undefined}
     >
       {toast != null && (
@@ -342,9 +502,14 @@ export function OfferedTimetablePage() {
         </div>
       )}
 
-      <section className="portal-card portal-stack" aria-labelledby="offered-timetable-heading">
+      <div className="portal-registration-plan-stack">
+        <details open className="portal-registration-plan-details">
+          <summary className="portal-registration-plan-details__summary">
+            {t('registrationPlanWeeklyHeading')}
+          </summary>
+          <div className="portal-registration-plan-details__body portal-stack">
         <div className="portal-offered-timetable__title-row">
-          <h2 id="offered-timetable-heading" className="portal-section-heading">
+          <h2 id="offered-timetable-heading" className="portal-section-heading portal-registration-plan-panel-title">
             {t('offeredTimetableHeading')}
           </h2>
           {showTimetableTabs ? (
@@ -397,6 +562,41 @@ export function OfferedTimetablePage() {
           </p>
         )}
 
+        {showTimetableTabs ? (
+          <fieldset className="portal-offered-timetable__schedule-filters">
+            <legend className="visually-hidden">{t('offeredTimetableFilterAria')}</legend>
+            <span className="portal-offered-timetable__schedule-filters-label">
+              {t('offeredTimetableFilterLabel')}:
+            </span>
+            <div className="portal-offered-timetable__schedule-filter-options">
+              <label className="portal-offered-timetable__schedule-filter-item">
+                <input
+                  type="checkbox"
+                  checked={weeklyFilterPlanned}
+                  onChange={(e) => setWeeklyFilterPlanned(e.target.checked)}
+                />
+                {t('offeredTimetableFilterPlanned')}
+              </label>
+              <label className="portal-offered-timetable__schedule-filter-item">
+                <input
+                  type="checkbox"
+                  checked={weeklyFilterAvailable}
+                  onChange={(e) => setWeeklyFilterAvailable(e.target.checked)}
+                />
+                {t('offeredTimetableFilterAvailable')}
+              </label>
+              <label className="portal-offered-timetable__schedule-filter-item">
+                <input
+                  type="checkbox"
+                  checked={weeklyFilterEnrolled}
+                  onChange={(e) => setWeeklyFilterEnrolled(e.target.checked)}
+                />
+                {t('offeredTimetableFilterEnrolled')}
+              </label>
+            </div>
+          </fieldset>
+        ) : null}
+
         {showTimetableTabs && langTab === 'en' ? (
           <div
             role="tabpanel"
@@ -407,6 +607,10 @@ export function OfferedTimetablePage() {
               <p className="portal-text-muted" role="status">
                 {t('offeredNoEnglishSections')}
               </p>
+            ) : englishSectionsForGrid.length === 0 ? (
+              <p className="portal-text-muted" role="status">
+                {t('offeredTimetableNoSectionsMatchFilter')}
+              </p>
             ) : (
               <OfferedTimetableWeekGrid
                 placedWeekdays={placedEn}
@@ -414,6 +618,7 @@ export function OfferedTimetablePage() {
                 bodyHeightPx={bodyHeightPx}
                 catalogByCode={catalogByCode}
                 binItems={binItems}
+                enrolledKeys={enrolledKeys}
                 onSelectSection={setDetailSection}
                 t={t}
               />
@@ -431,6 +636,10 @@ export function OfferedTimetablePage() {
               <p className="portal-text-muted" role="status">
                 {t('offeredNoChineseSections')}
               </p>
+            ) : chineseSectionsForGrid.length === 0 ? (
+              <p className="portal-text-muted" role="status">
+                {t('offeredTimetableNoSectionsMatchFilter')}
+              </p>
             ) : (
               <OfferedTimetableWeekGrid
                 placedWeekdays={placedCn}
@@ -438,13 +647,52 @@ export function OfferedTimetablePage() {
                 bodyHeightPx={bodyHeightPx}
                 catalogByCode={catalogByCode}
                 binItems={binItems}
+                enrolledKeys={enrolledKeys}
                 onSelectSection={setDetailSection}
                 t={t}
               />
             )}
           </div>
         ) : null}
-      </section>
+          </div>
+        </details>
+
+        <details open className="portal-registration-plan-details">
+          <summary className="portal-registration-plan-details__summary">
+            {t('registrationPlanSearchHeading')}
+          </summary>
+          <div className="portal-registration-plan-details__body portal-stack">
+            <p className="portal-text-muted" style={{ marginTop: 0 }}>
+              {t('registrationPlanSearchLede')}
+            </p>
+            <div role="search" aria-label={t('registrationPlanSearchHeading')}>
+              <RegistrationPlanCatalogSearch
+                termSections={sections ?? []}
+                catalogByCode={catalogByCode}
+                termMissing={termMissing}
+                binItems={binItems}
+                enrolledKeys={enrolledKeys}
+                addToCourseBin={addToCourseBin}
+                showToast={showToast}
+              />
+            </div>
+          </div>
+        </details>
+
+        <details open className="portal-registration-plan-details" id="registration-class-plan">
+          <summary className="portal-registration-plan-details__summary">
+            {t('registrationPlanClassPlanHeading')}
+          </summary>
+          <div className="portal-registration-plan-details__body">
+            <ClassPlanPanel
+              items={binItems}
+              enrolledKeys={enrolledKeys}
+              removeFromCourseBin={removeFromCourseBin}
+              showToast={showToast}
+            />
+          </div>
+        </details>
+      </div>
 
       {detailSection != null && (
         <div
@@ -520,7 +768,22 @@ export function OfferedTimetablePage() {
               </div>
             </dl>
             <div className="portal-offered-section-modal__actions">
-              {detailInBin ? (
+              {detailEnrolled ? (
+                <>
+                  <p className="portal-text-muted" style={{ margin: 0, flex: '1 1 auto' }}>
+                    {t('offeredModalAlreadyEnrolledNote')}
+                  </p>
+                  {detailInBin ? (
+                    <button
+                      type="button"
+                      className="portal-btn portal-btn--secondary portal-btn--compact"
+                      onClick={handleConfirmRemoveFromModal}
+                    >
+                      {t('removeFromCourseBin')}
+                    </button>
+                  ) : null}
+                </>
+              ) : detailInBin ? (
                 <button
                   type="button"
                   className="portal-btn portal-btn--secondary portal-btn--compact"

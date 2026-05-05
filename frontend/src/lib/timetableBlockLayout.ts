@@ -34,6 +34,60 @@ export const STUDENT_REGISTRATION_TIMETABLE_GRID: TimetableGridOptions = {
   endHour: TIMETABLE_END_HOUR,
 }
 
+/** Offered timetable default: 8:00 AM through 1:00 PM (same semantics as `endHour` elsewhere). */
+export const OFFERED_TIMETABLE_COMPACT_GRID: TimetableGridOptions = {
+  startHour: 8,
+  endHour: 12,
+}
+
+const OFFERED_COMPACT_START_MIN = 8 * 60
+/** Exclusive upper bound for the compact window (1:00 PM). */
+const OFFERED_COMPACT_END_MIN = 13 * 60
+const OFFERED_EXPANDED_EARLIEST_START_HOUR = 5
+
+/**
+ * Student offered timetable: compact 8:00–1:00 PM unless any section needs more range.
+ * If anything starts before 8:00 AM, `startHour` moves down (floor) but not earlier than 5:00 AM.
+ * If anything ends after 1:00 PM, `endHour` grows to fit (same rule as `Math.ceil(maxEnd/60)-1`).
+ */
+export function resolveOfferedTimetableGridOptions(
+  sections: readonly AdminCourseSection[] | null | undefined,
+): TimetableGridOptions {
+  if (sections == null || sections.length === 0) {
+    return OFFERED_TIMETABLE_COMPACT_GRID
+  }
+  let minStart = Infinity
+  let maxEnd = -Infinity
+  for (const s of sections) {
+    const st = timeToMinutes(s.start_time)
+    const en = timeToMinutes(s.end_time)
+    if (st == null || en == null || en <= st) continue
+    minStart = Math.min(minStart, st)
+    maxEnd = Math.max(maxEnd, en)
+  }
+  if (!Number.isFinite(minStart) || !Number.isFinite(maxEnd)) {
+    return OFFERED_TIMETABLE_COMPACT_GRID
+  }
+  const fitsCompact =
+    minStart >= OFFERED_COMPACT_START_MIN && maxEnd <= OFFERED_COMPACT_END_MIN
+  if (fitsCompact) {
+    return OFFERED_TIMETABLE_COMPACT_GRID
+  }
+  const startHour =
+    minStart < OFFERED_COMPACT_START_MIN
+      ? Math.max(OFFERED_EXPANDED_EARLIEST_START_HOUR, Math.floor(minStart / 60))
+      : OFFERED_TIMETABLE_COMPACT_GRID.startHour!
+  const endHourFromContent = Math.max(
+    OFFERED_TIMETABLE_COMPACT_GRID.endHour!,
+    Math.ceil(maxEnd / 60) - 1,
+  )
+  const endHour = Math.min(23, endHourFromContent)
+  if (startHour > endHour) {
+    return OFFERED_TIMETABLE_COMPACT_GRID
+  }
+  return { startHour, endHour }
+}
+
 function resolveGridHours(opts?: TimetableGridOptions): {
   startHour: number
   endHour: number

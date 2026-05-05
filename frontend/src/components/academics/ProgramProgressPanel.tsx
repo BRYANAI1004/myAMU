@@ -13,26 +13,25 @@ function formatAmount(value: number, isHours: boolean): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1)
 }
 
-function pieCompletedPath(earned: number, required: number): string | null {
+/** Pie slice from center; fractions are [0,1] of the full circle starting at top (−90°). */
+function pieSectorPath(fracStart: number, fracEnd: number): string | null {
+  if (!(fracEnd > fracStart)) return null
   const cx = 50
   const cy = 50
   const r = 42
-  if (required <= 0) return null
-  const frac = Math.min(1, Math.max(0, earned / required))
-  if (frac <= 0) return null
-  const start = -Math.PI / 2
+  const clamp = (f: number) => Math.min(1, Math.max(0, f))
+  const toAngle = (f: number) => -Math.PI / 2 + clamp(f) * 2 * Math.PI
+  const a0 = toAngle(fracStart)
+  const a1 = toAngle(fracEnd)
   const polar = (angle: number) => ({
     x: cx + r * Math.cos(angle),
     y: cy + r * Math.sin(angle),
   })
-  if (frac >= 1) {
-    return `M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx} ${cy + r} A ${r} ${r} 0 1 1 ${cx} ${cy - r} Z`
-  }
-  const split = start + frac * 2 * Math.PI
-  const p1 = polar(start)
-  const p2 = polar(split)
-  const largeCompleted = frac > 0.5 ? 1 : 0
-  return `M ${cx} ${cy} L ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeCompleted} 1 ${p2.x} ${p2.y} Z`
+  const p0 = polar(a0)
+  const p1 = polar(a1)
+  const sweep = a1 - a0
+  const largeArc = sweep > Math.PI ? 1 : 0
+  return `M ${cx} ${cy} L ${p0.x} ${p0.y} A ${r} ${r} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`
 }
 
 function bucketLabelKey(id: StudentProgramProgressResponse['buckets'][number]['id']): StudentPortalKey {
@@ -56,7 +55,7 @@ export type ProgramProgressPanelProps = {
   onRetry: () => void
 }
 
-type PieHover = 'completed' | 'remaining' | null
+type PieHover = 'completed' | 'inProgress' | 'remaining' | null
 
 export function ProgramProgressPanel({
   t,
@@ -96,14 +95,23 @@ export function ProgramProgressPanel({
 
   const req = progress.quarterUnitsRequired
   const earned = progress.quarterUnitsEarned
+  const inProgress = progress.quarterUnitsInProgress ?? 0
   const remaining = progress.quarterUnitsRemaining
-  const completedPath = pieCompletedPath(earned, req)
-  const completedFrac = req > 0 ? Math.min(1, Math.max(0, earned / req)) : 0
+
+  const fC = req > 0 ? Math.min(1, Math.max(0, earned / req)) : 0
+  const fI = req > 0 ? Math.min(1 - fC, Math.max(0, inProgress / req)) : 0
+
+  const pathRemaining = pieSectorPath(fC + fI, 1)
+  const pathInProgress = pieSectorPath(fC, fC + fI)
+  const pathCompleted = pieSectorPath(0, fC)
+
+  const completedFrac = fC
   const pctLabel =
     req > 0 ? `${Math.round(Math.min(1, Math.max(0, earned / req)) * 100)}%` : '—'
 
   const caption = t('programProgressPieCaption')
     .replace('{earned}', formatAmount(earned, false))
+    .replace('{inProgress}', formatAmount(inProgress, false))
     .replace('{required}', formatAmount(req, false))
     .replace('{remaining}', formatAmount(remaining, false))
 
@@ -116,6 +124,13 @@ export function ProgramProgressPanel({
           .replace('{required}', formatAmount(req, false))
           .replace('{pct}', pctForTip)
       : t('programProgressPieLegendCompleted')
+  const tooltipInProgress =
+    req > 0
+      ? t('programProgressTooltipInProgress').replace(
+          '{inProgress}',
+          formatAmount(inProgress, false),
+        )
+      : t('programProgressPieLegendInProgress')
   const tooltipRemaining =
     req > 0
       ? t('programProgressTooltipRemaining').replace('{remaining}', formatAmount(remaining, false))
@@ -145,9 +160,11 @@ export function ProgramProgressPanel({
           >
             {pieHover === 'completed'
               ? tooltipCompleted
-              : pieHover === 'remaining'
-                ? tooltipRemaining
-                : null}
+              : pieHover === 'inProgress'
+                ? tooltipInProgress
+                : pieHover === 'remaining'
+                  ? tooltipRemaining
+                  : null}
           </div>
           <svg
             className="portal-academics-program-progress__svg"
@@ -157,18 +174,27 @@ export function ProgramProgressPanel({
             aria-describedby={pieHover != null ? 'program-progress-pie-tooltip' : undefined}
           >
             <title>{caption}</title>
-            <circle
-              className="portal-academics-program-progress__slice portal-academics-program-progress__slice--remaining portal-academics-program-progress__slice--interactive"
-              cx={50}
-              cy={50}
-              r={42}
-              aria-hidden
-              onMouseEnter={() => setPieHover('remaining')}
-            />
-            {completedPath ? (
+            {pathRemaining ? (
+              <path
+                className="portal-academics-program-progress__slice portal-academics-program-progress__slice--remaining portal-academics-program-progress__slice--interactive"
+                d={pathRemaining}
+                aria-hidden
+                onMouseEnter={() => setPieHover('remaining')}
+              />
+            ) : null}
+            {pathInProgress ? (
+              <path
+                className="portal-academics-program-progress__slice portal-academics-program-progress__slice--in-progress portal-academics-program-progress__slice--interactive"
+                d={pathInProgress}
+                aria-hidden
+                onMouseEnter={() => setPieHover('inProgress')}
+              />
+            ) : null}
+            {pathCompleted ? (
               <path
                 className="portal-academics-program-progress__slice portal-academics-program-progress__slice--completed portal-academics-program-progress__slice--interactive"
-                d={completedPath}
+                d={pathCompleted}
+                aria-hidden
                 onMouseEnter={() => setPieHover('completed')}
               />
             ) : null}
@@ -193,6 +219,11 @@ export function ProgramProgressPanel({
               {req > 0 ? ` (${formatAmount(earned, false)} / ${formatAmount(req, false)})` : ''}
             </li>
             <li>
+              <span className="portal-academics-program-progress__swatch portal-academics-program-progress__swatch--in-progress" />
+              {t('programProgressPieLegendInProgress')}
+              {req > 0 ? ` (${formatAmount(inProgress, false)})` : ''}
+            </li>
+            <li>
               <span className="portal-academics-program-progress__swatch portal-academics-program-progress__swatch--remaining" />
               {t('programProgressPieLegendNeeded')}
               {req > 0 ? ` (${formatAmount(remaining, false)})` : ''}
@@ -211,6 +242,7 @@ export function ProgramProgressPanel({
                   <th scope="col">{t('programProgressColCategory')}</th>
                   <th scope="col">{t('programProgressColRequired')}</th>
                   <th scope="col">{t('programProgressColCompleted')}</th>
+                  <th scope="col">{t('programProgressColInProgress')}</th>
                   <th scope="col">{t('programProgressColRemaining')}</th>
                 </tr>
               </thead>
@@ -218,6 +250,7 @@ export function ProgramProgressPanel({
                 {progress.buckets.map((b) => {
                   const hours = b.unitKind === 'clinical_hours'
                   const unit = hours ? t('programProgressHoursAbbr') : t('programProgressUnitsAbbr')
+                  const ip = b.inProgress ?? 0
                   return (
                     <tr key={b.id}>
                       <th scope="row">{t(bucketLabelKey(b.id))}</th>
@@ -226,6 +259,9 @@ export function ProgramProgressPanel({
                       </td>
                       <td>
                         {formatAmount(b.completed, hours)} {unit}
+                      </td>
+                      <td>
+                        {formatAmount(ip, hours)} {unit}
                       </td>
                       <td>
                         {formatAmount(b.remaining, hours)} {unit}

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useSearchParams } from 'react-router-dom'
-import { useStudentPortalT } from '@/LanguageContext'
+import { useOptionalPortalLocale, useStudentPortalT } from '@/LanguageContext'
 import { BackToDashboardLink } from '../../components/BackToDashboardLink'
 import {
   fetchCurrentAcademicTerm,
+  fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   type AcademicTerm,
   type AcademicTermName,
@@ -17,6 +18,18 @@ import {
   REGISTRATION_TERMS_LOAD_ERROR,
   resolveSelectedRegistrationTermId,
 } from './registrationTermSearch'
+
+function formatPortalToday(locale: 'en' | 'zh'): { iso: string; label: string } {
+  const d = new Date()
+  const iso = d.toISOString().slice(0, 10)
+  const label = d.toLocaleDateString(locale === 'zh' ? 'zh-TW' : 'en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+  return { iso, label }
+}
 
 /** Lets `?term=<id>` stay valid when the id is not in recent/current (admin may still schedule it). */
 function academicTermStubForDeepLink(termId: string): AcademicTerm {
@@ -45,20 +58,23 @@ function academicTermStubForDeepLink(termId: string): AcademicTerm {
 
 export function RegistrationLayout() {
   const t = useStudentPortalT()
+  const locale = useOptionalPortalLocale()
   const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const isClinicalSection = pathname.startsWith('/registration/clinical')
+
   const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
-  const [currentTerm, setCurrentTerm] = useState<AcademicTerm | null>(null)
+  const [postedTerm, setPostedTerm] = useState<AcademicTerm | null>(null)
+  const [registrationOpenTerm, setRegistrationOpenTerm] = useState<AcademicTerm | null>(null)
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [loadError, setLoadError] = useState<string | null>(null)
 
   const options = useMemo(() => {
-    const merged = mergeTermOptions(recentTerms, currentTerm)
+    const merged = mergeTermOptions(recentTerms, postedTerm, registrationOpenTerm)
     const urlT = readRegistrationTermIdFromSearch(searchParams)?.trim() ?? ''
     if (urlT === '' || merged.some((t) => t.id === urlT)) return merged
     return [academicTermStubForDeepLink(urlT), ...merged]
-  }, [recentTerms, currentTerm, searchParams])
+  }, [recentTerms, postedTerm, registrationOpenTerm, searchParams])
 
   useEffect(() => {
     const ac = new AbortController()
@@ -66,12 +82,14 @@ export function RegistrationLayout() {
     setLoadError(null)
     void (async () => {
       const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
-      const currentP = fetchCurrentAcademicTerm({ signal: ac.signal })
-      const [recentR, currentR] = await Promise.allSettled([recentP, currentP])
+      const postedP = fetchPostedCurrentAcademicTerm({ signal: ac.signal })
+      const openP = fetchCurrentAcademicTerm({ signal: ac.signal })
+      const [recentR, postedR, openR] = await Promise.allSettled([recentP, postedP, openP])
       if (ac.signal.aborted) return
 
       let recent: AcademicTerm[] = []
-      let current: AcademicTerm | null = null
+      let posted: AcademicTerm | null = null
+      let open: AcademicTerm | null = null
       let anyRejected = false
 
       if (recentR.status === 'fulfilled') {
@@ -80,17 +98,24 @@ export function RegistrationLayout() {
         anyRejected = true
         console.error('[registration/layout] recent terms failed', recentR.reason)
       }
-      if (currentR.status === 'fulfilled') {
-        current = currentR.value
+      if (postedR.status === 'fulfilled') {
+        posted = postedR.value
       } else {
         anyRejected = true
-        console.error('[registration/layout] current term failed', currentR.reason)
+        console.error('[registration/layout] posted current term failed', postedR.reason)
+      }
+      if (openR.status === 'fulfilled') {
+        open = openR.value
+      } else {
+        anyRejected = true
+        console.error('[registration/layout] registration_open current term failed', openR.reason)
       }
 
       setRecentTerms(recent)
-      setCurrentTerm(current)
+      setPostedTerm(posted)
+      setRegistrationOpenTerm(open)
 
-      const merged = mergeTermOptions(recent, current)
+      const merged = mergeTermOptions(recent, posted, open)
       const haveAnyTerm = merged.length > 0
       if (!haveAnyTerm && anyRejected) {
         setLoadState('error')
@@ -108,7 +133,8 @@ export function RegistrationLayout() {
     const resolvedId = resolveSelectedRegistrationTermId(
       urlTerm,
       options,
-      currentTerm,
+      postedTerm,
+      registrationOpenTerm,
     )
 
     if (options.length === 0) {
@@ -139,7 +165,7 @@ export function RegistrationLayout() {
         { replace: true },
       )
     }
-  }, [loadState, options, currentTerm, searchParams, setSearchParams])
+  }, [loadState, options, postedTerm, registrationOpenTerm, searchParams, setSearchParams])
 
   useEffect(() => {
     const section = searchParams.get('section')
@@ -172,13 +198,16 @@ export function RegistrationLayout() {
   const selectedTermId = resolveSelectedRegistrationTermId(
     urlTerm,
     options,
-    currentTerm,
+    postedTerm,
+    registrationOpenTerm,
   )
 
   const termLinkSearch =
     selectedTermId.trim() !== '' ? `?term=${encodeURIComponent(selectedTermId.trim())}` : ''
 
   const courseBinKey = selectedTermId.trim() !== '' ? selectedTermId.trim() : 'none'
+
+  const today = formatPortalToday(locale)
 
   return (
     <CourseBinProvider key={courseBinKey} registrationTermId={selectedTermId.trim()}>
@@ -195,7 +224,16 @@ export function RegistrationLayout() {
             className="portal-registration-layout-term"
             aria-labelledby="registration-layout-term-label"
           >
-            <div className="portal-registration-layout-term__row">
+            <div
+              className={[
+                'portal-registration-layout-term__row',
+                loadState === 'ready' && options.length > 0
+                  ? 'portal-registration-layout-term__row--with-today-date'
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
               <span id="registration-layout-term-label" className="portal-registration-layout-term__title">
                 {t('selectTerm')}
               </span>
@@ -241,6 +279,15 @@ export function RegistrationLayout() {
                     </option>
                   ))}
                 </select>
+              ) : null}
+              {loadState === 'ready' && options.length > 0 ? (
+                <time
+                  className="portal-registration-layout-term__today"
+                  dateTime={today.iso}
+                  aria-label={t('registrationLayoutTodayAria')}
+                >
+                  {today.label}
+                </time>
               ) : null}
             </div>
             {loadState === 'ready' && options.length > 0 ? (

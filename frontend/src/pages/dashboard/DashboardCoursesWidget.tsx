@@ -9,6 +9,7 @@ import { useAccount } from '../../context/AccountContext'
 import {
   fetchAcademicTerms,
   fetchCurrentAcademicTerm,
+  fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   fetchStudentEnrolledSections,
   fetchStudentRegisteredScheduleRowsForTerm,
@@ -305,16 +306,19 @@ export function DashboardCoursesWidget() {
     const ac = new AbortController()
     void (async () => {
       const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
-      const currentP = fetchCurrentAcademicTerm({ signal: ac.signal })
-      const [recentR, currentR] = await Promise.allSettled([recentP, currentP])
+      const postedP = fetchPostedCurrentAcademicTerm({ signal: ac.signal })
+      const openP = fetchCurrentAcademicTerm({ signal: ac.signal })
+      const [recentR, postedR, openR] = await Promise.allSettled([recentP, postedP, openP])
       if (ac.signal.aborted) return
 
       let recent: Awaited<ReturnType<typeof fetchRecentAcademicTerms>> = []
-      let current: Awaited<ReturnType<typeof fetchCurrentAcademicTerm>> = null
+      let posted: Awaited<ReturnType<typeof fetchPostedCurrentAcademicTerm>> = null
+      let open: Awaited<ReturnType<typeof fetchCurrentAcademicTerm>> = null
       if (recentR.status === 'fulfilled') recent = recentR.value
-      if (currentR.status === 'fulfilled') current = currentR.value
+      if (postedR.status === 'fulfilled') posted = postedR.value
+      if (openR.status === 'fulfilled') open = openR.value
 
-      const merged = mergeTermOptions(recent, current)
+      const merged = mergeTermOptions(recent, posted, open)
       if (ac.signal.aborted) return
       setRegistrationMergedScheduleTerms(
         merged.map((t) => ({

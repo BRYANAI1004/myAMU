@@ -10,7 +10,7 @@ export const STUDENT_PORTAL_EN = {
   // Nav & shell
   registrationModule: 'Registration',
   logout: 'Logout',
-  finances: 'Make a Payment',
+  finances: 'AMUbill',
   academics: 'Academic Records',
   clinicalModule: 'Clinical',
   documents: 'Documents',
@@ -176,6 +176,7 @@ export const STUDENT_PORTAL_EN = {
 
   // Registration
   selectTerm: 'Select Term',
+  registrationLayoutTodayAria: "Today's date",
   loadingTerms: 'Loading terms…',
   couldNotLoadTerms: 'Could not load terms.',
   noAcademicTermsAvailable: 'No academic terms available.',
@@ -187,7 +188,6 @@ export const STUDENT_PORTAL_EN = {
   registrationSectionClinical: 'Clinical',
   courseSearch: 'Course Search',
   offeredTimetable: 'Offered Timetable',
-  myCourseBin: 'My CourseBin',
   addDrop: 'Add/Drop',
   myTimetable: 'My Timetable',
   navOverview: 'Overview',
@@ -451,7 +451,7 @@ export const STUDENT_PORTAL_EN = {
   couldNotLoadProgramProgress: 'Could not load program progress.',
   programProgressQuarterUnitsTitle: 'Quarter units (non-clinical)',
   programProgressPieCaption:
-    '{earned} of {required} units completed; {remaining} units still needed toward the configured requirement.',
+    '{earned} completed, {inProgress} in progress, {remaining} still needed of {required} configured quarter units.',
   programProgressBreakdownTitle: 'Requirement breakdown',
   programProgressColCategory: 'Category',
   programProgressBucketDidactic: 'Didactic units',
@@ -459,17 +459,21 @@ export const STUDENT_PORTAL_EN = {
   programProgressBucketClinical: 'Clinical internship hours',
   programProgressColRequired: 'Required',
   programProgressColCompleted: 'Completed',
+  programProgressColInProgress: 'In progress',
   programProgressColRemaining: 'Remaining',
   programProgressUnitsAbbr: 'units',
   programProgressHoursAbbr: 'hrs',
   programProgressPieLegendCompleted: 'Completed',
+  programProgressPieLegendInProgress: 'In progress',
   programProgressPieLegendNeeded: 'Still needed',
   programProgressTooltipCompleted:
     'Completed: {earned} of {required} quarter units ({pct}% of the configured requirement).',
+  programProgressTooltipInProgress:
+    'In progress: {inProgress} quarter units from active enrollments (not yet completed on your record).',
   programProgressTooltipRemaining:
     'Still needed: {remaining} quarter units to reach the configured requirement.',
   programProgressFootnote:
-    'Figures follow the portal catalog and your unofficial transcript. Official graduation clearance may differ.',
+    'Figures follow the portal catalog and your unofficial transcript. In progress reflects active marks and portal registrations with credits. Category rows use the MAHM curriculum map; course codes only in the live portal catalog (not that map) count as didactic until mapped. Official graduation clearance may differ.',
 
   // Enrollment status (registration history table)
   enrollmentStatusActive: 'Active',
@@ -855,12 +859,11 @@ export const STUDENT_PORTAL_EN = {
   registrationNoTermsAvailable: 'No academic terms available.',
   registrationTermFieldLabel: 'Registration term',
   registrationServicesHeading: 'Registration services',
-  regActionAddDropTitle: 'CourseBin & registered courses',
-  regActionAddDropDesc:
-    'Plan sections in CourseBin, complete checkout to register, and drop enrolled courses using official withdrawal rules.',
   regActionCourseSearchTitle: 'Course Search',
   regActionCourseSearchDesc:
     'Browse sections, seats, and meeting times before you register.',
+  regActionOfferedTimetableDesc:
+    'View English and Chinese weekly grids of scheduled sections for this term; add to CourseBin from the timetable.',
   regActionMyTimetableTitle: 'My Timetable',
   regActionMyTimetableDesc:
     'View your weekly class schedule on the Dashboard.',
@@ -914,19 +917,15 @@ export const STUDENT_PORTAL_EN = {
   checkoutErrorAddSections:
     'Add at least one section with a valid section code to your CourseBin.',
   checkoutSuccessAlreadyEnrolled:
-    'You were already enrolled in the selected course(s) for this term. Your CourseBin has been cleared.',
+    'You were already enrolled in the selected course(s) for this term. Your plan and CourseBin are unchanged.',
   checkoutSuccessAddedCount:
-    'Registration saved ({n} course(s) added). Your CourseBin has been cleared.',
+    'Registration saved ({n} course(s) added). Your plan and CourseBin are unchanged so you can continue to Finances or adjust sections.',
   registrationFailedGeneric: 'Registration failed.',
   courseBinSectionsCount: 'Sections in CourseBin:',
   registeringEllipsis: 'Registering…',
   registerButton: 'Register',
-  backToCourseBin: 'Back to CourseBin',
+  backToCourseBin: 'Back to plan & schedule',
 
-  myCourseBinLede:
-    'Sections you add from Course Search or the Offered Timetable appear here before registration is finalized.',
-  myCourseBinNotRegisteredHint:
-    'These sections are not registered yet. Remove only deletes them from your CourseBin.',
   courseBinRemoveButton: 'Remove',
   registeredCoursesHeading: 'Registered Courses',
   registeredCoursesLede:
@@ -979,6 +978,8 @@ export const STUDENT_PORTAL_EN = {
     'No active enrollment was withdrawn. Refresh and try again if this persists.',
   addDropCourseWithdrawn: 'Course withdrawn.',
   withdrawalFailedGeneric: 'Withdrawal failed.',
+  academicsWithdrawModalBody:
+    'Your enrollment status will be updated to withdrawn. Unofficial records will show a W for this course. Official transcripts follow registrar rules.',
   noRegisteredCoursesThisTerm: 'No registered courses for this term.',
   addDropRegisteredSectionsCaption:
     'Your registered course sections for the selected term',
@@ -1000,10 +1001,58 @@ export const STUDENT_PORTAL_EN = {
     'These entries do not have enough schedule detail to place on the timetable.',
   prerequisiteLabel: 'Prerequisite',
 
+  registrationPlanWeeklyHeading: 'Weekly schedule',
+  registrationPlanSearchHeading: 'Search for class and add to plan',
+  registrationPlanSearchLede:
+    'Search the course catalog for this term, then add sections to your plan from the results or from the weekly schedule above.',
+  registrationPlanSearchByLabel: 'Search by:',
+  registrationPlanSearchSubjectPlaceholder: 'Subject, title, or course code',
+  registrationPlanSearchNumberPlaceholder: 'Course number (e.g. 1 matches 101, 11, 510)',
+  registrationPlanSearchGo: 'Search',
+  registrationPlanSearchNoMatches: 'No matching courses.',
+  registrationPlanSearchResultsAria: 'Courses offered this term that match your search',
+  registrationPlanSearchNoTermMatches: 'No offered courses match this search for the selected term.',
+  registrationPlanSearchNoSectionsForCourse: 'No section rows were returned for this course this term.',
+  registrationPlanSearchSubmit: 'Search catalog',
+  registrationPlanClassPlanHeading: 'Class plan',
+  registrationPlanClassPlanEmpty:
+    'You have no courses in your class plan yet. Tap a section on the schedule above to add it, or search the catalog.',
+  registrationPlanClassPlanCaption: 'Courses in your class plan for this term',
+  registrationPlanCardTitle: 'Class {n}: {code} — {title}',
+  registrationPlanSectionLine: '{section} — {subtitle}',
+  registrationPlanFinalExamLine: 'Final exam: None listed / consult instructor.',
+  registrationPlanClassDetailCaption: 'Schedule details for {code}',
+  registrationPlanColChange: 'Change',
+  registrationPlanChangeButtonTitle:
+    'Open options to enroll with this plan or remove this section from your class planner.',
+  registrationPlanOptionsModalTitle: 'OPTIONS',
+  registrationPlanOptionsModalCourseLead: '{code} — {title} has the following options:',
+  registrationPlanOptionsModalSectionsIntro: 'Planned section:',
+  registrationPlanOptionsModalEnrollLead:
+    'Enroll completes registration for this section only. Tuition and term fees follow your student ledger for this term. Use Remove from planner if you only want to drop it from this list.',
+  registrationPlanOptionsModalRemoveFromPlanner: 'Remove from class planner',
+  registrationPlanColStatus: 'Status',
+  registrationPlanStatusInPlan: 'In plan',
+  registrationPlanStatusEnrolled: 'Enrolled',
+  registrationPlanColInfo: 'Info',
+  registrationPlanInfoBadgeTitle: 'Course details are shown above; use course search for catalog information.',
+  registrationPlanNavLabel: 'Plan & schedule',
+  registrationPlanEnrollmentNote:
+    'Use Change: Enroll registers this section for the term (same as checkout) so it appears on your record and tuition ledger. Remove from planner only removes it from this plan, not from registration.',
+  registrationPlanHomeTitle: 'Plan & schedule',
+  registrationPlanHomeDesc:
+    'Weekly offerings, catalog search, and your class plan (CourseBin) for the selected term — checkout when ready.',
   offeredTimetableHeading: 'Offered Timetable',
   offeredTimetableLanguageAria: 'Timetable language',
   offeredTimetableTabEnglish: 'English Timetable',
   offeredTimetableTabChinese: 'Chinese Timetable',
+  offeredTimetableFilterAria: 'Weekly schedule section filters',
+  offeredTimetableFilterLabel: 'Show',
+  offeredTimetableFilterPlanned: 'Planned',
+  offeredTimetableFilterAvailable: 'Available',
+  offeredTimetableFilterEnrolled: 'Enrolled',
+  offeredTimetableNoSectionsMatchFilter:
+    'No sections match the filters for this timetable. Turn a category back on to see classes.',
   offeredSelectTermForOfferings: 'Select an academic term above to view offerings.',
   offeredLoadingTimetable: 'Loading timetable…',
   offeredNoEnglishSections: 'No English timetable sections scheduled for this term.',
@@ -1015,6 +1064,13 @@ export const STUDENT_PORTAL_EN = {
   offeredViewDetailsFor: 'View details for {label}',
   offeredInCourseBinOpenDetails: '{label}, in CourseBin — open details',
   offeredAddedBadge: ' Added',
+  offeredRegisteredBadge: ' Enrolled',
+  offeredRegisteredOpenDetails: '{label}, already on your schedule — open details',
+  offeredAlreadyEnrolledToast: 'You are already registered for this section.',
+  offeredModalAlreadyEnrolledNote:
+    'This section is already on your official schedule for the term. Remove it from My Course Bin only if it appears there, or use Academics to withdraw if allowed.',
+  checkoutErrorAllAlreadyEnrolled:
+    'Every section in your Course Bin is already on your schedule. Nothing new to register.',
   offeredModalDtCourseCode: 'Course code',
   offeredModalDtCourseTitle: 'Course title',
   offeredModalDtAlternateTitle: 'Alternate title',
@@ -1421,7 +1477,7 @@ export type StudentPortalKey = keyof typeof STUDENT_PORTAL_EN
 const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationModule: '選課註冊',
   logout: '登出',
-  finances: '立即繳費',
+  finances: 'AMUbill',
   academics: '學業紀錄',
   clinicalModule: '臨床實習',
   documents: '文件',
@@ -1573,6 +1629,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   clinicalBookingPaymentHoldExpired: '此臨床預約費用之付款期限已過。',
 
   selectTerm: '選擇學期',
+  registrationLayoutTodayAria: '今日日期',
   loadingTerms: '正在載入學期…',
   couldNotLoadTerms: '無法載入學期。',
   noAcademicTermsAvailable: '目前沒有可用的學期。',
@@ -1583,7 +1640,6 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationSectionClinical: '臨床',
   courseSearch: '課程搜尋',
   offeredTimetable: '開課時間表',
-  myCourseBin: '我的課程暫存',
   addDrop: '加退選',
   myTimetable: '我的課表',
   navOverview: '總覽',
@@ -1829,7 +1885,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   couldNotLoadProgramProgress: '無法載入學程進度。',
   programProgressQuarterUnitsTitle: '季制學分（非臨床）',
   programProgressPieCaption:
-    '已修 {required} 單位中之 {earned} 單位；尚餘 {remaining} 單位未達目前設定之要求。',
+    '已完成 {earned}、進行中 {inProgress}、尚缺 {remaining}（應修 {required} 季制學分）。',
   programProgressBreakdownTitle: '要求項目明細',
   programProgressColCategory: '項目',
   programProgressBucketDidactic: '講授學分',
@@ -1837,16 +1893,20 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   programProgressBucketClinical: '臨床實習時數',
   programProgressColRequired: '應修',
   programProgressColCompleted: '已完成',
+  programProgressColInProgress: '進行中',
   programProgressColRemaining: '尚缺',
   programProgressUnitsAbbr: '單位',
   programProgressHoursAbbr: '小時',
   programProgressPieLegendCompleted: '已完成',
+  programProgressPieLegendInProgress: '進行中',
   programProgressPieLegendNeeded: '尚缺',
   programProgressTooltipCompleted:
     '已完成：{required} 單位中之 {earned} 單位（約為設定要求之 {pct}%）。',
+  programProgressTooltipInProgress:
+    '進行中：目前註冊／修課中且尚未完成成績之 {inProgress} 單位。',
   programProgressTooltipRemaining: '尚缺：距設定要求尚餘 {remaining} 單位。',
   programProgressFootnote:
-    '數據依入口網站課程目錄與非正式成績單計算；正式畢業審核以註冊組為準。',
+    '數據依入口網站課程目錄與非正式成績單計算；「進行中」含成績系統與入口網站之在學中課程學分。分類列依 MAHM 課程對照表；僅出現在線上目錄而未列入對照表之課號，暫計入「主修課程學分」之進行中。正式畢業審核以註冊組為準。',
 
   enrollmentStatusActive: '進行中',
   enrollmentStatusCompleted: '已完成',
@@ -2207,11 +2267,10 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationNoTermsAvailable: '目前沒有可用的學年學期。',
   registrationTermFieldLabel: '註冊學期',
   registrationServicesHeading: '註冊服務',
-  regActionAddDropTitle: '課程暫存與已選課程',
-  regActionAddDropDesc:
-    '於課程暫存規劃班級、於註冊確認完成選課，並依校方退選規則辦理已選課程之退選。',
   regActionCourseSearchTitle: '課程搜尋',
   regActionCourseSearchDesc: '註冊前瀏覽班級、名額與上課時間。',
+  regActionOfferedTimetableDesc:
+    '檢視本學期中、英文軌每週課表；可於課表上將班級加入課程暫存。',
   regActionMyTimetableTitle: '我的課表',
   regActionMyTimetableDesc: '於主控台檢視本學期每週上課時間表。',
   regActionRegistrationFormTitle: '註冊表單',
@@ -2258,18 +2317,15 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   checkoutErrorSignIn: '請先登入後再註冊。',
   checkoutErrorAddSections: '請至少將一個有效班級代碼加入課程暫存。',
   checkoutSuccessAlreadyEnrolled:
-    '您已選修所選課程，課程暫存已清空。',
-  checkoutSuccessAddedCount: '註冊已儲存（已新增 {n} 門課程）。課程暫存已清空。',
+    '您已選修所選課程；排課規劃與課程暫存維持不變。',
+  checkoutSuccessAddedCount:
+    '註冊已儲存（已新增 {n} 門課程）。排課規劃與課程暫存維持不變，可繼續前往帳務付款或再調整班級。',
   registrationFailedGeneric: '註冊失敗。',
   courseBinSectionsCount: '課程暫存中的班級：',
   registeringEllipsis: '註冊中…',
   registerButton: '註冊',
-  backToCourseBin: '返回課程暫存',
+  backToCourseBin: '返回排課與規劃',
 
-  myCourseBinLede:
-    '從課程搜尋或開課時間表加入的班級會顯示於此，直至完成註冊。',
-  myCourseBinNotRegisteredHint:
-    '以下班級尚未完成正式註冊。「移除」僅會從課程暫存刪除，不影響選課紀錄。',
   courseBinRemoveButton: '移除',
   registeredCoursesHeading: '已註冊課程',
   registeredCoursesLede:
@@ -2316,6 +2372,8 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   addDropWithdrawNoEnrollment: '未成功退選。若持續發生請重新整理後再試。',
   addDropCourseWithdrawn: '已辦理退選。',
   withdrawalFailedGeneric: '退選失敗。',
+  academicsWithdrawModalBody:
+    '退選後註冊狀態將更新為已退選；非正式成績單會顯示 W。正式成績單依註冊組規定辦理。',
   noRegisteredCoursesThisTerm: '本學期尚無已選課程。',
   addDropRegisteredSectionsCaption: '所選學期之已註冊班級',
   withdrawingEllipsis: '退選中…',
@@ -2335,10 +2393,57 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationScheduleUnplacedHelp: '以下項目缺乏足夠排課細節，無法置於課表。',
   prerequisiteLabel: '先修課程',
 
+  registrationPlanWeeklyHeading: '每週課表',
+  registrationPlanSearchHeading: '搜尋課程並加入規劃',
+  registrationPlanSearchLede:
+    '依本學期搜尋課程目錄，於結果或上方課表中將班級加入規劃。',
+  registrationPlanSearchByLabel: '搜尋方式：',
+  registrationPlanSearchSubjectPlaceholder: '科目、課名或課程代碼',
+  registrationPlanSearchNumberPlaceholder: '課程序號（如輸入 1 可對到 101、11、510）',
+  registrationPlanSearchGo: '搜尋',
+  registrationPlanSearchNoMatches: '沒有符合的課程。',
+  registrationPlanSearchResultsAria: '符合搜尋的本學期開課課程',
+  registrationPlanSearchNoTermMatches: '本學期開課中沒有符合此搜尋的課程。',
+  registrationPlanSearchNoSectionsForCourse: '本學期此課程尚無班級資料。',
+  registrationPlanSearchSubmit: '搜尋目錄',
+  registrationPlanClassPlanHeading: '課程規劃',
+  registrationPlanClassPlanEmpty:
+    '目前尚無課程在規劃中。請點選上方課表班級加入，或使用課程搜尋。',
+  registrationPlanClassPlanCaption: '本學期課程規劃（課程暫存）',
+  registrationPlanCardTitle: '第 {n} 門：{code} — {title}',
+  registrationPlanSectionLine: '{section} — {subtitle}',
+  registrationPlanFinalExamLine: '期末考：未公告／請洽授課教師。',
+  registrationPlanClassDetailCaption: '{code} 排課細節',
+  registrationPlanColChange: '變更',
+  registrationPlanChangeButtonTitle: '開啟選項，可完成註冊或從課程規劃移除此班級。',
+  registrationPlanOptionsModalTitle: '選項',
+  registrationPlanOptionsModalCourseLead: '{code} — {title} 提供下列操作：',
+  registrationPlanOptionsModalSectionsIntro: '規劃中的班級：',
+  registrationPlanOptionsModalEnrollLead:
+    '「註冊／選課」僅正式登錄此班；學費與本學期費用將依學生帳戶／帳本計入。若只想從此清單移除而未登錄，請用「從課程規劃移除」。',
+  registrationPlanOptionsModalRemoveFromPlanner: '從課程規劃移除',
+  registrationPlanColStatus: '狀態',
+  registrationPlanStatusInPlan: '規劃中',
+  registrationPlanStatusEnrolled: '已選',
+  registrationPlanColInfo: '資訊',
+  registrationPlanInfoBadgeTitle: '課程說明見上方；完整資料請至課程目錄搜尋。',
+  registrationPlanNavLabel: '排課與規劃',
+  registrationPlanEnrollmentNote:
+    '請使用「變更」：「註冊／選課」會正式登錄此班（與結帳頁註冊相同），並計入本學期帳務／學費。「從課程規劃移除」僅從此規劃移除，不影響已登錄選課。',
+  registrationPlanHomeTitle: '排課與規劃',
+  registrationPlanHomeDesc:
+    '本學期開課課表、課程搜尋與課程暫存規劃；完成後可前往結帳。',
   offeredTimetableHeading: '開課時間表',
   offeredTimetableLanguageAria: '課表語言',
   offeredTimetableTabEnglish: '英文課表',
   offeredTimetableTabChinese: '中文課表',
+  offeredTimetableFilterAria: '每週課表顯示篩選',
+  offeredTimetableFilterLabel: '顯示',
+  offeredTimetableFilterPlanned: '規劃中',
+  offeredTimetableFilterAvailable: '可選',
+  offeredTimetableFilterEnrolled: '已選',
+  offeredTimetableNoSectionsMatchFilter:
+    '此課表在目前篩選下沒有符合的班級；請勾選至少一類以顯示課程。',
   offeredSelectTermForOfferings: '請於上方選擇學年學期以檢視開課。',
   offeredLoadingTimetable: '正在載入課表…',
   offeredNoEnglishSections: '本學期尚無英文軌課表班級。',
@@ -2350,6 +2455,13 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   offeredViewDetailsFor: '檢視 {label} 詳情',
   offeredInCourseBinOpenDetails: '{label}，已在課程暫存 — 開啟詳情',
   offeredAddedBadge: ' 已加入',
+  offeredRegisteredBadge: ' 已選',
+  offeredRegisteredOpenDetails: '{label}，已在課表中—開啟詳情',
+  offeredAlreadyEnrolledToast: '您已註冊此班級。',
+  offeredModalAlreadyEnrolledNote:
+    '此班級已在本學期正式課表中。若課程暫存仍有顯示可移除；退選請至學業紀錄依規定辦理。',
+  checkoutErrorAllAlreadyEnrolled:
+    '課程暫存中的班級皆已在您的課表中，沒有需要新註冊的項目。',
   offeredModalDtCourseCode: '課程代碼',
   offeredModalDtCourseTitle: '課程名稱',
   offeredModalDtAlternateTitle: '另一語言名稱',

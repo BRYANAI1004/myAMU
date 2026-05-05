@@ -1722,6 +1722,19 @@ select.portal-profile-input {
   box-sizing: border-box;
 }
 
+.portal-registration-layout-term__row--with-today-date {
+  align-items: center;
+}
+
+.portal-registration-layout-term__today {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--portal-body-font-size);
+  font-weight: 600;
+  color: var(--portal-text-muted);
+  line-height: var(--portal-body-line-height);
+}
+
 .portal-registration-layout-term__status {
   margin: 0;
   font-size: var(--portal-body-font-size);
@@ -1738,6 +1751,320 @@ select.portal-profile-input {
 /* Registration: student offered timetable → CourseBin */
 .portal-offered-timetable {
   position: relative;
+}
+
+/* Registration: combined plan page (weekly grid + catalog search + class plan) */
+.portal-registration-plan-page .portal-registration-plan-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.portal-registration-plan-details {
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  overflow: hidden;
+  background: var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-registration-plan-details > summary {
+  list-style: none;
+}
+
+.portal-registration-plan-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.portal-registration-plan-details__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+  background: var(--portal-text, #1c2333);
+  cursor: pointer;
+  user-select: none;
+}
+
+.portal-registration-plan-details__summary::before {
+  content: '−';
+  display: inline-flex;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  font-size: 0.8rem;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.portal-registration-plan-details:not([open]) .portal-registration-plan-details__summary::before {
+  content: '+';
+}
+
+.portal-registration-plan-details__body {
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--portal-border-subtle);
+}
+
+.portal-registration-plan-panel-title {
+  font-size: 1rem;
+}
+
+.portal-class-plan-row-actions {
+  position: relative;
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.portal-class-plan-checkout-inline {
+  flex-shrink: 0;
+}
+
+/* Class plan (UCLA-style cards under registration plan) */
+.portal-class-plan-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.portal-class-plan-card {
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+  overflow: hidden;
+}
+
+.portal-class-plan-card__header {
+  padding: 0.85rem 1rem 0.65rem;
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: linear-gradient(180deg, #f8f9fb 0%, var(--portal-surface) 100%);
+}
+
+.portal-class-plan-card__title {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--portal-accent, #8c1d2c);
+}
+
+.portal-class-plan-card__section-line {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--portal-accent, #8c1d2c);
+}
+
+.portal-class-plan-card__meta {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.portal-class-plan-card__final {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+
+.portal-class-plan-card__table-wrap {
+  margin: 0;
+}
+
+.portal-class-plan-detail-table {
+  font-size: 0.8125rem;
+}
+
+.portal-class-plan-detail-table thead th {
+  background: #eceff3;
+  color: var(--portal-text-muted);
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 0.45rem 0.5rem;
+}
+
+.portal-class-plan-detail-table tbody td {
+  padding: 0.55rem 0.5rem;
+  vertical-align: middle;
+}
+
+.portal-class-plan-detail-table__col-change {
+  width: 3.25rem;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.portal-class-plan-change-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius-sm, 4px);
+  background: #fff;
+  color: var(--portal-accent, #8c1d2c);
+  cursor: pointer;
+}
+
+.portal-class-plan-change-btn:hover {
+  border-color: var(--portal-accent, #8c1d2c);
+  background: #fff8f9;
+}
+
+.portal-class-plan-change-btn:focus-visible {
+  outline: 2px solid var(--portal-accent, #8c1d2c);
+  outline-offset: 2px;
+}
+
+.portal-class-plan-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.45rem;
+  border-radius: var(--portal-radius-sm, 4px);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.portal-class-plan-status--plan {
+  background: #fff6d8;
+  color: #6b5500;
+  border: 1px solid #e8d48a;
+}
+
+.portal-class-plan-status--enrolled {
+  background: #e8f4ea;
+  color: #1e4d2a;
+  border: 1px solid #a8d4b2;
+}
+
+.portal-class-plan-info-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 50%;
+  border: 1px solid var(--portal-accent, #8c1d2c);
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-style: italic;
+  color: var(--portal-accent, #8c1d2c);
+  background: #fff;
+}
+
+.portal-class-plan-options-backdrop {
+  z-index: 1260;
+}
+
+.portal-class-plan-options-modal {
+  max-width: min(32rem, 100%);
+  padding: 0;
+  overflow: hidden;
+}
+
+.portal-class-plan-options-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.55rem 1rem;
+  background: linear-gradient(180deg, #d9eef9 0%, #cce8f7 100%);
+  border-bottom: 1px solid #7eb8d9;
+  border-top: 3px solid #1f5582;
+}
+
+.portal-class-plan-options-modal__header-icon {
+  display: flex;
+  flex-shrink: 0;
+}
+
+.portal-class-plan-options-modal__header-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--portal-text);
+}
+
+.portal-class-plan-options-modal__body {
+  padding: 1rem 1.25rem 0.25rem;
+}
+
+.portal-class-plan-options-modal__lead {
+  margin: 0 0 0.75rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--portal-text);
+}
+
+.portal-class-plan-options-modal__section-label {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.portal-class-plan-options-modal__section-list {
+  margin: 0 0 0.85rem;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.portal-class-plan-options-modal__enroll-hint {
+  margin: 0 0 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--portal-text-muted);
+}
+
+.portal-class-plan-options-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.85rem 1.25rem 1rem;
+  border-top: 1px solid var(--portal-border-subtle);
+  background: #fafbfc;
+}
+
+.portal-class-plan-options-modal__footer-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.portal-registration-class-plan__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.portal-registration-class-plan__enrollment-note {
+  flex: 1 1 14rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
 }
 
 .portal-offered-timetable__toast {
@@ -4326,6 +4653,10 @@ table.portal-academics-portal-grades-table.portal-table--grades td {
   fill: var(--portal-accent, #a6192e);
 }
 
+.portal-academics-program-progress__slice--in-progress {
+  fill: var(--portal-progress-in-progress, #6b7f9e);
+}
+
 .portal-academics-program-progress__pct {
   font-size: 13px;
   font-weight: 700;
@@ -4367,6 +4698,10 @@ table.portal-academics-portal-grades-table.portal-table--grades td {
 
 .portal-academics-program-progress__swatch--completed {
   background: var(--portal-accent, #a6192e);
+}
+
+.portal-academics-program-progress__swatch--in-progress {
+  background: var(--portal-progress-in-progress, #6b7f9e);
 }
 
 .portal-academics-program-progress__swatch--remaining {
@@ -5516,6 +5851,121 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   outline: none;
   border-color: var(--portal-accent);
   box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+/* Registration plan page: catalog typeahead (subject + number comboboxes) */
+.portal-plan-catalog-search__form {
+  margin: 0;
+}
+
+.portal-plan-catalog-search__by-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5rem 1rem;
+}
+
+.portal-plan-catalog-search__by-label {
+  flex: 0 0 auto;
+  min-width: 5.5rem;
+  padding-top: 0.55rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.portal-plan-catalog-search__stack {
+  flex: 1 1 18rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.portal-plan-catalog-combobox {
+  position: relative;
+  width: 100%;
+}
+
+.portal-plan-catalog-combobox__input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.portal-plan-catalog-combobox__list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem 0;
+  list-style: none;
+  max-height: min(14rem, 42vh);
+  overflow-y: auto;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-plan-catalog-combobox__option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  text-align: left;
+  font: inherit;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--portal-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+  word-break: break-word;
+}
+
+.portal-plan-catalog-combobox__option:hover,
+.portal-plan-catalog-combobox__option:focus-visible {
+  background: #eef5fb;
+  outline: none;
+}
+
+.portal-plan-catalog-combobox__option-code {
+  font-weight: 600;
+}
+
+.portal-plan-catalog-combobox__option-meta {
+  color: var(--portal-text-muted);
+  font-weight: 400;
+}
+
+.portal-plan-catalog-combobox__empty {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 40;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+}
+
+.portal-plan-catalog-search__go-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.portal-plan-search-results {
+  margin-top: 1rem;
+}
+
+.portal-plan-search-results--empty {
+  margin-top: 1rem;
 }
 
 .portal-registration-results-placeholder {
@@ -7484,6 +7934,46 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 
 .portal-offered-timetable__title-row .portal-section-heading {
   margin: 0;
+}
+
+.portal-offered-timetable__schedule-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius-sm, 6px);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.portal-offered-timetable__schedule-filters-label {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.portal-offered-timetable__schedule-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1.25rem;
+}
+
+.portal-offered-timetable__schedule-filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.portal-offered-timetable__schedule-filter-item input {
+  margin: 0;
+  cursor: pointer;
 }
 
 .portal-timetable-lang-tabs {
@@ -10531,6 +11021,12 @@ select.admin-student-edit-control {
     max-width: none;
     min-height: 2.5rem;
     font-size: 1rem;
+  }
+
+  .portal-registration-layout-term__row--with-today-date .portal-registration-layout-term__today {
+    margin-left: 0;
+    text-align: right;
+    width: 100%;
   }
 
   .portal-registration-search {

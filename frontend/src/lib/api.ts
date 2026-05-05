@@ -2265,7 +2265,10 @@ export type StudentAcademicCourseRecord = {
   source: 'marks' | 'clinic' | 'portal'
 }
 
-/** GET /api/students/:studentId/academics — schedule, transcript, and term metadata. */
+/**
+ * GET /api/students/:studentId/academics — schedule, transcript, and term metadata.
+ * `transcript` is merged marks + portal (incl. W on withdrawn portal rows), same ordering as `courseRecords`.
+ */
 export type StudentAcademicsResponse = {
   studentId: string
   studentName: string
@@ -2324,7 +2327,7 @@ export type StudentAcademicsResponse = {
     feedbackSubmitted?: boolean
     feedbackSubmittedAt?: string | null
   }>
-  /** Normalized marks rows; `currentSchedule`, `transcript`, and `enrollmentHistory` are views of this list. */
+  /** Merged marks + portal rows; `currentSchedule`, `transcript`, and `enrollmentHistory` are views of this list. */
   courseRecords: StudentAcademicCourseRecord[]
 }
 
@@ -2371,6 +2374,7 @@ export type StudentProgramProgressBucket = {
   unitKind: 'quarter_units' | 'clinical_hours'
   required: number
   completed: number
+  inProgress: number
   remaining: number
 }
 
@@ -2380,6 +2384,7 @@ export type StudentProgramProgressResponse = {
   ruleSetId: string
   quarterUnitsRequired: number
   quarterUnitsEarned: number
+  quarterUnitsInProgress: number
   quarterUnitsRemaining: number
   buckets: StudentProgramProgressBucket[]
   notes: string[]
@@ -2400,10 +2405,34 @@ function parseStudentProgramProgressResponse(data: unknown): StudentProgramProgr
   ) {
     throw new Error('Unexpected program progress response')
   }
+  const quarterUnitsInProgress =
+    typeof o.quarterUnitsInProgress === 'number' ? o.quarterUnitsInProgress : 0
   if (!Array.isArray(o.buckets) || !Array.isArray(o.notes)) {
     throw new Error('Unexpected program progress response')
   }
-  return data as StudentProgramProgressResponse
+  const buckets = o.buckets.map((raw) => {
+    if (raw == null || typeof raw !== 'object') {
+      throw new Error('Unexpected program progress response')
+    }
+    const b = raw as Record<string, unknown>
+    if (
+      typeof b.required !== 'number' ||
+      typeof b.completed !== 'number' ||
+      typeof b.remaining !== 'number'
+    ) {
+      throw new Error('Unexpected program progress response')
+    }
+    const inProgress = typeof b.inProgress === 'number' ? b.inProgress : 0
+    return {
+      ...(b as unknown as StudentProgramProgressBucket),
+      inProgress,
+    }
+  })
+  return {
+    ...(o as unknown as StudentProgramProgressResponse),
+    quarterUnitsInProgress,
+    buckets,
+  }
 }
 
 export async function fetchStudentProgramProgress(
@@ -4415,6 +4444,9 @@ export async function fetchPostedCurrentAcademicTerm(options?: {
 
 /** Registration module URL query key for academic term id (see `RegistrationLayout`). */
 export const REGISTRATION_TERM_QUERY_KEY = 'term'
+
+/** Registration course catalog search query (see `CourseSearchPage`, layout search bar). */
+export const REGISTRATION_CATALOG_QUERY_KEY = 'q'
 
 /** Read trimmed academic term id from router search params, or `null` if absent. */
 export function readRegistrationTermIdFromSearch(

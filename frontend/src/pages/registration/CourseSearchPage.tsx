@@ -1,11 +1,24 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
-import { fetchApiJson } from '../../lib/api'
+import {
+  fetchApiJson,
+  fetchStudentEnrolledSections,
+  REGISTRATION_CATALOG_QUERY_KEY,
+  type AdminCourseSection,
+} from '../../lib/api'
+import { useAccount } from '../../context/AccountContext'
+import { PORTAL_STUDENT_ENROLLMENT_CHANGED } from '../../lib/portalStudentEnrollmentEvents'
 import { formatTimeRangeHmsForDisplay } from '../../lib/formatScheduleTime'
 import { formatPrerequisiteCourseDisplay } from '../../lib/prerequisiteCourse'
 import { formatWeekdaysShortFromStored } from '../../lib/weekdaySchedule'
-import { useCourseBin, type CourseBinItem } from './CourseBinContext'
+import {
+  courseBinKeyFromSectionFields,
+  isCourseBinKeyInItemList,
+  useCourseBin,
+  type CourseBinItem,
+} from './CourseBinContext'
 import { useRegistrationTermSearchParam } from './registrationTermSearch'
 import { courseSearchSectionToCourseBinItem } from './sectionToCourseBinItem'
 
@@ -178,6 +191,14 @@ function sectionScheduleRows(
   ]
 }
 
+function courseSearchSectionEnrollmentKey(sec: CourseSectionDetail): string {
+  return courseBinKeyFromSectionFields({
+    course_code: sec.course_code,
+    section_code: sec.section_code,
+    schedule_track: sec.schedule_track,
+  })
+}
+
 function sharedSavedPrerequisiteDisplay(
   sectionRows: CourseSectionDetail[] | undefined,
 ): string | null {
@@ -209,6 +230,8 @@ function CourseSectionScheduleTable({
   course,
   sectionLoad,
   sectionErr,
+  enrolledKeys,
+  binItems,
   addToCourseBin,
   t,
 }: {
@@ -219,6 +242,8 @@ function CourseSectionScheduleTable({
   course: CourseCatalogItem
   sectionLoad: boolean
   sectionErr: string | undefined
+  enrolledKeys: Set<string>
+  binItems: CourseBinItem[]
   addToCourseBin: (item: CourseBinItem) => void
   t: (key: StudentPortalKey) => string
 }) {
@@ -270,34 +295,52 @@ function CourseSectionScheduleTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.key}>
-                  <td>{row.section}</td>
-                  <td>{row.session}</td>
-                  <td>{row.type}</td>
-                  <td>{row.units}</td>
-                  <td>{row.registered}</td>
-                  <td>{row.time}</td>
-                  <td>{row.days}</td>
-                  <td>{row.instructor}</td>
-                  <td>{row.location}</td>
-                  <td className="portal-course-section-schedule-col-action">
-                    <button
-                      type="button"
-                      className="portal-btn portal-btn--course-search-bin"
-                      disabled={row.sourceSection == null}
-                      onClick={() => {
-                        if (row.sourceSection == null) return
-                        addToCourseBin(
-                          courseSearchSectionToCourseBinItem(row.sourceSection, course),
-                        )
-                      }}
-                    >
-                      {t('addToCourseBin')}
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const secKey =
+                  row.sourceSection != null
+                    ? courseSearchSectionEnrollmentKey(row.sourceSection)
+                    : null
+                const enrolled = secKey != null && enrolledKeys.has(secKey)
+                const inBin = secKey != null && isCourseBinKeyInItemList(secKey, binItems)
+                return (
+                  <tr key={row.key}>
+                    <td>{row.section}</td>
+                    <td>{row.session}</td>
+                    <td>{row.type}</td>
+                    <td>{row.units}</td>
+                    <td>{row.registered}</td>
+                    <td>{row.time}</td>
+                    <td>{row.days}</td>
+                    <td>{row.instructor}</td>
+                    <td>{row.location}</td>
+                    <td className="portal-course-section-schedule-col-action">
+                      {enrolled ? (
+                        <span className="portal-text-muted" aria-label={t('offeredRegisteredBadge').trim()}>
+                          {t('offeredRegisteredBadge').trim()}
+                        </span>
+                      ) : inBin ? (
+                        <span className="portal-text-muted" aria-label={t('offeredAddedBadge').trim()}>
+                          {t('offeredAddedBadge').trim()}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className="portal-btn portal-btn--course-search-bin"
+                          disabled={row.sourceSection == null}
+                          onClick={() => {
+                            if (row.sourceSection == null) return
+                            addToCourseBin(
+                              courseSearchSectionToCourseBinItem(row.sourceSection, course),
+                            )
+                          }}
+                        >
+                          {t('addToCourseBin')}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -351,12 +394,19 @@ function panelIdForPrefix(prefixKey: string): string {
 
 export function CourseSearchPage() {
   const t = useStudentPortalT()
+  const [searchParams] = useSearchParams()
   const registrationTermId = useRegistrationTermSearchParam()
-  const { addToCourseBin } = useCourseBin()
+  const { currentStudentId, isAuthenticated } = useAccount()
+  const { addToCourseBin, items: binItems } = useCourseBin()
   const [courses, setCourses] = useState<CourseCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
+  const catalogQFromUrl = searchParams.get(REGISTRATION_CATALOG_QUERY_KEY)?.trim() ?? ''
+  useEffect(() => {
+    setQuery(catalogQFromUrl)
+  }, [catalogQFromUrl])
+
   const [expandedPrefixes, setExpandedPrefixes] = useState<Set<string>>(() => new Set())
   const [expandedCourseCodes, setExpandedCourseCodes] = useState<Set<string>>(() => new Set())
   const [sectionsByCode, setSectionsByCode] = useState<Record<string, CourseSectionDetail[]>>({})
@@ -365,6 +415,55 @@ export function CourseSearchPage() {
   const sectionsInflightRef = useRef<Set<string>>(new Set())
   const sectionsByCodeRef = useRef(sectionsByCode)
   sectionsByCodeRef.current = sectionsByCode
+
+  const [enrolledSections, setEnrolledSections] = useState<AdminCourseSection[]>([])
+  const [enrolledRefreshKey, setEnrolledRefreshKey] = useState(0)
+
+  useEffect(() => {
+    const onEnrollmentChanged = () => {
+      setEnrolledRefreshKey((k) => k + 1)
+    }
+    window.addEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    return () => {
+      window.removeEventListener(PORTAL_STUDENT_ENROLLMENT_CHANGED, onEnrollmentChanged)
+    }
+  }, [])
+
+  const studentKey = currentStudentId?.trim() ?? ''
+  const termKey = registrationTermId?.trim() ?? ''
+
+  useEffect(() => {
+    if (!isAuthenticated || studentKey === '' || termKey === '') {
+      setEnrolledSections([])
+      return
+    }
+    const ac = new AbortController()
+    void (async () => {
+      try {
+        const { sections: rows } = await fetchStudentEnrolledSections(studentKey, termKey, {
+          signal: ac.signal,
+        })
+        if (!ac.signal.aborted) setEnrolledSections(rows)
+      } catch {
+        if (!ac.signal.aborted) setEnrolledSections([])
+      }
+    })()
+    return () => ac.abort()
+  }, [isAuthenticated, studentKey, termKey, enrolledRefreshKey])
+
+  const enrolledKeys = useMemo(() => {
+    const s = new Set<string>()
+    for (const row of enrolledSections) {
+      s.add(
+        courseBinKeyFromSectionFields({
+          course_code: row.course_code,
+          section_code: row.section_code,
+          schedule_track: row.schedule_track,
+        }),
+      )
+    }
+    return s
+  }, [enrolledSections])
 
   useEffect(() => {
     setSectionsByCode({})
@@ -708,6 +807,8 @@ export function CourseSearchPage() {
                                             course={c}
                                             sectionLoad={sectionLoad}
                                             sectionErr={sectionErr}
+                                            enrolledKeys={enrolledKeys}
+                                            binItems={binItems}
                                             addToCourseBin={addToCourseBin}
                                             t={t}
                                           />

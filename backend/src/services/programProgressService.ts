@@ -1,8 +1,10 @@
 import { DEMO_STUDENT_ID } from "../config/constants.js";
 import { MAHM_COURSES } from "../data/mahmCatalog.js";
 import type { CourseRecord } from "../types/studentAccount.js";
+import type { StudentAcademicCourseRecord } from "../types/studentAcademics.js";
 import type { StudentTranscriptRow } from "../types/studentTranscript.js";
 import { evaluateGraduation } from "./graduationEvaluationService.js";
+import { getStudentAcademicsPayload } from "./studentAcademicsService.js";
 import { getStudentTranscriptPreviewPayload } from "./studentTranscriptService.js";
 
 function normalizeCourseCode(courseCode: string): string {
@@ -19,6 +21,27 @@ function buildCatalogByCode(): Map<string, CourseRecord> {
     byCode.set(normalizeCourseCode(c.courseCode), c);
   }
   return byCode;
+}
+
+/**
+ * Bucket math uses the static MAHM curriculum map when a code is listed there.
+ * Portal/catalog courses (e.g. AC300, BS101) not in that list still contribute to
+ * {@link sumActiveDegreeQuarterUnits}; without a fallback they would inflate the chart
+ * "in progress" total while showing 0 in didactic/lab/clinical breakdown rows.
+ * Unlisted quarter-credit courses are treated as **didactic** (not lab/clinical).
+ */
+function resolveProgressCatalogEntry(
+  codeNorm: string,
+  byCode: Map<string, CourseRecord>,
+): CourseRecord {
+  const listed = byCode.get(codeNorm);
+  if (listed != null) return listed;
+  return {
+    courseId: `unlisted:${codeNorm}`,
+    courseCode: codeNorm,
+    title: "",
+    type: "didactic",
+  };
 }
 
 function catalogRequirementTotals(): {
@@ -61,9 +84,6 @@ function sumCatalogEarnedFromTranscript(
   for (const row of transcript) {
     if (row.status !== "completed") continue;
     const code = normalizeCourseCode(row.courseCode);
-    const cat = byCode.get(code);
-    if (cat == null) continue;
-
     const credits = row.credits;
     const crOk = credits != null && Number.isFinite(credits) && credits > 0;
 
@@ -71,15 +91,92 @@ function sumCatalogEarnedFromTranscript(
       if (seenMarks.has(code)) continue;
       seenMarks.add(code);
       if (!crOk) continue;
+      const cat = resolveProgressCatalogEntry(code, byCode);
       if (cat.type === "didactic") didactic += credits;
       else if (cat.type === "lab") lab += credits;
       else if (cat.type === "clinical") clinicalHours += credits;
     } else if (row.source === "clinic") {
       if (seenClinic.has(code)) continue;
       seenClinic.add(code);
-      if (cat.type !== "clinical") continue;
+      const cat = byCode.get(code);
+      if (cat == null || cat.type !== "clinical") continue;
       if (crOk) clinicalHours += credits;
+    } else if (row.source === "portal") {
+      if (seenMarks.has(code)) continue;
+      seenMarks.add(code);
+      if (!crOk) continue;
+      const cat = resolveProgressCatalogEntry(code, byCode);
+      if (cat.type === "didactic") didactic += credits;
+      else if (cat.type === "lab") lab += credits;
+      else if (cat.type === "clinical") clinicalHours += credits;
     }
+  }
+
+  return {
+    didactic: roundTwo(didactic),
+    lab: roundTwo(lab),
+    clinicalHours: roundTwo(clinicalHours),
+  };
+}
+
+function portalInProgressDedupeKey(r: StudentAcademicCourseRecord): string {
+  if (r.portalEnrollmentRowId != null && Number.isFinite(r.portalEnrollmentRowId)) {
+    return `portal:${r.portalEnrollmentRowId}`;
+  }
+  const code = normalizeCourseCode(r.courseCode);
+  return `portal:${code}|${r.term}|${r.year}|${(r.sectionCode ?? "").trim().toLowerCase()}|${(r.scheduleTrack ?? "").trim().toLowerCase()}`;
+}
+
+/**
+ * Active marks/portal rows (not clinic narrative), deduped; all courses — same credit pool as graduation earned
+ * (excluding transfer; excluding completed-only clinic transcript lines).
+ */
+function sumActiveDegreeQuarterUnits(records: StudentAcademicCourseRecord[]): number {
+  const seen = new Set<string>();
+  let total = 0;
+  for (const r of records) {
+    if (r.status !== "active") continue;
+    if (r.source === "clinic") continue;
+    const cr = r.credits;
+    if (cr == null || !Number.isFinite(cr) || cr <= 0) continue;
+    const key =
+      r.source === "portal"
+        ? portalInProgressDedupeKey(r)
+        : `marks:${normalizeCourseCode(r.courseCode)}|${r.term}|${r.year}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    total += cr;
+  }
+  return roundTwo(total);
+}
+
+/** Catalog-matched active enrollments by MAHM bucket (didactic / lab / clinical hours). */
+function sumCatalogInProgressFromCourseRecords(
+  records: StudentAcademicCourseRecord[],
+  byCode: Map<string, CourseRecord>,
+): { didactic: number; lab: number; clinicalHours: number } {
+  const seen = new Set<string>();
+  let didactic = 0;
+  let lab = 0;
+  let clinicalHours = 0;
+
+  for (const r of records) {
+    if (r.status !== "active") continue;
+    if (r.source === "clinic") continue;
+    const code = normalizeCourseCode(r.courseCode);
+    const cr = r.credits;
+    if (cr == null || !Number.isFinite(cr) || cr <= 0) continue;
+    const dedupe =
+      r.source === "portal"
+        ? portalInProgressDedupeKey(r)
+        : `marks:${code}|${r.term}|${r.year}`;
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+
+    const cat = resolveProgressCatalogEntry(code, byCode);
+    if (cat.type === "didactic") didactic += cr;
+    else if (cat.type === "lab") lab += cr;
+    else if (cat.type === "clinical") clinicalHours += cr;
   }
 
   return {
@@ -94,6 +191,8 @@ export type ProgramProgressBucketDto = {
   unitKind: "quarter_units" | "clinical_hours";
   required: number;
   completed: number;
+  /** Active registrations / attempts in the portal catalog for this bucket (not yet completed on transcript). */
+  inProgress: number;
   remaining: number;
 };
 
@@ -104,6 +203,8 @@ export type StudentProgramProgressResponse = {
   /** Non-clinical quarter units (didactic + lab), per graduation evaluator (includes transfer when configured). */
   quarterUnitsRequired: number;
   quarterUnitsEarned: number;
+  /** Active marks + portal rows with positive credits (excludes clinic transcript narrative source). */
+  quarterUnitsInProgress: number;
   quarterUnitsRemaining: number;
   buckets: ProgramProgressBucketDto[];
   notes: string[];
@@ -117,6 +218,7 @@ function emptyResponse(studentId: string): StudentProgramProgressResponse {
     ruleSetId: "none",
     quarterUnitsRequired: 0,
     quarterUnitsEarned: 0,
+    quarterUnitsInProgress: 0,
     quarterUnitsRemaining: 0,
     buckets: [
       {
@@ -124,6 +226,7 @@ function emptyResponse(studentId: string): StudentProgramProgressResponse {
         unitKind: "quarter_units",
         required: roundTwo(didacticRequired),
         completed: 0,
+        inProgress: 0,
         remaining: roundTwo(didacticRequired),
       },
       {
@@ -131,6 +234,7 @@ function emptyResponse(studentId: string): StudentProgramProgressResponse {
         unitKind: "quarter_units",
         required: roundTwo(labRequired),
         completed: 0,
+        inProgress: 0,
         remaining: roundTwo(labRequired),
       },
       {
@@ -138,6 +242,7 @@ function emptyResponse(studentId: string): StudentProgramProgressResponse {
         unitKind: "clinical_hours",
         required: clinicalHoursRequired,
         completed: 0,
+        inProgress: 0,
         remaining: clinicalHoursRequired,
       },
     ],
@@ -159,10 +264,17 @@ export async function getStudentProgramProgressPayload(
   /** Sequential loads avoid overlapping with evaluateGraduation's own DB work (reduces connection spikes). */
   const evaluation = await evaluateGraduation(trimmed);
   const transcriptPayload = await getStudentTranscriptPreviewPayload(trimmed);
+  const academics = await getStudentAcademicsPayload(trimmed);
 
   const byCode = buildCatalogByCode();
   const { didacticRequired, labRequired, clinicalHoursRequired } = catalogRequirementTotals();
   const earned = sumCatalogEarnedFromTranscript(transcriptPayload.transcript, byCode);
+  const inProgBuckets = sumCatalogInProgressFromCourseRecords(academics.courseRecords, byCode);
+  const quarterUnitsInProgress = sumActiveDegreeQuarterUnits(academics.courseRecords);
+  const quarterUnitsRemaining = Math.max(
+    0,
+    roundTwo(evaluation.requiredCredits - evaluation.earnedCredits - quarterUnitsInProgress),
+  );
 
   const buckets: ProgramProgressBucketDto[] = [
     {
@@ -170,27 +282,38 @@ export async function getStudentProgramProgressPayload(
       unitKind: "quarter_units",
       required: roundTwo(didacticRequired),
       completed: earned.didactic,
-      remaining: Math.max(0, roundTwo(didacticRequired - earned.didactic)),
+      inProgress: inProgBuckets.didactic,
+      remaining: Math.max(
+        0,
+        roundTwo(didacticRequired - earned.didactic - inProgBuckets.didactic),
+      ),
     },
     {
       id: "lab",
       unitKind: "quarter_units",
       required: roundTwo(labRequired),
       completed: earned.lab,
-      remaining: Math.max(0, roundTwo(labRequired - earned.lab)),
+      inProgress: inProgBuckets.lab,
+      remaining: Math.max(0, roundTwo(labRequired - earned.lab - inProgBuckets.lab)),
     },
     {
       id: "clinical",
       unitKind: "clinical_hours",
       required: clinicalHoursRequired,
       completed: earned.clinicalHours,
-      remaining: Math.max(0, roundTwo(clinicalHoursRequired - earned.clinicalHours)),
+      inProgress: inProgBuckets.clinicalHours,
+      remaining: Math.max(
+        0,
+        roundTwo(clinicalHoursRequired - earned.clinicalHours - inProgBuckets.clinicalHours),
+      ),
     },
   ];
 
   const notes = [
     ...evaluation.notes,
     "Didactic, lab, and clinical rows match portal catalog course codes on your unofficial transcript. Quarter-unit totals in the chart follow graduation credit rules (including transfer credits when recorded).",
+    "In progress counts active marks and portal registrations with positive credits (not yet completed). Remaining is required minus completed and in progress for each bucket.",
+    "Courses registered in the portal but not listed in the static MAHM curriculum map count toward didactic in-progress and completed buckets (not lab or clinical) until mapped explicitly.",
   ];
 
   return {
@@ -199,7 +322,8 @@ export async function getStudentProgramProgressPayload(
     ruleSetId: evaluation.ruleSetId,
     quarterUnitsRequired: evaluation.requiredCredits,
     quarterUnitsEarned: evaluation.earnedCredits,
-    quarterUnitsRemaining: evaluation.missingCredits,
+    quarterUnitsInProgress,
+    quarterUnitsRemaining,
     buckets,
     notes,
   };

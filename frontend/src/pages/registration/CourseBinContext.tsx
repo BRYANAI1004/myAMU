@@ -65,6 +65,29 @@ export function courseBinSectionKey(
   return `${courseCode.trim().toLowerCase()}|${section.trim().toLowerCase()}|${tr}`
 }
 
+/** Same key shape as {@link courseBinSectionKey} for offered / enrolled API sections (`section_code`). */
+export function courseBinKeyFromSectionFields(args: {
+  course_code: string
+  section_code: string
+  schedule_track?: 'EN' | 'CN' | string | null
+}): string {
+  const raw = args.schedule_track
+  const tr: 'EN' | 'CN' | undefined =
+    raw === 'CN' || (typeof raw === 'string' && raw.trim().toUpperCase() === 'CN')
+      ? 'CN'
+      : undefined
+  return courseBinSectionKey(args.course_code, args.section_code, tr)
+}
+
+export function isCourseBinKeyInItemList(
+  key: string,
+  items: CourseBinItem[],
+): boolean {
+  return items.some(
+    (it) => courseBinSectionKey(it.course_code, it.section, it.schedule_track) === key,
+  )
+}
+
 function storageKeyForTerm(registrationTermId: string): string | null {
   const tid = registrationTermId.trim()
   return tid === '' ? null : `${STORAGE_KEY_PREFIX}${tid}`

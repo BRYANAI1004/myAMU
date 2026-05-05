@@ -26,9 +26,9 @@ import { LoginPage } from './pages/LoginPage'
 import { PaymentPlanPage } from './pages/PaymentPlanPage'
 import { PortalLayout } from './components/PortalLayout'
 import { RegistrationLayout } from './pages/registration/RegistrationLayout'
-import { MyCourseBinPage } from './pages/registration/MyCourseBinPage'
 import { CourseBinCheckoutPage } from './pages/registration/CourseBinCheckoutPage'
 import { OfferedTimetablePage } from './pages/registration/OfferedTimetablePage'
+import { CourseSearchPage } from './pages/registration/CourseSearchPage'
 import { FinancesLayout } from './pages/finances/FinancesLayout'
 import { FinancesOverviewPage } from './pages/finances/FinancesOverviewPage'
 import { FinancesPaymentPage } from './pages/finances/FinancesPaymentPage'
@@ -119,6 +119,12 @@ function RegistrationIndexRedirect() {
   return <Navigate to={{ pathname: 'offered-timetable', search }} replace />
 }
 
+/** Legacy `/registration/course-bin` and `/registration/add-drop` → Plan & schedule. */
+function RegistrationCourseBinLegacyRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '../offered-timetable', search }} replace />
+}
+
 function ClinicalStudentLegacyRedirect() {
   const { pathname, search } = useLocation()
   const tail = pathname.replace(/^\/clinical\/?/, '').trim() || 'schedule'
@@ -191,10 +197,11 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/registration" element={<RegistrationLayout />}>
               <Route index element={<RegistrationIndexRedirect />} />
-              <Route path="search" element={<Navigate to="../offered-timetable" replace />} />
-              <Route path="course-bin" element={<MyCourseBinPage />} />
+              <Route path="search" element={<Navigate to="../course-search" replace />} />
+              <Route path="course-search" element={<CourseSearchPage />} />
+              <Route path="course-bin" element={<RegistrationCourseBinLegacyRedirect />} />
               <Route path="checkout" element={<CourseBinCheckoutPage />} />
-              <Route path="add-drop" element={<Navigate to="../course-bin" replace />} />
+              <Route path="add-drop" element={<RegistrationCourseBinLegacyRedirect />} />
               <Route path="schedule" element={<Navigate to="/dashboard" replace />} />
               <Route path="offered-timetable" element={<OfferedTimetablePage />} />
               <Route path="clinical" element={<ClinicalModuleShell />}>
