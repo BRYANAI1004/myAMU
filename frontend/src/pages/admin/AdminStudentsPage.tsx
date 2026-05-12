@@ -11,9 +11,13 @@ import {
   type AdminStudentsProgramFilter,
   type AdminStudentsTrackFilter,
 } from '../../lib/api'
+import { BulkEmailComposeModal } from '../../components/admin/BulkEmailComposeModal'
 
 const PAGE_SIZE = 25
 const SEARCH_DEBOUNCE_MS = 300
+
+/* AMU/personal email selection happens inside `BulkEmailComposeModal` (it owns the choice
+ * UI) — this page just builds the candidate list with both potential addresses. */
 
 const EMPTY_ENROLLMENT_FILTER_OPTIONS: AdminStudentEnrollmentFilterOptions = {
   years: [],
@@ -97,6 +101,15 @@ export function AdminStudentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [deleteSummary, setDeleteSummary] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [bulkEmailSummary, setBulkEmailSummary] = useState<string | null>(null)
+  const [emailModal, setEmailModal] = useState<{
+    candidates: Array<{
+      studentId: string
+      name: string
+      amuEmail: string | null
+      personalEmail: string | null
+    }>
+  } | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const [enrollmentFilterOptions, setEnrollmentFilterOptions] =
@@ -276,7 +289,39 @@ export function AdminStudentsPage() {
     setPage(1)
     setSelectedIds(new Set())
     setDeleteSummary(null)
+    setBulkEmailSummary(null)
+    setEmailModal(null)
     setExportError(null)
+  }
+
+  function onBulkEmail() {
+    setBulkEmailSummary(null)
+    const candidates = items
+      .filter((row) => selectedIds.has(row.studentId))
+      .map((row) => ({
+        studentId: row.studentId,
+        name: row.name,
+        amuEmail: row.amuEmail,
+        personalEmail: row.email,
+      }))
+    if (candidates.length === 0) {
+      setBulkEmailSummary('Select at least one student to email.')
+      return
+    }
+    const hasAnyEmail = candidates.some(
+      (c) =>
+        (c.amuEmail != null && c.amuEmail.trim() !== '') ||
+        (c.personalEmail != null && c.personalEmail.trim() !== ''),
+    )
+    if (!hasAnyEmail) {
+      setBulkEmailSummary(
+        `None of the ${candidates.length} selected student${
+          candidates.length === 1 ? '' : 's'
+        } have an email address on file.`,
+      )
+      return
+    }
+    setEmailModal({ candidates })
   }
 
   async function onDeleteSelected() {
@@ -384,7 +429,7 @@ export function AdminStudentsPage() {
         isEnrollmentView ? ' admin-students-page--enrollment' : ''
       }`}
     >
-      <div className="admin-page__toolbar">
+      <div className="admin-page__toolbar admin-students-page__toolbar">
         <div className="admin-students-page__heading">
           <h1 className="admin-page__title admin-page__title--inline">Students</h1>
           <div
@@ -416,6 +461,17 @@ export function AdminStudentsPage() {
             </button>
           </div>
         </div>
+
+        {!isEnrollmentView ? (
+          <div className="admin-students-page__primary-cta portal-academics-print-hide">
+            <Link
+              to="/admin/students/new"
+              className="portal-btn portal-btn--primary"
+            >
+              Add Student
+            </Link>
+          </div>
+        ) : null}
 
         {isEnrollmentView ? (
           <div className="admin-page__toolbar-actions admin-page__toolbar-actions--wrap portal-academics-print-hide">
@@ -612,16 +668,24 @@ export function AdminStudentsPage() {
                 selectedIds.size === 0 ||
                 deleting
               }
+              onClick={onBulkEmail}
+              title="Open a new email in your default mail app with the selected students' emails in the BCC field"
+            >
+              Email Selected
+            </button>
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              disabled={
+                sectionLoading ||
+                Boolean(error) ||
+                selectedIds.size === 0 ||
+                deleting
+              }
               onClick={() => void onDeleteSelected()}
             >
               {deleting ? 'Deleting…' : 'Delete Selected'}
             </button>
-            <Link
-              to="/admin/students/new"
-              className="portal-btn portal-btn--primary"
-            >
-              Add Student
-            </Link>
           </div>
         )}
       </div>
@@ -656,6 +720,34 @@ export function AdminStudentsPage() {
           >
             {deleteSummary}
           </pre>
+        </section>
+      ) : null}
+
+      {bulkEmailSummary && !sectionLoading ? (
+        <section
+          className="portal-card portal-profile-state portal-academics-print-hide"
+          role="status"
+          aria-live="polite"
+          style={{ marginBottom: '1rem' }}
+        >
+          <p className="portal-profile-state__title" style={{ marginTop: 0 }}>
+            Bulk email
+          </p>
+          <p
+            className="portal-profile-state__detail"
+            style={{ marginBottom: 0 }}
+          >
+            {bulkEmailSummary}
+          </p>
+          <div className="portal-actions portal-profile-state__actions">
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary"
+              onClick={() => setBulkEmailSummary(null)}
+            >
+              Dismiss
+            </button>
+          </div>
         </section>
       ) : null}
 
@@ -805,6 +897,23 @@ export function AdminStudentsPage() {
             </button>
           </div>
         </>
+      ) : null}
+
+      {emailModal ? (
+        <BulkEmailComposeModal
+          candidates={emailModal.candidates}
+          onClose={() => setEmailModal(null)}
+          onSent={(response) => {
+            setBulkEmailSummary(
+              response.delivered
+                ? `Email sent to ${response.recipientCount} recipient${
+                    response.recipientCount === 1 ? '' : 's'
+                  }${response.profileId ? ` (sender: ${response.profileId})` : ''}.`
+                : (response.note ??
+                    'Server received the message but did not deliver it.'),
+            )
+          }}
+        />
       ) : null}
     </main>
   )

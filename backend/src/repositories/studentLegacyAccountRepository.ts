@@ -247,6 +247,7 @@ export async function loadLegacyStudentProfileRow(
        state,
        zip,
        email,
+       amu_email,
        requirements_id
      FROM students
      WHERE id = ?
@@ -498,6 +499,7 @@ export type LegacyAdminStudentListRow = RowDataPacket & {
   id: string;
   name: unknown;
   email: unknown;
+  amu_email: unknown;
   status: unknown;
   program: unknown;
   /** Omitted in lightweight roster `SELECT`; mapper treats as empty. */
@@ -628,9 +630,10 @@ function buildAdminStudentListFilters(
       LOWER(TRIM(s.id)) LIKE ? ESCAPE '\\\\'
       OR LOWER(COALESCE(s.name, '')) LIKE ? ESCAPE '\\\\'
       OR LOWER(COALESCE(s.email, '')) LIKE ? ESCAPE '\\\\'
+      OR LOWER(COALESCE(s.amu_email, '')) LIKE ? ESCAPE '\\\\'
       OR LOWER(TRIM(COALESCE(s.program, ''))) LIKE ? ESCAPE '\\\\'
     )`);
-    params.push(like, like, like, like);
+    params.push(like, like, like, like, like);
   }
   const programClause = buildAdminStudentProgramClause(query.program);
   if (programClause !== "") {
@@ -696,6 +699,7 @@ const ADMIN_STUDENT_LIST_SELECT_SQL = `SELECT
        TRIM(s.id) AS id,
        s.name,
        s.email,
+       s.amu_email,
        NULLIF(TRIM(s.status), '') AS status,
        TRIM(s.program) AS program,
        s.signed_date,
@@ -826,6 +830,8 @@ export async function listLegacyAdminStudentListRowsByStudentIds(
 export type LegacyStudentMasterUpdate = {
   name: string;
   email: string;
+  /** AMU-issued email address; pass empty string to clear (column is `NULL`-able and DB stores NULL). */
+  amu_email: string;
   program: string;
   gender: string;
   background: string;
@@ -858,10 +864,12 @@ export async function updateLegacyStudentMasterRow(
   studentId: string,
   patch: LegacyStudentMasterUpdate,
 ): Promise<boolean> {
+  const amuEmailParam = patch.amu_email.trim() === "" ? null : patch.amu_email;
   const [result] = await pool.execute(
     `UPDATE students SET
        name = ?,
        email = ?,
+       amu_email = ?,
        program = ?,
        gender = ?,
        background = ?,
@@ -887,6 +895,7 @@ export async function updateLegacyStudentMasterRow(
     [
       patch.name,
       patch.email,
+      amuEmailParam,
       patch.program,
       patch.gender,
       patch.background,

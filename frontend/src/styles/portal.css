@@ -8915,10 +8915,301 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   margin-left: auto;
 }
 
+.admin-students-page__toolbar {
+  align-items: flex-start;
+  row-gap: 0.85rem;
+}
+
+.admin-students-page__toolbar .admin-students-page__heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-students-page__primary-cta {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.admin-students-page__toolbar .admin-page__toolbar-actions {
+  flex-basis: 100%;
+  margin-left: 0;
+  justify-content: flex-start;
+}
+
 .admin-students-page__heading {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* ─── Bulk-email compose modal ──────────────────────────────────────────── */
+
+.bulk-email-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(15, 17, 26, 0.55);
+  backdrop-filter: blur(2px);
+  overflow-y: auto;
+}
+
+.bulk-email-modal {
+  box-sizing: border-box;
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(90vh, 56rem);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--portal-radius);
+  border: 1px solid var(--portal-border-subtle);
+  background: var(--portal-surface, #fff);
+  box-shadow: 0 20px 60px rgba(15, 17, 26, 0.35);
+  overflow: hidden;
+}
+
+.bulk-email-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.25rem;
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: var(--amu-card, #f4f5f8);
+}
+
+.bulk-email-modal__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--portal-text);
+}
+
+.bulk-email-modal__close {
+  appearance: none;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--portal-text-muted);
+}
+
+.bulk-email-modal__close:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--portal-text);
+}
+
+.bulk-email-modal__close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.bulk-email-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem 1.25rem 1.1rem;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.bulk-email-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.bulk-email-modal__row-2 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.85rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px dashed var(--portal-border-subtle);
+}
+
+@media (max-width: 600px) {
+  .bulk-email-modal__row-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bulk-email-modal__select {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--portal-surface, #fff);
+  color: var(--portal-text);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.bulk-email-modal__select:focus {
+  outline: none;
+  border-color: var(--amu-red, #970000);
+  box-shadow: 0 0 0 3px rgba(151, 0, 0, 0.15);
+}
+
+.bulk-email-modal__hint--error {
+  color: #b91c1c;
+}
+
+.bulk-email-modal__hint code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 0.85em;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+}
+
+.bulk-email-modal__field--recipients {
+  padding-bottom: 0.7rem;
+  border-bottom: 1px dashed var(--portal-border-subtle);
+}
+
+.bulk-email-modal__field--body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.bulk-email-modal__field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--portal-text-muted);
+}
+
+.bulk-email-modal__count {
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--portal-text);
+}
+
+.bulk-email-modal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 6.5rem;
+  overflow-y: auto;
+  padding: 0.15rem 0;
+}
+
+.bulk-email-modal__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(151, 0, 0, 0.08);
+  color: var(--amu-red, #970000);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bulk-email-modal__chip--overflow {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--portal-text);
+}
+
+.bulk-email-modal__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--portal-text-muted);
+}
+
+.bulk-email-modal__subject,
+.bulk-email-modal__body {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  background: var(--portal-surface, #fff);
+  color: var(--portal-text);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.bulk-email-modal__subject:focus,
+.bulk-email-modal__body:focus {
+  outline: none;
+  border-color: var(--amu-red, #970000);
+  box-shadow: 0 0 0 3px rgba(151, 0, 0, 0.15);
+}
+
+.bulk-email-modal__body {
+  min-height: 12rem;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.bulk-email-modal__char-count {
+  margin: 0.15rem 0 0;
+  font-size: 0.7rem;
+  color: var(--portal-text-muted);
+  align-self: flex-end;
+}
+
+.bulk-email-modal__alert {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.bulk-email-modal__alert--error {
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #b91c1c;
+}
+
+.bulk-email-modal__alert--success {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #15803d;
+}
+
+.bulk-email-modal__alert--warn {
+  background: rgba(234, 179, 8, 0.12);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: #92400e;
+}
+
+.bulk-email-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--portal-border-subtle);
+  margin-top: 0.25rem;
+  padding-block: 0.75rem 0.1rem;
+}
+
+@media (max-width: 600px) {
+  .bulk-email-modal {
+    width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .bulk-email-modal-backdrop {
+    padding: 0;
+  }
 }
 
 .admin-students-page__tabs {

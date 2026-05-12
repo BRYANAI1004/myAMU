@@ -98,6 +98,7 @@ function parseUpdateBody(raw: unknown): ParseBodyResult<AdminStudentUpdateBody> 
       name: raw.name,
       program: program.value,
       email: parseNullableStringField(raw.email),
+      amuEmail: parseNullableStringField(raw.amuEmail),
       gender: parseNullableStringField(raw.gender),
       backgroundSchool: parseNullableStringField(raw.backgroundSchool),
       highestDegree: parseNullableStringField(raw.highestDegree),
@@ -166,6 +167,7 @@ function parseCreateBody(raw: unknown): ParseBodyResult<AdminStudentCreateBody> 
       name: raw.name,
       program: program.value,
       email: parseNullableStringField(raw.email),
+      amuEmail: parseNullableStringField(raw.amuEmail),
       gender: parseNullableStringField(raw.gender),
       requirementsId:
         requirementsId === undefined ? null : requirementsId,
