@@ -21,11 +21,18 @@ function isMysqlZeroOrEmptyDate(v: unknown): boolean {
   return false;
 }
 
-/** Parse MySQL DATE / DATETIME or ISO-ish string to UTC midnight for that calendar day. */
+/** Parse MySQL DATE / DATETIME or ISO-ish string to UTC midnight for that calendar day.
+ *
+ * Pre-1900 dates are treated as null because the legacy MS Access source uses
+ * `1899-11-30` (OLE epoch / day 0) as the sentinel for "no date". Both the
+ * `Date` and string branches must enforce this so GET and PUT agree on what
+ * counts as a valid calendar date.
+ */
 function toUtcMidnight(v: unknown): Date | null {
   if (isMysqlZeroOrEmptyDate(v)) return null;
   if (v instanceof Date) {
     if (Number.isNaN(v.getTime())) return null;
+    if (v.getUTCFullYear() < 1900) return null;
     return new Date(
       Date.UTC(v.getUTCFullYear(), v.getUTCMonth(), v.getUTCDate()),
     );

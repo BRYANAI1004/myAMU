@@ -96,6 +96,10 @@ import {
   postAdminAuthLogout,
 } from "../controllers/adminAuthController.js";
 import {
+  getAdminEmailProfiles,
+  postAdminBulkEmail,
+} from "../controllers/adminBulkEmailController.js";
+import {
   getStudentEnrolledSections,
   postStudentEnroll,
   postStudentWithdraw,
@@ -231,6 +235,8 @@ adminRouter.get("/students/next-id", getNextAdminStudentId);
 adminRouter.post("/students", postAdminStudent);
 adminRouter.post("/students/delete-selected", postDeleteSelectedAdminStudents);
 adminRouter.post("/students/export.csv", postExportAdminStudentsCsv);
+adminRouter.get("/email/profiles", getAdminEmailProfiles);
+adminRouter.post("/email/bulk", postAdminBulkEmail);
 adminRouter.post("/students/:studentId/loa", postAdminStudentLoa);
 adminRouter.post(
   "/students/:studentId/photo",

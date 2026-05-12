@@ -200,6 +200,8 @@ function mapRowToListItem(r: Record<string, unknown>): AdminStudentListItem {
   const name = nameRaw.length > 0 ? nameRaw : studentId;
   const emailRaw = str(r.email);
   const email = emailRaw.length > 0 ? emailRaw : null;
+  const amuEmailRaw = str(r.amu_email);
+  const amuEmail = amuEmailRaw.length > 0 ? amuEmailRaw : null;
   const enrollment = parseAdminStudentEnrollmentInfo(studentId);
   const signedDate = legacyDbDateToIso(r.signed_date);
   const enrollStartDate = legacyDbDateToIso(readEnrollStart(r));
@@ -215,6 +217,7 @@ function mapRowToListItem(r: Record<string, unknown>): AdminStudentListItem {
     division: divisionFromStudentId(studentId),
     name,
     email,
+    amuEmail,
     status: statusToApi(r.status),
     program: studentProgramFromDb(r.program),
     trackCode: enrollment.trackCode,
@@ -523,6 +526,8 @@ function mapProfileRowToAdminDetail(
   const name = nameRaw.length > 0 ? nameRaw : studentId;
   const emailRaw = str(row.email);
   const email = emailRaw.length > 0 ? emailRaw : null;
+  const amuEmailRaw = str(row.amu_email);
+  const amuEmail = amuEmailRaw.length > 0 ? amuEmailRaw : null;
   const genderRaw = str(row.gender);
   const gender = genderRaw.length > 0 ? genderRaw : null;
   const signedDate = legacyDbDateToIso(row.signed_date);
@@ -566,6 +571,7 @@ function mapProfileRowToAdminDetail(
     division: divisionFromStudentId(studentId),
     name,
     email,
+    amuEmail,
     program: studentProgramFromDb(row.program),
     requirementsId: requirementsIdToApi(row.requirements_id),
     highestDegree: tertiary.length > 0 ? tertiary : null,
@@ -874,6 +880,7 @@ export async function updateAdminStudent(
   const patch = {
     name,
     email: str(body.email),
+    amu_email: str(body.amuEmail),
     program: body.program,
     gender: str(body.gender),
     background: str(body.backgroundSchool),

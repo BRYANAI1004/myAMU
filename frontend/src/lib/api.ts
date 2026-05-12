@@ -283,7 +283,10 @@ export type AdminStudentListItem = {
   studentId: string
   division: 'Chinese' | 'English' | 'Unknown'
   name: string
+  /** Personal email address. */
   email: string | null
+  /** AMU-issued email address (NULL until staff fill it in). */
+  amuEmail: string | null
   status: string | null
   program: StudentProgram
   trackCode: 'C' | 'E' | null
@@ -377,7 +380,10 @@ export type AdminStudentDetail = {
   studentId: string
   division: 'Chinese' | 'English' | 'Unknown'
   name: string
+  /** Personal email address. */
   email: string | null
+  /** AMU-issued email address. */
+  amuEmail: string | null
   program: StudentProgram
   requirementsId: string | null
   highestDegree: string | null
@@ -425,6 +431,7 @@ export type AdminStudentUpdatePayload = {
   name: string
   program: StudentProgram
   email: string | null
+  amuEmail: string | null
   gender: string | null
   backgroundSchool: string | null
   highestDegree: string | null
@@ -784,6 +791,7 @@ function parseAdminStudentListRow(o: Record<string, unknown>): AdminStudentListI
     division: parseAdminDivision(o.division),
     name: o.name,
     email: parseNullableString(o.email),
+    amuEmail: parseNullableString(o.amuEmail),
     status: parseNullableString(o.status),
     program: parseStudentProgram(o.program),
     trackCode: parseNullableTrackCode(o.trackCode),
@@ -826,6 +834,7 @@ function parseAdminStudentDetailPayload(data: unknown): AdminStudentDetail {
     division: parseAdminDivision(o.division),
     name: o.name,
     email: parseNullableString(o.email),
+    amuEmail: parseNullableString(o.amuEmail),
     program: parseStudentProgram(o.program),
     requirementsId: parseNullableRequirementsId(o.requirementsId),
     highestDegree: parseNullableString(o.highestDegree),
@@ -1300,6 +1309,134 @@ export async function deleteSelectedAdminStudents(
     return data as DeleteSelectedAdminStudentsResponse
   }
   throw new Error('Unexpected delete-selected response')
+}
+
+export type SendAdminBulkEmailInput = {
+  recipients: string[]
+  subject: string
+  body: string
+  /** Defaults to "bcc" (recommended). Use "to" only when staff explicitly want it. */
+  recipientField?: 'bcc' | 'to'
+  replyTo?: string | null
+  /** SMTP sender profile id (from `fetchAdminEmailProfiles`). Omit/empty for the server default. */
+  profileId?: string | null
+}
+
+export type SendAdminBulkEmailResponse = {
+  delivered: boolean
+  messageId: string | null
+  /** Profile id that actually sent the message (or null on no-op fallback). */
+  profileId: string | null
+  recipientCount: number
+  /** Populated when SMTP is not configured on the server. */
+  note: string | null
+}
+
+export type AdminEmailProfile = {
+  id: string
+  label: string
+  fromAddress: string
+  fromName: string
+  host: string
+}
+
+export type AdminEmailProfilesResponse = {
+  profiles: AdminEmailProfile[]
+  /** Maximum number of recipients accepted per send. */
+  recipientLimit: number
+}
+
+/** GET /api/admin/email/profiles — list configured sender profiles (no credentials). */
+export async function fetchAdminEmailProfiles(
+  options?: { signal?: AbortSignal },
+): Promise<AdminEmailProfilesResponse> {
+  const data = (await fetchApiJson('/api/admin/email/profiles', {
+    method: 'GET',
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as { profiles?: unknown }).profiles)
+  ) {
+    const raw = data as { profiles: unknown[]; recipientLimit?: unknown }
+    const profiles: AdminEmailProfile[] = []
+    for (const p of raw.profiles) {
+      if (
+        p != null &&
+        typeof p === 'object' &&
+        typeof (p as { id?: unknown }).id === 'string' &&
+        typeof (p as { label?: unknown }).label === 'string' &&
+        typeof (p as { fromAddress?: unknown }).fromAddress === 'string' &&
+        typeof (p as { fromName?: unknown }).fromName === 'string' &&
+        typeof (p as { host?: unknown }).host === 'string'
+      ) {
+        const o = p as AdminEmailProfile
+        profiles.push({
+          id: o.id,
+          label: o.label,
+          fromAddress: o.fromAddress,
+          fromName: o.fromName,
+          host: o.host,
+        })
+      }
+    }
+    const recipientLimit =
+      typeof raw.recipientLimit === 'number' && Number.isFinite(raw.recipientLimit)
+        ? Math.trunc(raw.recipientLimit)
+        : 200
+    return { profiles, recipientLimit }
+  }
+  throw new Error('Unexpected email-profiles response')
+}
+
+/**
+ * POST /api/admin/email/bulk — send a single email addressed (To or Bcc) to many students.
+ * The backend dedupes recipients and validates each email; sends via the chosen SMTP profile
+ * (or the first configured profile when omitted). When no SMTP profiles are configured, the
+ * server returns `delivered: false` with a note explaining what to set, and the modal
+ * surfaces that to the user.
+ */
+export async function sendAdminBulkEmail(
+  input: SendAdminBulkEmailInput,
+  options?: { signal?: AbortSignal },
+): Promise<SendAdminBulkEmailResponse> {
+  const data = (await fetchApiJson('/api/admin/email/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipients: input.recipients,
+      subject: input.subject,
+      body: input.body,
+      recipientField: input.recipientField ?? 'bcc',
+      replyTo: input.replyTo ?? null,
+      profileId: input.profileId ?? null,
+    }),
+    signal: options?.signal,
+  })) as unknown
+
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as { delivered?: unknown }).delivered === 'boolean' &&
+    typeof (data as { recipientCount?: unknown }).recipientCount === 'number'
+  ) {
+    const o = data as {
+      delivered: boolean
+      messageId?: unknown
+      profileId?: unknown
+      recipientCount: number
+      note?: unknown
+    }
+    return {
+      delivered: o.delivered,
+      messageId: typeof o.messageId === 'string' ? o.messageId : null,
+      profileId: typeof o.profileId === 'string' ? o.profileId : null,
+      recipientCount: Math.trunc(o.recipientCount),
+      note: typeof o.note === 'string' ? o.note : null,
+    }
+  }
+  throw new Error('Unexpected bulk-email response')
 }
 
 export async function downloadAdminStudentsCsv(options?: {

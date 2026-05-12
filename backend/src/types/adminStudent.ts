@@ -20,7 +20,10 @@ export type AdminStudentListItem = {
   studentId: string;
   division: "Chinese" | "English" | "Unknown";
   name: string;
+  /** Personal email address from legacy `students.email`. */
   email: string | null;
+  /** AMU-issued email from `students.amu_email`. NULL when not yet on file. */
+  amuEmail: string | null;
   status: string | null;
   program: StudentProgram;
   trackCode: "C" | "E" | null;
@@ -101,7 +104,10 @@ export type AdminStudentDetail = {
   studentId: string;
   division: "Chinese" | "English" | "Unknown";
   name: string;
+  /** Personal email address. */
   email: string | null;
+  /** AMU-issued email address. */
+  amuEmail: string | null;
   program: StudentProgram;
   requirementsId: string | null;
   highestDegree: string | null;
@@ -135,6 +141,7 @@ export type AdminStudentUpdateBody = {
   name: string;
   program: StudentProgram;
   email: string | null;
+  amuEmail: string | null;
   gender: string | null;
   backgroundSchool: string | null;
   highestDegree: string | null;
@@ -175,6 +182,7 @@ export type AdminStudentCreateBody = {
   name: string;
   program: StudentProgram;
   email?: string | null;
+  amuEmail?: string | null;
   gender?: string | null;
   requirementsId?: number | null;
   highestDegree?: string | null;
