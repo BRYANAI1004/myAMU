@@ -1199,7 +1199,10 @@ export type CreateAdminStudentBody = {
   entryDate: string
   name: string
   program: StudentProgram
+  /** Personal email address. */
   email?: string | null
+  /** AMU-issued email address. */
+  amuEmail?: string | null
   gender?: string | null
   requirementsId?: number | null
   highestDegree?: string | null
