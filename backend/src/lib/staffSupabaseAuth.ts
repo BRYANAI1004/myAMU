@@ -134,7 +134,10 @@ export async function signInStaffWithSupabasePassword(
   });
   if (error || !data.session || !data.user) return false;
   const meta = data.user.app_metadata as Record<string, unknown> | undefined;
-  return meta?.account_type === "staff";
+  if (meta?.account_type === "staff") return true;
+  // Block explicit student auth accounts; allow legacy staff rows missing metadata.
+  if (meta?.account_type === "student" || meta?.role === "student") return false;
+  return true;
 }
 
 export function supabaseStaffAuthEnabled(): boolean {
