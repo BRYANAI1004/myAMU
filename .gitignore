@@ -23,6 +23,7 @@ frontend/dist/
 # Local migration exports (large; do not commit)
 scripts/mysql_exports/
 scripts/*.log
+exports/
 
 # Logs and OS noise
 *.log

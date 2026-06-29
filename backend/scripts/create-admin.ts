@@ -1,31 +1,47 @@
 /**
- * Upserts the DB-backed admin (`deanjiang@amu`) into `admin_users`.
- * Other admin emails use legacy hardcoded auth (see `legacyAdminAccounts.ts`).
- * Run after migration `015_admin_users.sql`. Usage (from backend/): `npm run admin:create`
+ * Upserts staff rows into `admin_users` (MySQL). Supabase Auth users are created by
+ * `npm run auth:migrate-staff`. Legacy hardcoded admin accounts were removed.
  */
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { closePool, pool, testDatabaseConnection } from "../src/lib/db.js";
+import { STAFF_SEED_ROWS } from "../src/lib/staffSupabaseAuth.js";
 
-type SeedRow = { email: string; password: string; role: string };
-
-const SEED_ROWS: readonly SeedRow[] = [
-  { email: "deanjiang@amu", password: "deanjiang123", role: "super_admin" },
-] as const;
+async function ensureAdminUsersColumns(): Promise<void> {
+  const [rows] = await pool.query<Array<{ Field: string }>>(
+    `SHOW COLUMNS FROM admin_users LIKE 'username'`,
+  );
+  if (rows.length === 0) {
+    await pool.execute(
+      `ALTER TABLE admin_users
+         ADD COLUMN username varchar(64) NULL AFTER email,
+         ADD COLUMN display_name varchar(255) NULL AFTER username`,
+    );
+    await pool.execute(
+      `ALTER TABLE admin_users
+         ADD UNIQUE KEY uq_admin_users_username (username)`,
+    );
+  }
+}
 
 async function main(): Promise<void> {
   await testDatabaseConnection();
-  for (const row of SEED_ROWS) {
+  await ensureAdminUsersColumns();
+  await pool.execute(`DELETE FROM admin_users`);
+  for (const row of STAFF_SEED_ROWS) {
     const passwordHash = await bcrypt.hash(row.password, 10);
     await pool.execute(
-      `INSERT INTO admin_users (email, password_hash, role)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         password_hash = VALUES(password_hash),
-         role = VALUES(role)`,
-      [row.email, passwordHash, row.role],
+      `INSERT INTO admin_users (email, username, display_name, password_hash, role)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        row.email.trim().toLowerCase(),
+        row.username.trim().toLowerCase(),
+        row.displayName.trim(),
+        passwordHash,
+        row.role,
+      ],
     );
   }
-  console.log(`[admin:create] Upserted ${SEED_ROWS.length} admin_users row(s).`);
+  console.log(`[admin:create] Seeded ${STAFF_SEED_ROWS.length} admin_users row(s).`);
   await closePool();
 }
 

@@ -1,30 +1,12 @@
 import type { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import { env } from "../config/env.js";
 import {
   ADMIN_ACCESS_COOKIE_NAME,
-  issueAdminAccessToken,
   readTokenTtlSecondsPublic,
-  type AdminJwtRole,
-  type AuthenticatedAdmin,
   verifyAdminAccessToken,
   verifyAdminAccessTokenString,
 } from "../lib/adminAuthToken.js";
-import { authenticateLegacyAdmin } from "../lib/legacyAdminAccounts.js";
 import { pool } from "../lib/db.js";
-import { findAdminUserByEmail } from "../repositories/adminUserRepository.js";
-
-const ADMIN_ROLE_SET = new Set<string>([
-  "super_admin",
-  "admin",
-  "teacher",
-  "clinical_teacher",
-  "clinical_admin",
-]);
-
-function isAdminJwtRole(value: string): value is AdminJwtRole {
-  return ADMIN_ROLE_SET.has(value);
-}
+import { authenticateAdminLogin } from "../services/adminAuthService.js";
 
 function readLoginBody(req: Request): { identifier: string; password: string } {
   const body = req.body as Record<string, unknown> | null | undefined;
@@ -36,7 +18,7 @@ function readLoginBody(req: Request): { identifier: string; password: string } {
 }
 
 function clearAdminCookie(res: Response): void {
-  const isProd = env.nodeEnv === "production";
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie(ADMIN_ACCESS_COOKIE_NAME, {
     httpOnly: true,
     secure: isProd,
@@ -46,7 +28,7 @@ function clearAdminCookie(res: Response): void {
 }
 
 function setAdminCookie(res: Response, token: string): void {
-  const isProd = env.nodeEnv === "production";
+  const isProd = process.env.NODE_ENV === "production";
   const maxAgeSeconds = readTokenTtlSecondsPublic();
   res.cookie(ADMIN_ACCESS_COOKIE_NAME, token, {
     httpOnly: true,
@@ -57,19 +39,9 @@ function setAdminCookie(res: Response, token: string): void {
   });
 }
 
-function resolveAdminFromRequest(req: Request): AuthenticatedAdmin | null {
-  const fromAuth = verifyAdminAccessToken(req.headers.authorization);
-  if (fromAuth != null) return fromAuth;
-  const raw = req.cookies?.[ADMIN_ACCESS_COOKIE_NAME];
-  if (typeof raw === "string" && raw.trim() !== "") {
-    return verifyAdminAccessTokenString(raw.trim());
-  }
-  return null;
-}
-
 /**
  * POST /api/admin/auth/login
- * Body: { identifier, password }
+ * Body: { identifier, password } — email or username
  */
 export async function postAdminAuthLogin(req: Request, res: Response): Promise<void> {
   const { identifier, password } = readLoginBody(req);
@@ -83,36 +55,28 @@ export async function postAdminAuthLogin(req: Request, res: Response): Promise<v
   }
 
   try {
-    const row = await findAdminUserByEmail(pool, idNorm);
-    if (row != null) {
-      const match = await bcrypt.compare(pwTrim, row.password_hash);
-      if (!match || !isAdminJwtRole(row.role)) {
-        clearAdminCookie(res);
-        res.status(401).json({ ok: false, error: "Invalid email or password." });
-        return;
-      }
-      const token = issueAdminAccessToken(row.email, row.role as AdminJwtRole);
-      setAdminCookie(res, token);
-      res.status(200).json({
-        ok: true,
-        user: { email: row.email, role: row.role },
-      });
+    const result = await authenticateAdminLogin(pool, identifier, password);
+    if (result == null) {
+      clearAdminCookie(res);
+      res.status(401).json({ ok: false, error: "Invalid email or password." });
       return;
     }
 
-    const legacy = authenticateLegacyAdmin(idNorm, pwTrim);
-    if (legacy != null) {
-      const token = issueAdminAccessToken(legacy.email, legacy.role);
-      setAdminCookie(res, token);
-      res.status(200).json({
-        ok: true,
-        user: { email: legacy.email, role: legacy.role },
-      });
-      return;
-    }
-
-    clearAdminCookie(res);
-    res.status(401).json({ ok: false, error: "Invalid email or password." });
+    setAdminCookie(res, result.accessToken);
+    console.info("[admin/auth] login ok", {
+      email: result.user.email,
+      role: result.user.role,
+      verifiedVia: result.verifiedVia,
+    });
+    res.status(200).json({
+      ok: true,
+      user: {
+        email: result.user.email,
+        role: result.user.role,
+        username: result.user.username,
+        displayName: result.user.displayName,
+      },
+    });
   } catch (e) {
     console.error("[admin/auth/login] failed:", e);
     res.status(500).json({ ok: false, error: "Login failed." });
@@ -129,14 +93,24 @@ export async function postAdminAuthLogout(_req: Request, res: Response): Promise
 
 /**
  * GET /api/admin/auth/me
- * Uses cookie or Bearer; responds 200 with ok flag (no 401) so the SPA can hydrate quietly.
  */
 export async function getAdminAuthMe(req: Request, res: Response): Promise<void> {
-  const user = resolveAdminFromRequest(req);
+  const fromAuth = verifyAdminAccessToken(req.headers.authorization);
+  const user =
+    fromAuth ??
+    (() => {
+      const raw = req.cookies?.[ADMIN_ACCESS_COOKIE_NAME];
+      if (typeof raw === "string" && raw.trim() !== "") {
+        return verifyAdminAccessTokenString(raw.trim());
+      }
+      return null;
+    })();
+
   if (user == null) {
     res.status(200).json({ ok: false });
     return;
   }
+
   res.status(200).json({
     ok: true,
     user: { email: user.email, role: user.role },

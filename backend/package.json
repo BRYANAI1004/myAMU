@@ -25,6 +25,7 @@
     "job:clinical-hold-cleanup": "tsx scripts/runClinicalPaymentHoldCleanup.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "auth:migrate-students": "tsx scripts/migrateStudentsToSupabaseAuth.ts",
+    "auth:migrate-staff": "tsx scripts/migrateStaffToSupabaseAuth.ts",
     "smoke:academics": "tsx scripts/smoke-academics-progress.ts",
     "smoke:withdrawal": "tsx scripts/smoke-portal-withdrawal.ts",
     "dev:worker": "wrangler dev",

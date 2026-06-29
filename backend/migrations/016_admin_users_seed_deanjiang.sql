@@ -1,5 +1,5 @@
 -- Single DB-backed admin seed: deanjiang@amu (password: deanjiang123, bcrypt cost 10).
--- Legacy admin emails remain out of this table; see `legacyAdminAccounts.ts`.
+-- Legacy hardcoded admin accounts were removed; staff roster is seeded via migrateStaffToSupabaseAuth.
 INSERT INTO admin_users (email, password_hash, role)
 VALUES (
   'deanjiang@amu',
