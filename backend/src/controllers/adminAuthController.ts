@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import { env } from "../config/env.js";
 import {
   ADMIN_ACCESS_COOKIE_NAME,

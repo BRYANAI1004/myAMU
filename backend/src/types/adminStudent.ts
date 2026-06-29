@@ -194,5 +194,6 @@ export type AdminStudentCreateBody = {
   city?: string | null;
   state?: string | null;
   zip?: string | null;
-  initialPassword: string;
+  /** When omitted or blank, server derives default from name + student id. */
+  initialPassword?: string | null;
 };

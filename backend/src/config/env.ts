@@ -2,19 +2,31 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, "../../.env");
-// Force re-read on every spawn so tsx watch restarts pick up new SMTP creds.
-const dotenvResult = dotenv.config({ path: envPath, override: true });
-
-if ((process.env.NODE_ENV ?? "development") === "development") {
-  console.log(
-    "[env]",
-    dotenvResult.error
-      ? `.env not loaded from ${envPath}: ${dotenvResult.error.message}`
-      : `.env loaded from ${envPath}`,
-  );
+function loadLocalDotenv(): void {
+  // Workers inject env via wrangler; import.meta.url is unavailable during deploy validation.
+  if (process.env.USE_HYPERDRIVE === "1" && process.env.NODE_ENV === "production") {
+    return;
+  }
+  try {
+    const moduleUrl = import.meta.url;
+    if (typeof moduleUrl !== "string" || moduleUrl.length === 0) return;
+    const dirname = path.dirname(fileURLToPath(moduleUrl));
+    const envPath = path.resolve(dirname, "../../.env");
+    const dotenvResult = dotenv.config({ path: envPath, override: true });
+    if ((process.env.NODE_ENV ?? "development") === "development") {
+      console.log(
+        "[env]",
+        dotenvResult.error
+          ? `.env not loaded from ${envPath}: ${dotenvResult.error.message}`
+          : `.env loaded from ${envPath}`,
+      );
+    }
+  } catch {
+    // Non-Node / Workers bundle — rely on process.env bindings only.
+  }
 }
+
+loadLocalDotenv();
 
 function required(name: string): string {
   const value = process.env[name];
@@ -22,6 +34,21 @@ function required(name: string): string {
     throw new Error(`Missing required environment variable: ${name}`);
   }
   return value;
+}
+
+/** Workers production uses Hyperdrive binding; DB_* env vars are optional then. */
+function useHyperdrive(): boolean {
+  const raw = process.env.USE_HYPERDRIVE?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+function requiredUnlessHyperdrive(name: string, placeholder: string): string {
+  if (useHyperdrive()) {
+    const value = process.env[name];
+    if (value === undefined || value === "") return placeholder;
+    return value;
+  }
+  return required(name);
 }
 
 function optional(name: string): string | null {
@@ -195,11 +222,11 @@ export const env = {
   port: parsePort(process.env.PORT, 3001),
   corsOrigins: parseCorsOrigins(),
   db: {
-    host: required("DB_HOST"),
+    host: requiredUnlessHyperdrive("DB_HOST", "hyperdrive"),
     port: parseDbPort(process.env.DB_PORT, 3306),
-    user: required("DB_USER"),
+    user: requiredUnlessHyperdrive("DB_USER", "hyperdrive"),
     password: process.env.DB_PASSWORD ?? "",
-    database: required("DB_NAME"),
+    database: requiredUnlessHyperdrive("DB_NAME", "school"),
   },
   supabase: {
     url: optional("SUPABASE_URL"),

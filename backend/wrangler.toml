@@ -1,0 +1,46 @@
+# myAMU API — Cloudflare Workers (production)
+# Docs: https://developers.cloudflare.com/workers/tutorials/deploy-an-express-app/
+name = "myamu-api"
+main = "src/worker.ts"
+workers_dev = true
+
+# Node.js HTTP server + Express support
+compatibility_date = "2026-04-23"
+compatibility_flags = [
+  "nodejs_compat",
+  "enable_nodejs_http_modules",
+  "enable_nodejs_http_server_modules",
+]
+
+# Route on wanpanel.ai zone (remove cloudflared tunnel ingress for this hostname first).
+routes = [
+  { pattern = "myamu-api.wanpanel.ai/*", zone_name = "wanpanel.ai" }
+]
+
+[vars]
+NODE_ENV = "production"
+USE_HYPERDRIVE = "1"
+
+# Create with:
+#   npx wrangler hyperdrive create myamu-mysql \
+#     --connection-string="mysql://USER:PASSWORD@HOST:3306/school"
+# Then paste the returned id below.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "20f6041e55724e0489cc08b30bdd8377"
+
+# Secrets (set via CLI, not committed):
+#   npx wrangler secret put STUDENT_AUTH_SECRET
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   npx wrangler secret put AUTHORIZE_API_LOGIN_ID
+#   npx wrangler secret put AUTHORIZE_TRANSACTION_KEY
+#   npx wrangler secret put OPENAI_API_KEY
+# Optional SMTP / Authorize / Supabase bucket vars as needed.
+
+[observability]
+enabled = true
+
+# Express always `require("body-parser")` at import time; stub it for Workers.
+[alias]
+"body-parser" = "./src/worker-shims/body-parser.ts"

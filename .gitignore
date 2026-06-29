@@ -1,6 +1,7 @@
 # Environment and secrets (never commit)
 .env
 backend/.env
+backend/.dev.vars
 frontend/.env
 frontend/.env.*
 !frontend/.env.example
@@ -17,6 +18,11 @@ frontend/dist/
 .vite/
 *.tsbuildinfo
 .cache/
+.cursor/
+
+# Local migration exports (large; do not commit)
+scripts/mysql_exports/
+scripts/*.log
 
 # Logs and OS noise
 *.log

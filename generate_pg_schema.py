@@ -15,20 +15,26 @@ from __future__ import annotations
 
 import re
 import sys
+import os
 from pathlib import Path
 from typing import Iterable
 
 
 MYSQL_CONFIG = {
-    "host": "school-db.cd6o8awqe4ig.us-east-2.rds.amazonaws.com",
-    "user": "admin",
-    "password": "School123!aws",
-    "database": "school",
-    "port": 3306,
+    "host": os.environ.get("DB_HOST", "school-db.cd6o8awqe4ig.us-east-2.rds.amazonaws.com"),
+    "user": os.environ.get("DB_USER", "admin"),
+    "password": os.environ.get("DB_PASSWORD", "School123!aws"),
+    "database": os.environ.get("DB_NAME", "school"),
+    "port": int(os.environ.get("DB_PORT", "3306")),
     "ssl": True,
 }
 
-OUTPUT_PATH = Path("/Users/alt./Desktop/pg_schema.sql")
+OUTPUT_PATH = Path(
+    os.environ.get(
+        "PG_SCHEMA_OUTPUT",
+        str(Path(__file__).resolve().parent / "scripts" / "pg_schema.sql"),
+    )
+)
 
 
 def connect_mysql():

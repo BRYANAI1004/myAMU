@@ -148,7 +148,13 @@ function parseCreateBody(raw: unknown): ParseBodyResult<AdminStudentCreateBody> 
   if (raw.division !== "Chinese" && raw.division !== "English") {
     return { ok: false, error: "Invalid request body." };
   }
-  if (typeof raw.name !== "string" || typeof raw.initialPassword !== "string") {
+  if (typeof raw.name !== "string") {
+    return { ok: false, error: "Invalid request body." };
+  }
+  if (
+    raw.initialPassword != null &&
+    typeof raw.initialPassword !== "string"
+  ) {
     return { ok: false, error: "Invalid request body." };
   }
   const entryDate = parseEntryDateFromBody(raw.entryDate);
@@ -180,7 +186,8 @@ function parseCreateBody(raw: unknown): ParseBodyResult<AdminStudentCreateBody> 
       city: parseNullableStringField(raw.city),
       state: parseNullableStringField(raw.state),
       zip: parseNullableStringField(raw.zip),
-      initialPassword: raw.initialPassword,
+      initialPassword:
+        typeof raw.initialPassword === "string" ? raw.initialPassword : null,
     },
   };
 }

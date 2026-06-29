@@ -2,9 +2,14 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import { env } from "./config/env.js";
+import { workersDbMiddleware } from "./lib/db.js";
+import { workersJsonBodyParser } from "./middleware/workersJsonBody.js";
 import { apiRouter } from "./routes/index.js";
 
 export const app = express();
+
+const isWorkersRuntime =
+  process.env.USE_HYPERDRIVE === "1" && process.env.NODE_ENV === "production";
 
 /** Browser origins allowed for CORS (production + local Vite; env merges extra hosts). */
 const requiredCorsOrigins = new Set([
@@ -43,5 +48,10 @@ app.use(cors(corsOptions));
 /** Same options as `app.use(cors)` so preflight gets Allow-Credentials + explicit origin (not `*`). */
 app.options("*", cors(corsOptions));
 app.use(cookieParser());
-app.use(express.json());
+if (isWorkersRuntime) {
+  app.use(workersDbMiddleware);
+  app.use(workersJsonBodyParser);
+} else {
+  app.use(express.json());
+}
 app.use("/api", apiRouter);

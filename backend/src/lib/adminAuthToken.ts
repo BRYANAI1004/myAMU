@@ -67,7 +67,14 @@ function readAdminAuthSecret(): string {
   throw new Error("Missing required environment variable: ADMIN_AUTH_SECRET");
 }
 
-const ADMIN_AUTH_SECRET = readAdminAuthSecret();
+let cachedAdminAuthSecret: string | null = null;
+
+function getAdminAuthSecret(): string {
+  if (cachedAdminAuthSecret == null) {
+    cachedAdminAuthSecret = readAdminAuthSecret();
+  }
+  return cachedAdminAuthSecret;
+}
 
 function readTokenTtlSeconds(): number {
   return parsePositiveInt(
@@ -77,7 +84,7 @@ function readTokenTtlSeconds(): number {
 }
 
 function sign(input: string): string {
-  return createHmac("sha256", ADMIN_AUTH_SECRET)
+  return createHmac("sha256", getAdminAuthSecret())
     .update(input)
     .digest("base64url");
 }

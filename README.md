@@ -118,6 +118,71 @@ npm run start -w backend
 
 Serve the contents of `frontend/dist/` with your static host or reverse proxy, and point the SPA’s `VITE_API_BASE_URL` at the deployed API during the build step.
 
+## Production API (Cloudflare Workers)
+
+The production API is deployed to **Cloudflare Workers** with **Wrangler**, not a long-running Node process or tunnel.
+
+| Item | Value |
+|------|-------|
+| Worker name | `myamu-api` |
+| Public URL | `https://myamu-api.wanpanel.ai` |
+| Config | `backend/wrangler.toml` |
+| Entry | `backend/src/worker.ts` (Express via `httpServerHandler`) |
+| Database | **Hyperdrive** → MySQL (AWS RDS or other host) |
+
+### First-time setup
+
+1. **Install backend deps** (includes Wrangler):
+
+   ```bash
+   npm install
+   ```
+
+2. **Create a Hyperdrive config** pointing at your production MySQL:
+
+   ```bash
+   cd backend
+   npx wrangler hyperdrive create myamu-mysql \
+     --connection-string="mysql://USER:PASSWORD@HOST:3306/school"
+   ```
+
+   Copy the returned id into `backend/wrangler.toml` → `[[hyperdrive]].id`.
+
+3. **Set Worker secrets** (repeat for each):
+
+   ```bash
+   npx wrangler secret put STUDENT_AUTH_SECRET
+   npx wrangler secret put SUPABASE_URL
+   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+   # Authorize.net, OpenAI, SMTP as needed
+   ```
+
+4. **Deploy**:
+
+   ```bash
+   npm run deploy -w backend
+   ```
+
+5. **Verify**:
+
+   ```bash
+   curl -sS https://myamu-api.wanpanel.ai/api/health
+   curl -sS https://myamu-api.wanpanel.ai/api/health/db
+   ```
+
+### Local Worker dev
+
+```bash
+cp backend/.dev.vars.example backend/.dev.vars
+npm run dev:worker -w backend
+```
+
+### Notes
+
+- **Socket.IO realtime** is not available on Workers (`upgrade` unsupported). Enrollment change events are skipped gracefully; the rest of the API works normally.
+- **Admin login** uses `bcryptjs` on Workers (compatible with existing bcrypt password hashes).
+- Remove or disable the old **cloudflared tunnel** route for `myamu-api.wanpanel.ai` once the Worker is live — two origins on the same hostname cause conflicts (HTTP 530 / 1033).
+
 ## License / support
 
 Internal project configuration; add your organization’s license or support contacts here if needed.

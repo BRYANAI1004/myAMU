@@ -1214,7 +1214,8 @@ export type CreateAdminStudentBody = {
   city?: string | null
   state?: string | null
   zip?: string | null
-  initialPassword: string
+  /** When omitted, server uses given name + last 4 of student id. */
+  initialPassword?: string | null
 }
 
 export async function fetchNextAdminStudentId(

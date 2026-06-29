@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,8 +25,16 @@ export type KnowledgeIndexFileV2 = {
 };
 
 export function knowledgeChunksFilePath(): string {
-  const dir = path.dirname(fileURLToPath(import.meta.url));
-  return path.resolve(dir, "../../knowledge/build/knowledge_chunks.json");
+  try {
+    const moduleUrl = import.meta.url;
+    if (typeof moduleUrl !== "string" || moduleUrl.length === 0) {
+      return "knowledge/build/knowledge_chunks.json";
+    }
+    const dir = path.dirname(fileURLToPath(moduleUrl));
+    return path.resolve(dir, "../../knowledge/build/knowledge_chunks.json");
+  } catch {
+    return "knowledge/build/knowledge_chunks.json";
+  }
 }
 
 export function cosineSimilarity(a: number[], b: number[]): number {
@@ -143,9 +150,16 @@ function isKnowledgeIndexV2(x: unknown): x is KnowledgeIndexFileV2 {
 }
 
 export async function loadKnowledgeChunks(): Promise<KnowledgeChunkRow[]> {
+  if (process.env.USE_HYPERDRIVE === "1") {
+    throw new Error(
+      "Knowledge RAG file loading is unavailable on Cloudflare Workers. Use OpenAI tooling locally or host chunks in R2/KV.",
+    );
+  }
+
   const filePath = knowledgeChunksFilePath();
   let raw: string;
   try {
+    const fs = await import("node:fs/promises");
     raw = await fs.readFile(filePath, "utf-8");
   } catch (e) {
     const err = e as NodeJS.ErrnoException;

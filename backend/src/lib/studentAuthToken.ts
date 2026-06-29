@@ -46,7 +46,14 @@ function readStudentAuthSecret(): string {
   throw new Error("Missing required environment variable: STUDENT_AUTH_SECRET");
 }
 
-const STUDENT_AUTH_SECRET = readStudentAuthSecret();
+let cachedStudentAuthSecret: string | null = null;
+
+function getStudentAuthSecret(): string {
+  if (cachedStudentAuthSecret == null) {
+    cachedStudentAuthSecret = readStudentAuthSecret();
+  }
+  return cachedStudentAuthSecret;
+}
 
 function readTokenTtlSeconds(): number {
   return parsePositiveInt(
@@ -56,7 +63,7 @@ function readTokenTtlSeconds(): number {
 }
 
 function sign(input: string): string {
-  return createHmac("sha256", STUDENT_AUTH_SECRET)
+  return createHmac("sha256", getStudentAuthSecret())
     .update(input)
     .digest("base64url");
 }

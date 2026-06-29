@@ -11,10 +11,12 @@
   "scripts": {
     "dev": "concurrently -n web,api -c blue,green \"npm run dev -w frontend\" \"npm run dev -w backend\"",
     "build": "npm run build -w backend && npm run build -w frontend",
-    "seed": "npm run seed -w backend"
+    "seed": "npm run seed -w backend",
+    "supabase": "supabase"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "supabase": "^2.108.0"
   },
   "dependencies": {
     "lottie-react": "^2.4.1",

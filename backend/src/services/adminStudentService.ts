@@ -1,4 +1,5 @@
 import { pool } from "../lib/db.js";
+import { defaultStudentPassword } from "../lib/defaultStudentPassword.js";
 import {
   createLegacyStudentLoaRow,
   createLegacyStudentMasterRow,
@@ -1024,15 +1025,6 @@ export async function createAdminStudent(
     };
   }
 
-  const initialPassword = str(body.initialPassword);
-  if (initialPassword === "") {
-    return {
-      ok: false,
-      status: 400,
-      message: `${DATE_VALIDATION_PREFIX} initialPassword is required.`,
-    };
-  }
-
   const signed = sqlDateFromBodyField("signedDate", body.signedDate);
   if (signed.kind === "error") {
     return { ok: false, status: 400, message: signed.message };
@@ -1103,6 +1095,10 @@ export async function createAdminStudent(
       studentId,
       ...insertPayload,
     });
+    const initialPassword =
+      str(body.initialPassword) !== ""
+        ? str(body.initialPassword)
+        : defaultStudentPassword(name, studentId);
     await createLegacyStudentPasswordRow(
       connection,
       studentId,

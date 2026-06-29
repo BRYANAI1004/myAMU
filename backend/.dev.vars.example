@@ -1,0 +1,14 @@
+# Copy to `.dev.vars` for `wrangler dev` (never commit `.dev.vars`).
+# MySQL is provided via Hyperdrive in wrangler.toml — these are optional locally
+# when USE_HYPERDRIVE=1, but set them if you run the worker against Hyperdrive
+# without a local tunnel.
+
+USE_HYPERDRIVE=1
+NODE_ENV=development
+
+STUDENT_AUTH_SECRET=dev-only-change-me
+# SUPABASE_URL=
+# SUPABASE_SERVICE_ROLE_KEY=
+# AUTHORIZE_API_LOGIN_ID=
+# AUTHORIZE_TRANSACTION_KEY=
+# OPENAI_API_KEY=

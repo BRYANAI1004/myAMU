@@ -11,6 +11,7 @@ import {
   ADMIN_GENDER_SELECT_VALUES,
   ADMIN_HIGHEST_DEGREE_VALUES,
 } from '../../lib/adminStudentFields'
+import { defaultStudentPassword } from '../../lib/defaultStudentPassword'
 
 function nullableTrim(s: string): string | null {
   const t = s.trim()
@@ -61,7 +62,8 @@ export function AdminStudentCreatePage() {
 
   const [name, setName] = useState('')
   const [program, setProgram] = useState<StudentProgram | ''>('')
-  const [initialPassword, setInitialPassword] = useState('')
+  const [useCustomPassword, setUseCustomPassword] = useState(false)
+  const [customPassword, setCustomPassword] = useState('')
   const [email, setEmail] = useState('')
   const [amuEmail, setAmuEmail] = useState('')
   const [gender, setGender] = useState('')
@@ -130,6 +132,14 @@ export function AdminStudentCreatePage() {
     [requirementsId],
   )
 
+  const suggestedPassword = useMemo(() => {
+    const trimmedName = name.trim()
+    if (trimmedName === '' || previewId == null || previewId.trim() === '') {
+      return null
+    }
+    return defaultStudentPassword(trimmedName, previewId)
+  }, [name, previewId])
+
   const submitBlockers = useMemo(() => {
     const reasons: string[] = []
     if (division !== 'Chinese' && division !== 'English') {
@@ -149,8 +159,11 @@ export function AdminStudentCreatePage() {
     if (program !== 'DAHM' && program !== 'MAHM') {
       reasons.push('Program is required')
     }
-    if (initialPassword.trim() === '') {
-      reasons.push('Initial password is required')
+    if (useCustomPassword && customPassword.trim() === '') {
+      reasons.push('Custom initial password is required when override is enabled')
+    }
+    if (!useCustomPassword && suggestedPassword == null) {
+      reasons.push('Default password preview is not ready yet')
     }
     if (requirementsParsed === 'invalid') {
       reasons.push('Requirements ID must be a whole number or blank')
@@ -158,13 +171,15 @@ export function AdminStudentCreatePage() {
     return reasons
   }, [
     canPreview,
+    customPassword,
     division,
     entryDate,
-    initialPassword,
     name,
-    program,
     previewError,
+    program,
     requirementsParsed,
+    suggestedPassword,
+    useCustomPassword,
   ])
 
   const formValid = submitBlockers.length === 0
@@ -185,7 +200,9 @@ export function AdminStudentCreatePage() {
       entryDate: entryDate.trim(),
       name: name.trim(),
       program,
-      initialPassword,
+      ...(useCustomPassword
+        ? { initialPassword: customPassword.trim() }
+        : {}),
       email: nullableTrim(email),
       amuEmail: nullableTrim(amuEmail),
       gender: nullableTrim(gender),
@@ -372,18 +389,36 @@ export function AdminStudentCreatePage() {
           </div>
 
           <div className="portal-stack" style={{ gap: '0.35rem' }}>
-            <label htmlFor="admin-create-password" className="portal-card-note" style={{ margin: 0 }}>
-              Initial password *
+            <p className="portal-card-note" style={{ margin: 0 }}>
+              Initial password
+            </p>
+            <p className="portal-card-note" style={{ margin: 0 }}>
+              Default rule: given name (from &quot;Last, First&quot;) + last 4 of student ID.
+              Example: Wang, Teng-Huei + C17310 → <strong>Teng-Huei7310</strong>
+            </p>
+            <p className="portal-card-note" style={{ margin: 0 }}>
+              Preview:{' '}
+              <strong>{suggestedPassword ?? 'Enter name and wait for student ID preview'}</strong>
+            </p>
+            <label className="portal-card-note" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+              <input
+                type="checkbox"
+                checked={useCustomPassword}
+                onChange={(ev) => setUseCustomPassword(ev.target.checked)}
+              />
+              Use a custom initial password instead
             </label>
-            <input
-              id="admin-create-password"
-              type="password"
-              autoComplete="new-password"
-              className="admin-input"
-              style={{ width: '100%', maxWidth: '100%' }}
-              value={initialPassword}
-              onChange={(ev) => setInitialPassword(ev.target.value)}
-            />
+            {useCustomPassword ? (
+              <input
+                id="admin-create-password"
+                type="password"
+                autoComplete="new-password"
+                className="admin-input"
+                style={{ width: '100%', maxWidth: '100%' }}
+                value={customPassword}
+                onChange={(ev) => setCustomPassword(ev.target.value)}
+              />
+            ) : null}
           </div>
 
           <div className="portal-stack" style={{ gap: '0.35rem' }}>
