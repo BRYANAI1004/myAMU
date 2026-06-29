@@ -26,6 +26,8 @@ type AcceptSecureData = {
     month: string
     year: string
     cardCode: string
+    fullName: string
+    zip: string
   }
 }
 

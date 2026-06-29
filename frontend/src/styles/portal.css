@@ -2228,6 +2228,23 @@ select.portal-profile-input {
   color: var(--portal-text-muted);
 }
 
+.portal-finance-payment-modal__field .card-input-wrapper input {
+  width: 100%;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--portal-border, #d4d4d8);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface, #fff);
+  color: var(--portal-text);
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.portal-finance-payment-modal__field .card-input-wrapper input:focus-visible {
+  outline: 2px solid var(--portal-accent);
+  outline-offset: 2px;
+}
+
 .portal-finance-payment-modal__expiry-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3305,6 +3322,10 @@ table.portal-table--ledger td.portal-table--ledger-col-money {
   padding-right: 9.5rem;
 }
 
+.card-number-input--network-detected {
+  padding-right: 3.25rem;
+}
+
 .card-brand-icons {
   position: absolute;
   right: 0.8125rem;
@@ -3314,6 +3335,18 @@ table.portal-table--ledger td.portal-table--ledger-col-money {
   align-items: center;
   gap: 0.625rem;
   pointer-events: none;
+}
+
+.card-brand-icons--placeholder img {
+  opacity: 0.35;
+}
+
+.card-brand-icons--detected img.card-brand-icons__active {
+  opacity: 1;
+}
+
+.portal-finance-checkout-form__network-detected {
+  margin: 0.35rem 0 0;
 }
 
 .card-brand-icons img {
@@ -3355,6 +3388,16 @@ table.portal-table--ledger td.portal-table--ledger-col-money {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 0.75rem;
+}
+
+.portal-finance-checkout-form__card-meta-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+.portal-finance-checkout-form__helper--flush {
+  margin-top: -0.15rem;
 }
 
 .portal-finance-checkout-form__helper {
@@ -3432,6 +3475,10 @@ table.portal-table--ledger td.portal-table--ledger-col-money {
     grid-template-columns: 1fr;
   }
 
+  .portal-finance-checkout-form__card-meta-row {
+    grid-template-columns: 1fr;
+  }
+
   .portal-finance-checkout-form__input-wrap--card-number input {
     padding-right: 8.75rem;
   }
@@ -3448,6 +3495,10 @@ table.portal-table--ledger td.portal-table--ledger-col-money {
 
   .card-number-input {
     padding-right: 8.75rem;
+  }
+
+  .card-number-input--network-detected {
+    padding-right: 3rem;
   }
 
   .card-brand-icons {

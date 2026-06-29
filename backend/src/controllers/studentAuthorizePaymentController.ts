@@ -160,6 +160,8 @@ export async function postAuthorizeNetChargeHandler(
       installmentCount: parsed.value.installmentCount,
       opaqueData: parsed.value.opaqueData,
       cardBinPrefix: parsed.value.cardBinPrefix,
+      cardholderName: parsed.value.cardholderName,
+      billingZip: parsed.value.billingZip,
     });
     res.json({
       ok: true,
@@ -230,6 +232,8 @@ export async function postAuthorizeNetTuitionChargeHandler(
       installmentCount: parsed.value.installmentCount,
       opaqueData: parsed.value.opaqueData,
       cardBinPrefix: parsed.value.cardBinPrefix,
+      cardholderName: parsed.value.cardholderName,
+      billingZip: parsed.value.billingZip,
     });
     res.json({
       ok: true,
@@ -290,6 +294,8 @@ export async function postAuthorizeNetClinicFeeChargeHandler(
       installmentCount: 1,
       opaqueData: parsed.value.opaqueData,
       cardBinPrefix: parsed.value.cardBinPrefix,
+      cardholderName: parsed.value.cardholderName,
+      billingZip: parsed.value.billingZip,
     });
     res.json({
       ok: true,

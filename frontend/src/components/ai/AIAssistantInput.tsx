@@ -1,4 +1,5 @@
 import type { Ref } from 'react'
+import { AI_ASSISTANT_COMING_SOON } from '@/lib/aiAssistantConfig'
 import { useStudentPortalT } from '../../LanguageContext'
 
 type AIAssistantInputProps = {
@@ -20,8 +21,9 @@ export function AIAssistantInput({
 }: AIAssistantInputProps) {
   const t = useStudentPortalT()
 
-  const canSend = value.trim() !== ''
+  const canSend = value.trim() !== '' && !AI_ASSISTANT_COMING_SOON
   const sendDisabled = Boolean(disabled || !canSend)
+  const inputDisabled = Boolean(disabled || AI_ASSISTANT_COMING_SOON)
 
   return (
     <div className="portal-ai-assistant-input-stack">
@@ -38,7 +40,7 @@ export function AIAssistantInput({
           className="portal-ai-assistant-input"
           rows={1}
           value={value}
-          disabled={disabled}
+          disabled={inputDisabled}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key !== 'Enter' || e.shiftKey) return
@@ -46,7 +48,11 @@ export function AIAssistantInput({
             e.preventDefault()
             onSubmit()
           }}
-          placeholder={t('askAQuestionPlaceholder')}
+          placeholder={
+            AI_ASSISTANT_COMING_SOON
+              ? t('askAQuestionComingSoonPlaceholder')
+              : t('askAQuestionPlaceholder')
+          }
           autoComplete="off"
         />
         <button

@@ -1698,6 +1698,10 @@ export type AuthorizeNetChargeRequest = {
   opaqueData: AuthorizeNetOpaqueData
   /** First 6–8 digits of the card; must match server-side BIN rules. */
   cardBinPrefix: string
+  /** Name as printed on the card. */
+  cardholderName: string
+  /** US billing ZIP (5 digits or ZIP+4) for AVS. */
+  billingZip: string
 }
 
 export type AuthorizeNetChargeResponse = {

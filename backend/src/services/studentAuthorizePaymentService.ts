@@ -7,6 +7,10 @@ import {
   normalizeCardBinPrefix,
 } from "./cardFundingFromBin.js";
 import { totalChargeWithProcessingFee } from "./creditCardProcessingFee.js";
+import {
+  parsePaymentBillingDetails,
+  splitCardholderNameForBillTo,
+} from "./paymentBillingFields.js";
 
 export { proportionalProcessingFeeRefund } from "./creditCardProcessingFee.js";
 import {
@@ -44,6 +48,8 @@ export type AuthorizeChargeBody = {
   opaqueData: OpaqueDataInput;
   /** First 6–8 digits of the PAN (BIN); used only for credit vs debit fee rules. */
   cardBinPrefix: string;
+  cardholderName: string;
+  billingZip: string;
 };
 
 export type AuthorizeChargeResult = {
@@ -493,6 +499,10 @@ export function parseAuthorizeChargeBody(
       error: "cardBinPrefix must be the first 6–8 digits of the card number.",
     };
   }
+  const billing = parsePaymentBillingDetails(o);
+  if (!billing.ok) {
+    return billing;
+  }
   return {
     ok: true,
     value: {
@@ -507,6 +517,8 @@ export function parseAuthorizeChargeBody(
         dataValue: value,
       },
       cardBinPrefix,
+      cardholderName: billing.value.cardholderName,
+      billingZip: billing.value.billingZip,
     },
   };
 }
@@ -520,6 +532,8 @@ export async function processAuthorizeNetStudentPayment(input: {
   installmentCount: 1 | 2 | 3;
   opaqueData: OpaqueDataInput;
   cardBinPrefix: string;
+  cardholderName: string;
+  billingZip: string;
 }): Promise<AuthorizeChargeResult> {
   const parsedTerm = parseTermCode(input.termInput);
   if (!parsedTerm) {
@@ -558,6 +572,7 @@ export async function processAuthorizeNetStudentPayment(input: {
   const { base, fee, total } = totalChargeWithProcessingFee(amount, cardFunding);
   const invoiceNumber = invoiceNumberFor(input.studentId);
   const referenceId = referenceIdFor(input.studentId);
+  const billToNames = splitCardholderNameForBillTo(input.cardholderName);
   const charged = await chargeAuthorizeOpaqueData({
     amount: total,
     opaqueData: input.opaqueData,
@@ -565,6 +580,11 @@ export async function processAuthorizeNetStudentPayment(input: {
     referenceId,
     studentId: input.studentId,
     termCode: parsedTerm.termCode,
+    billTo: {
+      firstName: billToNames.firstName,
+      lastName: billToNames.lastName,
+      zip: input.billingZip,
+    },
   });
 
   const feePart =

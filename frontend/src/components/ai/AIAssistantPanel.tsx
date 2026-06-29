@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { PointerEvent as ReactPointerEvent, Ref } from 'react'
+import { AI_ASSISTANT_COMING_SOON } from '@/lib/aiAssistantConfig'
 import { useStudentPortalT } from '../../LanguageContext'
 import type { AIAssistantChatMessage } from '../../hooks/useAIAssistant'
 import { AIAssistantBrandTitle } from './AIAssistantBrandTitle'
@@ -55,7 +56,11 @@ export function AIAssistantPanel({
 
   return (
     <section
-      className="portal-ai-assistant-panel"
+      className={
+        AI_ASSISTANT_COMING_SOON
+          ? 'portal-ai-assistant-panel portal-ai-assistant-panel--coming-soon'
+          : 'portal-ai-assistant-panel'
+      }
       role="dialog"
       aria-modal="false"
       aria-labelledby="portal-ai-assistant-title"
@@ -135,7 +140,11 @@ export function AIAssistantPanel({
                 }
               >
                 {m.welcomeLines?.length ? (
-                  <AIAssistantWelcomeMessage lines={m.welcomeLines} lottieSize={WELCOME_LOTTIE_PX} />
+                  <AIAssistantWelcomeMessage
+                    lines={m.welcomeLines}
+                    lottieSize={WELCOME_LOTTIE_PX}
+                    comingSoon={AI_ASSISTANT_COMING_SOON}
+                  />
                 ) : (
                   m.content
                 )}

@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  CardNetworkDetectedNote,
+  CardNetworkIcons,
+  useDetectedCardNetwork,
+} from '@/components/finance/CardNetworkDisplay'
 import { postAuthorizeNetCharge } from '@/lib/api'
 import { formatMoney } from '@/lib/formatMoney'
 import { cardBinPrefixFromPan, inferCardFundingFromPan } from '@/lib/cardFundingFromBin'
@@ -7,6 +12,12 @@ import {
   roundMoney,
   totalWithProcessingFee,
 } from '@/lib/creditCardProcessingFee'
+import {
+  formatBillingZipInput,
+  isValidCardholderName,
+  normalizeBillingZip,
+  normalizeCardholderName,
+} from '@/lib/paymentBillingFields'
 
 type FinancePaymentModalProps = {
   isOpen: boolean
@@ -50,6 +61,8 @@ declare global {
             month: string
             year: string
             cardCode: string
+            fullName: string
+            zip: string
           }
         },
         callback: (response: AcceptDispatchSuccessResponse) => void,
@@ -109,7 +122,14 @@ function loadAcceptJs(): Promise<void> {
 
 function dispatchAcceptData(secureData: {
   authData: { apiLoginID: string; clientKey: string }
-  cardData: { cardNumber: string; month: string; year: string; cardCode: string }
+  cardData: {
+    cardNumber: string
+    month: string
+    year: string
+    cardCode: string
+    fullName: string
+    zip: string
+  }
 }): Promise<AcceptOpaqueData> {
   return new Promise((resolve, reject) => {
     if (!window.Accept?.dispatchData) {
@@ -141,10 +161,12 @@ export function FinancePaymentModal({
   onPaymentSuccess,
 }: FinancePaymentModalProps) {
   const [amount, setAmount] = useState(() => roundMoney(Math.max(0, balanceDue)).toFixed(2))
+  const [cardholderName, setCardholderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [expMonth, setExpMonth] = useState('')
   const [expYear, setExpYear] = useState('')
   const [cvv, setCvv] = useState('')
+  const [billingZip, setBillingZip] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [scriptReady, setScriptReady] = useState(false)
@@ -152,10 +174,12 @@ export function FinancePaymentModal({
   useEffect(() => {
     if (!isOpen) return
     setAmount(roundMoney(Math.max(0, balanceDue)).toFixed(2))
+    setCardholderName('')
     setCardNumber('')
     setExpMonth('')
     setExpYear('')
     setCvv('')
+    setBillingZip('')
     setError(null)
     setSubmitting(false)
     setScriptReady(false)
@@ -180,6 +204,7 @@ export function FinancePaymentModal({
   }, [amountNum, balanceDue])
 
   const cardFunding = useMemo(() => inferCardFundingFromPan(cardNumber), [cardNumber])
+  const detectedNetwork = useDetectedCardNetwork(cardNumber)
   const processingFee = useMemo(
     () => (Number.isFinite(amountNum) ? computeCreditCardProcessingFee(amountNum, cardFunding) : 0),
     [amountNum, cardFunding],
@@ -240,6 +265,18 @@ export function FinancePaymentModal({
       setCvv('')
       return
     }
+    if (!isValidCardholderName(cardholderName)) {
+      setError('Enter the full name as printed on your card (2–64 characters).')
+      setCvv('')
+      return
+    }
+    const normalizedZip = normalizeBillingZip(billingZip)
+    if (normalizedZip == null) {
+      setError('Enter a valid 5-digit US ZIP or ZIP+4 code.')
+      setCvv('')
+      return
+    }
+    const normalizedCardholderName = normalizeCardholderName(cardholderName)
 
     setSubmitting(true)
     setError(null)
@@ -254,6 +291,8 @@ export function FinancePaymentModal({
           month: expMonth,
           year: expYear,
           cardCode: cvv,
+          fullName: normalizedCardholderName,
+          zip: normalizedZip,
         },
       })
       const result = await postAuthorizeNetCharge(
@@ -265,6 +304,8 @@ export function FinancePaymentModal({
           installmentCount: 1,
           opaqueData,
           cardBinPrefix,
+          cardholderName: normalizedCardholderName,
+          billingZip: normalizedZip,
         },
         { authToken: authToken?.trim() || undefined },
       )
@@ -324,17 +365,41 @@ export function FinancePaymentModal({
         </label>
 
         <label className="portal-finance-payment-modal__field">
-          <span>Card Number</span>
+          <span>Name on card</span>
           <input
             type="text"
-            inputMode="numeric"
-            autoComplete="cc-number"
-            maxLength={19}
-            value={cardNumber}
-            onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, ''))}
+            autoComplete="cc-name"
+            placeholder="Full name as shown on card"
+            maxLength={64}
+            value={cardholderName}
+            onChange={(e) => setCardholderName(e.target.value)}
             disabled={submitting}
             required
           />
+        </label>
+
+        <label className="portal-finance-payment-modal__field">
+          <span>Card Number</span>
+          <div className="portal-finance-checkout-form__input-wrap portal-finance-checkout-form__input-wrap--card-number card-input-wrapper">
+            <input
+              className={[
+                'card-number-input',
+                detectedNetwork != null ? 'card-number-input--network-detected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-number"
+              maxLength={19}
+              value={cardNumber}
+              onChange={(e) => setCardNumber(e.target.value.replace(/\D/g, ''))}
+              disabled={submitting}
+              required
+            />
+            <CardNetworkIcons cardNumber={cardNumber} />
+          </div>
+          <CardNetworkDetectedNote cardNumber={cardNumber} />
         </label>
 
         {cardNumber.replace(/\D/g, '').length >= 6 && Number.isFinite(amountNum) ? (
@@ -407,6 +472,21 @@ export function FinancePaymentModal({
             maxLength={4}
             value={cvv}
             onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
+            disabled={submitting}
+            required
+          />
+        </label>
+
+        <label className="portal-finance-payment-modal__field">
+          <span>Billing ZIP</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="postal-code"
+            placeholder="12345"
+            maxLength={10}
+            value={billingZip}
+            onChange={(e) => setBillingZip(formatBillingZipInput(e.target.value))}
             disabled={submitting}
             required
           />

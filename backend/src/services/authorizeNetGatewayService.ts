@@ -3,6 +3,12 @@ type OpaqueDataInput = {
   dataValue: string;
 };
 
+type BillingBillTo = {
+  firstName: string;
+  lastName: string;
+  zip: string;
+};
+
 type ChargeOpaqueDataInput = {
   amount: number;
   opaqueData: OpaqueDataInput;
@@ -10,6 +16,7 @@ type ChargeOpaqueDataInput = {
   invoiceNumber: string;
   studentId: string;
   termCode: string;
+  billTo: BillingBillTo;
 };
 
 export type AuthorizeNetChargeResult = {
@@ -141,6 +148,12 @@ export async function chargeAuthorizeOpaqueData(
         },
         customer: {
           id: input.studentId.trim(),
+        },
+        billTo: {
+          firstName: input.billTo.firstName,
+          lastName: input.billTo.lastName,
+          zip: input.billTo.zip.slice(0, 5),
+          country: "US",
         },
       },
     },

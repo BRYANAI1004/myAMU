@@ -142,6 +142,45 @@
   margin-bottom: 0;
 }
 
+.portal-ai-assistant-welcome__coming-soon {
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--portal-ai-red);
+}
+
+.portal-ai-assistant-coming-soon-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(242, 195, 0, 0.22);
+  color: var(--portal-ai-red-dark);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.portal-ai-assistant-coming-soon-badge--minimized {
+  margin-left: 0.4rem;
+  font-size: 0.62rem;
+}
+
+.portal-ai-assistant-panel--coming-soon .portal-ai-assistant-input:disabled {
+  background: #f8f9fb;
+  color: var(--portal-ai-muted);
+  cursor: not-allowed;
+}
+
+.portal-ai-assistant-panel--coming-soon .portal-ai-assistant-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .portal-ai-assistant-bubble--welcome {
   max-width: 100%;
   padding: 0.55rem 0.65rem;

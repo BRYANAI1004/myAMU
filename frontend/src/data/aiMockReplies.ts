@@ -1,4 +1,5 @@
 import { t, type PortalLocale, type StudentPortalKey } from '@/lib/i18n'
+import { AI_ASSISTANT_COMING_SOON } from '@/lib/aiAssistantConfig'
 
 export type AIAssistantPageContext =
   | 'registration'
@@ -39,6 +40,9 @@ export function getWelcomeLines(
   locale: PortalLocale,
   context: AIAssistantPageContext,
 ): readonly string[] {
+  if (AI_ASSISTANT_COMING_SOON) {
+    return [t(locale, 'aiWelcomeHi'), t(locale, 'aiComingSoonMessage')]
+  }
   const [a, b] = WELCOME_KEY_PAIRS[context]
   return [t(locale, a), t(locale, b)]
 }

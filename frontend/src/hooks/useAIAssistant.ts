@@ -4,6 +4,7 @@ import { getWelcomeLines } from '../data/aiMockReplies'
 import { useLanguage } from '../LanguageContext'
 import { useAccount } from '../context/AccountContext'
 import { extractConversationFacts } from '../lib/aiConversationFacts'
+import { AI_ASSISTANT_COMING_SOON } from '../lib/aiAssistantConfig'
 import { api } from '../lib/api'
 import { t as portalT, type PortalLocale } from '../lib/i18n'
 import type { SendAssistantAttachmentPayload } from '../lib/sendAssistantMessage'
@@ -244,6 +245,7 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
   }, [])
 
   const submitDraft = useCallback(async () => {
+    if (AI_ASSISTANT_COMING_SOON) return
     const text = draft.trim()
     if ((text === '' && attachments.length === 0) || isAwaitingReply) return
 
@@ -335,7 +337,7 @@ export function useAIAssistant(pageContext: AIAssistantPageContext) {
   }, [pageContext, locale])
 
   useEffect(() => {
-    if (panelState !== 'open') return
+    if (panelState !== 'open' || AI_ASSISTANT_COMING_SOON) return
     const id = window.requestAnimationFrame(() => {
       inputRef.current?.focus()
     })

@@ -1,12 +1,19 @@
 import type { FormEvent } from 'react'
 import { Lock, ShieldCheck } from 'lucide-react'
+import {
+  CardNetworkDetectedNote,
+  CardNetworkIcons,
+  useDetectedCardNetwork,
+} from '@/components/finance/CardNetworkDisplay'
 import { useStudentPortalT } from '@/LanguageContext'
 
 type PaymentCardFormProps = {
   amount: string
+  cardholderName: string
   cardNumber: string
   expirationDate: string
   cvv: string
+  billingZip: string
   allowPartialPayment: boolean
   lockedAmountNote?: string | null
   /** Shown under the form (e.g. card processing fee policy). */
@@ -16,18 +23,22 @@ type PaymentCardFormProps = {
   scriptReady: boolean
   error: string | null
   onAmountChange: (next: string) => void
+  onCardholderNameChange: (next: string) => void
   onCardNumberChange: (next: string) => void
   onExpirationDateChange: (next: string) => void
   onCvvChange: (next: string) => void
+  onBillingZipChange: (next: string) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onCancel: () => void
 }
 
 export function PaymentCardForm({
   amount,
+  cardholderName,
   cardNumber,
   expirationDate,
   cvv,
+  billingZip,
   allowPartialPayment,
   lockedAmountNote,
   disclosureNote,
@@ -36,13 +47,16 @@ export function PaymentCardForm({
   scriptReady,
   error,
   onAmountChange,
+  onCardholderNameChange,
   onCardNumberChange,
   onExpirationDateChange,
   onCvvChange,
+  onBillingZipChange,
   onSubmit,
   onCancel,
 }: PaymentCardFormProps) {
   const t = useStudentPortalT()
+  const detectedNetwork = useDetectedCardNetwork(cardNumber)
 
   return (
     <section className="portal-card portal-finance-checkout-card" aria-labelledby="payment-form-title">
@@ -56,10 +70,30 @@ export function PaymentCardForm({
 
       <form className="portal-finance-checkout-form" onSubmit={onSubmit}>
         <label className="portal-finance-checkout-form__field">
+          <span>{t('cardholderNameLabel')}</span>
+          <input
+            type="text"
+            autoComplete="cc-name"
+            placeholder={t('cardholderNamePlaceholder')}
+            maxLength={64}
+            value={cardholderName}
+            onChange={(event) => onCardholderNameChange(event.target.value)}
+            disabled={busy}
+            required
+          />
+          <span className="portal-finance-checkout-form__helper">{t('cardholderNameHelper')}</span>
+        </label>
+
+        <label className="portal-finance-checkout-form__field">
           <span>{t('cardNumberLabel')}</span>
           <div className="portal-finance-checkout-form__input-wrap portal-finance-checkout-form__input-wrap--card-number card-input-wrapper">
             <input
-              className="card-number-input"
+              className={[
+                'card-number-input',
+                detectedNetwork != null ? 'card-number-input--network-detected' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               type="text"
               inputMode="numeric"
               autoComplete="cc-number"
@@ -69,16 +103,12 @@ export function PaymentCardForm({
               disabled={busy}
               required
             />
-            <div className="portal-finance-checkout-form__trailing-icons card-brand-icons" aria-hidden="true">
-              <img src="/visa.png" alt="" />
-              <img src="/master.png" alt="" />
-              <img src="/amex.png" alt="" />
-              <img src="/discover.png" alt="" />
-            </div>
+            <CardNetworkIcons cardNumber={cardNumber} />
           </div>
+          <CardNetworkDetectedNote cardNumber={cardNumber} />
         </label>
 
-        <div className="portal-finance-checkout-form__triple">
+        <div className="portal-finance-checkout-form__card-meta-row">
           <label className="portal-finance-checkout-form__field">
             <span>{t('expDateLabel')}</span>
             <input
@@ -113,7 +143,24 @@ export function PaymentCardForm({
               </div>
             </div>
           </label>
+          <label className="portal-finance-checkout-form__field">
+            <span>{t('billingZipLabel')}</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              placeholder={t('billingZipPlaceholder')}
+              maxLength={10}
+              value={billingZip}
+              onChange={(event) => onBillingZipChange(event.target.value)}
+              disabled={busy}
+              required
+            />
+          </label>
         </div>
+        <p className="portal-finance-checkout-form__helper portal-finance-checkout-form__helper--flush">
+          {t('billingZipHelper')}
+        </p>
 
         <label className="portal-finance-checkout-form__field">
           <span>{t('paymentSummaryAmountToPay')}</span>

@@ -21,6 +21,12 @@ import {
   roundMoney,
   totalWithProcessingFee,
 } from '@/lib/creditCardProcessingFee'
+import {
+  formatBillingZipInput,
+  isValidCardholderName,
+  normalizeBillingZip,
+  normalizeCardholderName,
+} from '@/lib/paymentBillingFields'
 import type { PaymentBreakdownLine } from '@/components/finance/PaymentSummaryCard'
 
 function normalizeAmountInput(v: string): string {
@@ -96,9 +102,11 @@ export function FinancesClinicFeePaymentPage() {
   const [termLabel, setTermLabel] = useState(() => searchParams.get('label')?.trim() ?? '')
   const [billingSummary, setBillingSummary] = useState<ClinicFeeBillingSummaryResponse | null>(null)
   const [amount, setAmount] = useState('0.00')
+  const [cardholderName, setCardholderName] = useState('')
   const [cardNumber, setCardNumber] = useState('')
   const [expirationDate, setExpirationDate] = useState('')
   const [cvv, setCvv] = useState('')
+  const [billingZip, setBillingZip] = useState('')
   const [scriptReady, setScriptReady] = useState(false)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -141,6 +149,13 @@ export function FinancesClinicFeePaymentPage() {
 
   const studentName = account.student.name?.trim() || t('studentFallback')
   const displayStudentId = account.student.studentId?.trim() || studentId || '—'
+
+  useEffect(() => {
+    setCardholderName((prev) => {
+      if (prev.trim() !== '') return prev
+      return account.student.name?.trim() ?? ''
+    })
+  }, [account.student.name])
   const displayTerm = termLabel || portalTermLabel(account) || t('selectedTerm')
   const termCode = termCodeFromQuarter(term, year)
   const statusMessage = clinicStatusMessage(billingSummary, t)
@@ -276,6 +291,18 @@ export function FinancesClinicFeePaymentPage() {
       setCvv('')
       return
     }
+    if (!isValidCardholderName(cardholderName)) {
+      setError(t('cardholderNameInvalid'))
+      setCvv('')
+      return
+    }
+    const normalizedZip = normalizeBillingZip(billingZip)
+    if (normalizedZip == null) {
+      setError(t('billingZipInvalid'))
+      setCvv('')
+      return
+    }
+    const normalizedCardholderName = normalizeCardholderName(cardholderName)
 
     setSubmitting(true)
     setError(null)
@@ -287,6 +314,8 @@ export function FinancesClinicFeePaymentPage() {
           month: expirationParts.month,
           year: expirationParts.year,
           cardCode: cvv,
+          fullName: normalizedCardholderName,
+          zip: normalizedZip,
         },
       })
       const result = await postAuthorizeNetClinicFeeCharge(
@@ -298,6 +327,8 @@ export function FinancesClinicFeePaymentPage() {
           installmentCount: 1,
           opaqueData,
           cardBinPrefix,
+          cardholderName: normalizedCardholderName,
+          billingZip: normalizedZip,
         },
         { authToken: authToken?.trim() || undefined },
       )
@@ -402,9 +433,11 @@ export function FinancesClinicFeePaymentPage() {
               <div className="portal-finance-checkout-layout__col">
                 <PaymentCardForm
                   amount={amount}
+                  cardholderName={cardholderName}
                   cardNumber={cardNumber}
                   expirationDate={expirationDate}
                   cvv={cvv}
+                  billingZip={billingZip}
                   allowPartialPayment={false}
                   lockedAmountNote={t('clinicFeeMustBeFullPayment')}
                   disclosureNote={t('creditCardProcessingFeeDisclosure')}
@@ -413,9 +446,11 @@ export function FinancesClinicFeePaymentPage() {
                   scriptReady={scriptReady}
                   error={error}
                   onAmountChange={(next) => setAmount(normalizeAmountInput(next))}
+                  onCardholderNameChange={setCardholderName}
                   onCardNumberChange={(next) => setCardNumber(next.replace(/\D/g, ''))}
                   onExpirationDateChange={(next) => setExpirationDate(normalizeExpirationInput(next))}
                   onCvvChange={(next) => setCvv(next.replace(/\D/g, ''))}
+                  onBillingZipChange={(next) => setBillingZip(formatBillingZipInput(next))}
                   onSubmit={(event) => void handleSubmit(event)}
                   onCancel={() => navigate('/finances/overview')}
                 />
