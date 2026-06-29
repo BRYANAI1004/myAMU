@@ -156,6 +156,11 @@ function normalizeSql(sql: string): string {
   out = out.replace(/\bJSON_OBJECT\s*\(/gi, "json_build_object(");
   out = out.replace(/\bCAST\s*\(\s*\?\s+AS\s+JSON\s*\)/gi, "(?::jsonb)");
   out = out.replace(/\bREGEXP\b/gi, "~");
+  // Postgres folds unquoted aliases to lowercase; quote camelCase SELECT aliases.
+  out = out.replace(
+    /(\sAS\s+)([a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*)\b/g,
+    '$1"$2"',
+  );
   out = quoteMixedCaseIdentifiers(out);
   return out;
 }
