@@ -43,6 +43,7 @@ const COLUMN_SPECS: ColumnSpec[] = [
     out: "clinic1Required",
     candidates: [
       "clinic1Required",
+      "clinicL1Required",
       "clinic1_required",
       "clinic_1_required",
       "clinic1_req",
@@ -52,6 +53,7 @@ const COLUMN_SPECS: ColumnSpec[] = [
     out: "clinic2Required",
     candidates: [
       "clinic2Required",
+      "clinicL2Required",
       "clinic2_required",
       "clinic_2_required",
       "clinic2_req",
@@ -69,13 +71,18 @@ function invalidateCoursesColumnCache(): void {
 
 async function loadCoursesTableColumns(): Promise<Set<string>> {
   const [rows] = await pool.query<RowDataPacket[]>(
-    `SELECT column_name AS columnName
+    `SELECT column_name
      FROM information_schema.columns
      WHERE table_schema = 'public'
        AND table_name = 'courses'
      ORDER BY ordinal_position`,
   );
-  return new Set(rows.map((r) => String(r.columnName)));
+  return new Set(
+    rows.map((r) => {
+      const raw = r.column_name ?? r.columnName ?? r.columnname;
+      return String(raw ?? "").trim();
+    }).filter((name) => name !== ""),
+  );
 }
 
 function pickColumn(
