@@ -143,6 +143,7 @@ function quoteMixedCaseIdentifiers(sql: string): string {
 function normalizeSql(sql: string): string {
   let out = sql.replace(/`([^`]+)`/g, '"$1"');
   out = out.replace(/\bCAST\s*\(([^)]+)\)\s+AS\s+SIGNED\b/gi, "CAST($1 AS INTEGER)");
+  out = out.replace(/\bAS\s+SIGNED\b/gi, "AS INTEGER");
   out = out.replace(/\bCURRENT_DATE\s*\(\s*\)/gi, "CURRENT_DATE");
   out = out.replace(/\bDATE\s*\(([^)]+)\)/gi, "($1)::date");
   out = out.replace(/\bYEAR\s*\(([^)]+)\)/gi, "EXTRACT(YEAR FROM $1)");
@@ -154,6 +155,7 @@ function normalizeSql(sql: string): string {
   out = out.replace(/\bJSON_ARRAYAGG\s*\(/gi, "json_agg(");
   out = out.replace(/\bJSON_OBJECT\s*\(/gi, "json_build_object(");
   out = out.replace(/\bCAST\s*\(\s*\?\s+AS\s+JSON\s*\)/gi, "(?::jsonb)");
+  out = out.replace(/\bREGEXP\b/gi, "~");
   out = quoteMixedCaseIdentifiers(out);
   return out;
 }

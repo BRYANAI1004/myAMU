@@ -1,5 +1,5 @@
 import { type Pool, type PoolConnection, type ResultSetHeader, type RowDataPacket } from "../lib/db.js";
-import { sortTermYearPairsDescending } from "../lib/pgSql.js";
+import { sortTermYearPairsDescending, portalQuarterOrderRank } from "../lib/pgSql.js";
 /**
  * Legacy **financial registration** and accounting (`registration`, `accounting`, `students` profile slices).
  *
@@ -299,9 +299,9 @@ export async function findLatestLegacyStudentLoaRow(
      FROM loa
      WHERE TRIM(student_id) = ?
      ORDER BY
-       CAST(NULLIF(TRIM(absent_year), '') AS SIGNED) DESC,
+       absent_year DESC NULLS LAST,
        ${legacyQuarterOrderSql("absent_quarter")} DESC,
-       CAST(COALESCE(seqNumber, 0) AS SIGNED) DESC
+       COALESCE("seqNumber", 0) DESC
      LIMIT 1`,
     [studentId.trim()],
   );
@@ -477,7 +477,7 @@ export async function sumLegacyAccountingBalanceByStudentForQuarter(
             COALESCE(SUM(debit - credit), 0) AS balance
      FROM accounting
      WHERE LOWER(TRIM(term)) = LOWER(TRIM(?))
-       AND CAST(year AS SIGNED) = ?
+       AND year = ?
      GROUP BY TRIM(id)`,
     [t, y],
   );
@@ -657,7 +657,7 @@ function buildAdminStudentListFilters(
       FROM loa
       WHERE TRIM(loa.student_id) = TRIM(s.id)
         AND UPPER(TRIM(loa.absent_quarter)) = UPPER(?)
-        AND CAST(NULLIF(TRIM(loa.absent_year), '') AS SIGNED) = ?
+        AND loa.absent_year = ?
     )`);
     params.push(query.loaQuarter, query.loaYear);
   }
@@ -780,22 +780,28 @@ export async function listLegacyAdminStudentLoaTermFacetRows(
   query: LegacyAdminStudentListQuery,
 ): Promise<LegacyAdminStudentLoaTermFacetRow[]> {
   const { clause, params } = buildAdminStudentListFilters(query);
+  const loaTermFilter =
+    "TRIM(l.absent_quarter) IS NOT NULL AND TRIM(l.absent_quarter) <> '' AND l.absent_year IS NOT NULL";
+  const whereClause =
+    clause === "" ? ` WHERE ${loaTermFilter}` : `${clause} AND ${loaTermFilter}`;
   const [rows] = await pool.query<LegacyAdminStudentLoaTermFacetRow[]>(
     `SELECT DISTINCT
        TRIM(l.absent_quarter) AS absent_quarter,
-       CAST(NULLIF(TRIM(l.absent_year), '') AS SIGNED) AS absent_year
+       l.absent_year AS absent_year
      FROM loa l
      INNER JOIN students s
        ON TRIM(l.student_id) = TRIM(s.id)
-     ${clause}
-     HAVING absent_quarter IS NOT NULL
-       AND absent_quarter <> ''
-       AND absent_year IS NOT NULL
-     ORDER BY absent_year DESC,
-       ${legacyQuarterOrderSql("absent_quarter")} ASC`,
+     ${whereClause}`,
     params,
   );
-  return rows;
+  return [...rows].sort((a, b) => {
+    const ay = Number(a.absent_year);
+    const by = Number(b.absent_year);
+    if (by !== ay) return by - ay;
+    const aq = String(a.absent_quarter ?? "").trim();
+    const bq = String(b.absent_quarter ?? "").trim();
+    return portalQuarterOrderRank(aq) - portalQuarterOrderRank(bq);
+  });
 }
 
 /**
