@@ -4,6 +4,15 @@ import { env } from "../config/env.js";
 import { getSupabaseAdminClient } from "../lib/supabaseAdmin.js";
 
 const STUDENT_PHOTO_SIGNED_URL_TTL_SECONDS = 3600;
+const STUDENT_PHOTO_BUCKET_MIME_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+] as const;
+const STUDENT_PHOTO_BUCKET_MAX_BYTES = 5 * 1024 * 1024;
+
+let bucketEnsured = false;
 
 function requireSupabaseStorageConfig(): {
   url: string;
@@ -29,6 +38,43 @@ function requireSupabaseStorageConfig(): {
 
 function getSupabaseClient(): SupabaseClient {
   return getSupabaseAdminClient();
+}
+
+/** Creates the configured bucket on first upload when it does not exist yet. */
+export async function ensureStudentPhotoBucket(): Promise<void> {
+  if (bucketEnsured) return;
+  const cfg = requireSupabaseStorageConfig();
+  const client = getSupabaseClient();
+  const { data: buckets, error: listErr } = await client.storage.listBuckets();
+  if (listErr) {
+    throw new Error(`Supabase listBuckets failed: ${listErr.message}`);
+  }
+  if (buckets?.some((bucket) => bucket.name === cfg.bucket)) {
+    bucketEnsured = true;
+    return;
+  }
+  const { error: createErr } = await client.storage.createBucket(cfg.bucket, {
+    public: false,
+    fileSizeLimit: STUDENT_PHOTO_BUCKET_MAX_BYTES,
+    allowedMimeTypes: [...STUDENT_PHOTO_BUCKET_MIME_TYPES],
+  });
+  if (
+    createErr &&
+    !createErr.message.toLowerCase().includes("already exists")
+  ) {
+    throw new Error(`Supabase createBucket failed: ${createErr.message}`);
+  }
+  bucketEnsured = true;
+}
+
+export function isStorageObjectNotFoundError(err: unknown): boolean {
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : "";
+  return /object not found|not found|does not exist|404/i.test(message);
 }
 
 function extFromContentType(contentType: string): "jpg" | "png" | "webp" {
@@ -60,6 +106,7 @@ export async function uploadStudentPhoto(input: {
   contentType: string;
 }): Promise<string> {
   const cfg = requireSupabaseStorageConfig();
+  await ensureStudentPhotoBucket();
   const path = buildStudentPhotoPath(input.studentId, input.contentType);
   const client = getSupabaseClient();
 

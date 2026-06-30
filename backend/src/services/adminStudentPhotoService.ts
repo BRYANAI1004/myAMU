@@ -7,6 +7,8 @@ import {
 import {
   createStudentPhotoSignedUrl,
   deleteStudentPhoto,
+  ensureStudentPhotoBucket,
+  isStorageObjectNotFoundError,
   uploadStudentPhoto,
 } from "./studentPhotoStorageService.js";
 
@@ -61,13 +63,36 @@ export async function getStudentPhotoUrl(
       photoUrl: null,
     };
   }
-  const photoUrl = await createStudentPhotoSignedUrl(photoPath);
-  return {
-    success: true,
-    studentId,
-    photoPath,
-    photoUrl,
-  };
+  try {
+    await ensureStudentPhotoBucket();
+    const photoUrl = await createStudentPhotoSignedUrl(photoPath);
+    return {
+      success: true,
+      studentId,
+      photoPath,
+      photoUrl,
+    };
+  } catch (err) {
+    if (!isStorageObjectNotFoundError(err)) {
+      throw err;
+    }
+    console.warn(
+      `[student-photo] stale photo_path for ${studentId}, clearing:`,
+      photoPath,
+    );
+    await updateLegacyStudentPhotoPath(pool, studentId, null).catch((clearErr) => {
+      console.warn(
+        `[student-photo] failed to clear stale photo_path for ${studentId}:`,
+        clearErr,
+      );
+    });
+    return {
+      success: true,
+      studentId,
+      photoPath: null,
+      photoUrl: null,
+    };
+  }
 }
 
 export async function uploadStudentPhotoForStudentId(input: {
