@@ -8,6 +8,7 @@ function tabClass(isActive: boolean) {
 
 const ITEMS: { to: string; labelKey: StudentPortalKey }[] = [
   { to: 'overview', labelKey: 'overview' },
+  { to: 'store', labelKey: 'feesAndServices' },
 ]
 
 export function FinancesNav() {

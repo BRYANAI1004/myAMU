@@ -193,8 +193,8 @@ export async function listVisibleAcademicTerms(
       : undefined;
   const sel = await termSelectSql();
   const sql = lim
-    ? `${sel} WHERE is_visible = 1 ORDER BY sequence_no DESC LIMIT ?`
-    : `${sel} WHERE is_visible = 1 ORDER BY sequence_no DESC`;
+    ? `${sel} WHERE is_visible = true ORDER BY sequence_no DESC LIMIT ?`
+    : `${sel} WHERE is_visible = true ORDER BY sequence_no DESC`;
   const [rows] = await pool.query<RowDataPacket[]>(
     sql,
     lim ? [lim] : [],
@@ -232,7 +232,7 @@ export async function getPostedToDashboardTerm(): Promise<AcademicTermDetail | n
     return null;
   }
   const sel = await termSelectSql();
-  const sql = `${sel} WHERE is_posted_to_dashboard = 1 ORDER BY sequence_no DESC LIMIT 1`;
+  const sql = `${sel} WHERE is_posted_to_dashboard = true ORDER BY sequence_no DESC LIMIT 1`;
   const [rows] = await pool.query<RowDataPacket[]>(sql);
   const row = rows[0];
   return row ? normalizeRow(row) : null;
@@ -473,9 +473,9 @@ export async function postAcademicTermToDashboard(
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    await conn.query(`UPDATE academic_terms SET is_posted_to_dashboard = 0`);
+    await conn.query(`UPDATE academic_terms SET is_posted_to_dashboard = false`);
     const [res] = await conn.query<ResultSetHeader>(
-      `UPDATE academic_terms SET is_posted_to_dashboard = 1 WHERE id = ?`,
+      `UPDATE academic_terms SET is_posted_to_dashboard = true WHERE id = ?`,
       [trimmed],
     );
     if (res.affectedRows === 0) {
@@ -542,12 +542,12 @@ export async function insertAcademicTerm(
       row.withdraw_deadline,
       row.payment_due_date,
       row.clinic_appointment_deadline,
-      row.lock_registration_if_overdue ? 1 : 0,
+      row.lock_registration_if_overdue,
       row.status,
-      row.is_visible ? 1 : 0,
+      row.is_visible,
     ];
     if (hasPostedToDashboardColumn) {
-      params.push(row.is_posted_to_dashboard ? 1 : 0);
+      params.push(row.is_posted_to_dashboard);
     }
     await pool.query<ResultSetHeader>(sql, params);
   } else {
@@ -587,10 +587,10 @@ export async function insertAcademicTerm(
       row.withdraw_deadline,
       row.clinic_appointment_deadline,
       row.status,
-      row.is_visible ? 1 : 0,
+      row.is_visible,
     ];
     if (hasPostedToDashboardColumn) {
-      params.push(row.is_posted_to_dashboard ? 1 : 0);
+      params.push(row.is_posted_to_dashboard);
     }
     await pool.query<ResultSetHeader>(sql, params);
   }
@@ -651,12 +651,12 @@ export async function updateAcademicTermRow(
       row.withdraw_deadline,
       row.payment_due_date,
       row.clinic_appointment_deadline,
-      row.lock_registration_if_overdue ? 1 : 0,
+      row.lock_registration_if_overdue,
       row.status,
-      row.is_visible ? 1 : 0,
+      row.is_visible,
     ];
     if (hasPostedToDashboardColumn) {
-      params.push(row.is_posted_to_dashboard ? 1 : 0);
+      params.push(row.is_posted_to_dashboard);
     }
     params.push(currentId);
     await pool.query<ResultSetHeader>(sql, params);
@@ -693,10 +693,10 @@ export async function updateAcademicTermRow(
       row.withdraw_deadline,
       row.clinic_appointment_deadline,
       row.status,
-      row.is_visible ? 1 : 0,
+      row.is_visible,
     ];
     if (hasPostedToDashboardColumn) {
-      params.push(row.is_posted_to_dashboard ? 1 : 0);
+      params.push(row.is_posted_to_dashboard);
     }
     params.push(currentId);
     await pool.query<ResultSetHeader>(sql, params);

@@ -69,6 +69,14 @@ import {
   postAuthorizeNetChargeHandler,
   postAuthorizeNetTuitionChargeHandler,
 } from "../controllers/studentAuthorizePaymentController.js";
+import {
+  deleteStoreCartLineHandler,
+  getStoreCartHandler,
+  getStoreCatalogHandler,
+  postStoreCartCommitHandler,
+  postStoreCheckoutHandler,
+  putStoreCartLineHandler,
+} from "../controllers/studentStoreController.js";
 import { getStudentAcademics } from "../controllers/studentAcademicsController.js";
 import { getStudentProgramProgress } from "../controllers/studentProgramProgressController.js";
 import {
@@ -192,6 +200,12 @@ apiRouter.get(
   "/payments/authorize/clinic-fee-summary",
   getAuthorizeClinicFeeSummaryHandler,
 );
+apiRouter.get("/store/catalog", getStoreCatalogHandler);
+apiRouter.get("/store/cart", getStoreCartHandler);
+apiRouter.put("/store/cart/lines", putStoreCartLineHandler);
+apiRouter.post("/store/cart/commit-to-ledger", postStoreCartCommitHandler);
+apiRouter.delete("/store/cart/lines", deleteStoreCartLineHandler);
+apiRouter.post("/store/checkout", postStoreCheckoutHandler);
 
 apiRouter.post("/student/enroll", postStudentEnroll);
 apiRouter.post("/student/withdraw", postStudentWithdraw);

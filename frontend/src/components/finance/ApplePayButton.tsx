@@ -3,11 +3,12 @@ import { useStudentPortalT } from '@/LanguageContext'
 type ApplePayButtonProps = {
   disabled?: boolean
   busy?: boolean
+  demo?: boolean
   onClick: () => void
 }
 
 /** Native-styled Apple Pay button (Safari renders the wallet sheet, not the Wallet app). */
-export function ApplePayButton({ disabled = false, busy = false, onClick }: ApplePayButtonProps) {
+export function ApplePayButton({ disabled = false, busy = false, demo = false, onClick }: ApplePayButtonProps) {
   const t = useStudentPortalT()
   const isDisabled = disabled || busy
 
@@ -33,7 +34,7 @@ export function ApplePayButton({ disabled = false, busy = false, onClick }: Appl
         ) : null}
       </button>
       <p className="portal-finance-checkout-form__helper portal-finance-apple-pay__note">
-        {t('applePaySheetNote')}
+        {demo ? t('applePayDemoSheetNote') : t('applePaySheetNote')}
       </p>
     </div>
   )

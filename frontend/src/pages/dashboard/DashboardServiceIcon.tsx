@@ -3,6 +3,7 @@ import type { DashboardService } from './dashboardMockData'
 import {
   IconAcademics,
   IconDocument,
+  IconFeesStore,
   IconFinance,
   IconMyAccount,
   IconRegistration,
@@ -11,6 +12,7 @@ import {
 const SERVICE_ICON: Record<DashboardService['icon'], ComponentType<SVGProps<SVGSVGElement>>> = {
   registration: IconRegistration,
   finances: IconFinance,
+  feesStore: IconFeesStore,
   academics: IconAcademics,
   documents: IconDocument,
   account: IconMyAccount,

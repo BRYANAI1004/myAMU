@@ -15,6 +15,7 @@ import {
   type TuitionBillingSummaryResponse,
 } from '@/lib/api'
 import { formatMoney } from '@/lib/formatMoney'
+import { clearStoreCart } from '@/lib/storeCart'
 import { calculateInstallmentSchedule, type PaymentPlan } from '@/lib/paymentPlan'
 import { cardBinPrefixFromPan, inferCardFundingFromPan } from '@/lib/cardFundingFromBin'
 import {
@@ -33,6 +34,7 @@ import {
   canShowApplePayButton,
   requestApplePayPayment,
 } from '@/lib/applePaySession'
+import { isApplePayDemoMode } from '@/lib/applePayConfig'
 
 function normalizeAmountInput(v: string): string {
   const trimmed = v.trim()
@@ -76,6 +78,21 @@ export function FinancesPaymentPage() {
   const t = useStudentPortalT()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const ledgerSelection = searchParams.get('selection') === 'ledger'
+  const ledgerSelectedAmount = useMemo(() => {
+    const raw = searchParams.get('amount')?.trim() ?? ''
+    const n = roundMoney(Number(raw))
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [searchParams])
+  const ledgerAdjustmentIds = useMemo(() => {
+    const raw = searchParams.get('adjIds')?.trim() ?? ''
+    if (raw === '') return undefined
+    const ids = raw
+      .split(',')
+      .map((part) => Math.trunc(Number(part.trim())))
+      .filter((id) => Number.isFinite(id) && id > 0)
+    return ids.length > 0 ? ids : undefined
+  }, [searchParams])
   const { account, currentStudentId, authToken, isAuthenticated } = useAccount()
   const [term, setTerm] = useState(() => searchParams.get('term')?.trim() ?? '')
   const [year, setYear] = useState(() => Number(searchParams.get('year') ?? NaN))
@@ -100,12 +117,14 @@ export function FinancesPaymentPage() {
   const studentId = currentStudentId?.trim() ?? ''
   const installmentCount = 3
   const serviceFeePerInstallment = 15
-  const installmentEligible = selectedChargeType === 'tuition'
+  const installmentEligible = selectedChargeType === 'tuition' && !ledgerSelection
   const selectedChargeDue = Math.max(
     0,
-    selectedChargeType === 'tuition'
-      ? billingSummary?.tuitionCharge.amountDue ?? 0
-      : billingSummary?.lateFeeCharge.amountDue ?? 0,
+    ledgerSelection && ledgerSelectedAmount != null
+      ? ledgerSelectedAmount
+      : selectedChargeType === 'tuition'
+        ? billingSummary?.tuitionCharge.amountDue ?? 0
+        : billingSummary?.lateFeeCharge.amountDue ?? 0,
   )
   const tuitionDue = Math.max(0, billingSummary?.tuitionCharge.amountDue ?? 0)
   const lateFeeDue = Math.max(0, billingSummary?.lateFeeCharge.amountDue ?? 0)
@@ -179,13 +198,16 @@ export function FinancesPaymentPage() {
       : t('continueToFullPayment')
   }, [paymentPlan, selectedChargeType, t])
   const lockedAmountNote = useMemo(() => {
+    if (ledgerSelection) {
+      return t('amountMatchesLedgerSelection')
+    }
     if (selectedChargeType === 'late_fee') {
       return t('amountFixedForLateFee')
     }
     return paymentPlan === 'installment'
       ? t('amountIncludesFirstInstallmentAndFee')
       : t('amountMatchesFullTuition')
-  }, [paymentPlan, selectedChargeType, t])
+  }, [ledgerSelection, paymentPlan, selectedChargeType, t])
 
   const studentName = account.student.name?.trim() || t('studentFallback')
   const displayStudentId = account.student.studentId?.trim() || studentId || '—'
@@ -210,8 +232,13 @@ export function FinancesPaymentPage() {
   }, [installmentEligible, paymentPlan])
 
   useEffect(() => {
+    if (ledgerSelection && ledgerSelectedAmount != null) {
+      setPaymentPlan('full')
+      setAmount(ledgerSelectedAmount.toFixed(2))
+      return
+    }
     setAmount(amountDueToday.toFixed(2))
-  }, [amountDueToday])
+  }, [amountDueToday, ledgerSelection, ledgerSelectedAmount])
 
   useEffect(() => {
     if (!isAuthenticated || studentId === '') {
@@ -309,6 +336,9 @@ export function FinancesPaymentPage() {
   }
 
   const navigateAfterSuccessfulPayment = (result: { amount: string; providerTransactionId: string }) => {
+    if (ledgerAdjustmentIds != null && ledgerAdjustmentIds.length > 0) {
+      clearStoreCart(studentId)
+    }
     const successText = t('tuitionPaymentSuccess')
       .replace('{amount}', formatMoney(Number(result.amount)))
       .replace('{reference}', result.providerTransactionId)
@@ -358,6 +388,14 @@ export function FinancesPaymentPage() {
           },
         })
 
+      if (isApplePayDemoMode()) {
+        navigateAfterSuccessfulPayment({
+          amount: applePayTotal.toFixed(2),
+          providerTransactionId: `DEMO-${Date.now()}`,
+        })
+        return
+      }
+
       const resolvedName = normalizeCardholderName(
         walletName.trim() !== '' ? walletName : studentName,
       )
@@ -380,6 +418,7 @@ export function FinancesPaymentPage() {
           opaqueData,
           cardholderName: resolvedName,
           billingZip: resolvedZip,
+          ledgerAdjustmentIds,
         },
         { authToken: authToken?.trim() || undefined },
       )
@@ -475,6 +514,7 @@ export function FinancesPaymentPage() {
           cardBinPrefix,
           cardholderName: normalizedCardholderName,
           billingZip: normalizedZip,
+          ledgerAdjustmentIds,
         },
         { authToken: authToken?.trim() || undefined },
       )
@@ -532,7 +572,7 @@ export function FinancesPaymentPage() {
                   <dd>{formatMoney(amountDueToday)}</dd>
                 </div>
               </dl>
-              {selectedChargeType === 'tuition' ? (
+              {selectedChargeType === 'tuition' && !ledgerSelection ? (
                 <div className="portal-finance-payment-option__cards" role="radiogroup" aria-label={t('tuitionPaymentModeAria')}>
                   <button
                     type="button"
@@ -553,6 +593,7 @@ export function FinancesPaymentPage() {
                 </div>
               ) : null}
               {selectedChargeType === 'tuition' &&
+              !ledgerSelection &&
               paymentPlan === 'installment' &&
               tuitionDue > 0 &&
               firstInstallment != null ? (
@@ -619,6 +660,7 @@ export function FinancesPaymentPage() {
                     aria-label={t('applePayPayWith')}
                   >
                     <ApplePayButton
+                      demo={isApplePayDemoMode()}
                       busy={applePaySubmitting}
                       disabled={submitting || loading || selectedChargeDue <= 0}
                       onClick={() => void handleApplePayPay()}

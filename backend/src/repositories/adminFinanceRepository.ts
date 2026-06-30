@@ -472,6 +472,8 @@ export async function insertPortalBillingAdjustment(
     adjustmentSource?:
       | "manual"
       | "admin_manual_charge"
+      | "store_purchase"
+      | "store_cart_pending"
       | "system_late_fee"
       | "system_clinical"
       | "system_late_fee_reversal";
@@ -828,6 +830,62 @@ export async function deleteManualBillingAdjustment(
   if (ok === 0) {
     throw new Error("NOT_MANUAL_OR_MISSING");
   }
+}
+
+export async function deleteStoreCartPendingAdjustment(
+  pool: Pool | PoolConnection,
+  id: number,
+): Promise<void> {
+  const [res] = await pool.execute(
+    `DELETE FROM portal_billing_adjustments
+     WHERE id = ?
+       AND adjustment_source = 'store_cart_pending'`,
+    [Math.trunc(id)],
+  );
+  const ok = (res as { affectedRows?: number }).affectedRows ?? 0;
+  if (ok === 0) {
+    throw new Error("NOT_STORE_CART_PENDING");
+  }
+}
+
+export async function updateStoreCartPendingAdjustment(
+  pool: Pool | PoolConnection,
+  id: number,
+  params: { description: string; amount: number },
+): Promise<void> {
+  const [res] = await pool.execute(
+    `UPDATE portal_billing_adjustments
+     SET description = ?, amount = ?
+     WHERE id = ?
+       AND adjustment_source = 'store_cart_pending'`,
+    [params.description.trim().slice(0, 255), params.amount, Math.trunc(id)],
+  );
+  const ok = (res as { affectedRows?: number }).affectedRows ?? 0;
+  if (ok === 0) {
+    throw new Error("NOT_STORE_CART_PENDING");
+  }
+}
+
+export async function promoteStoreCartPendingAdjustments(
+  conn: PoolConnection,
+  params: {
+    adjustmentIds: number[];
+    orderId: number;
+  },
+): Promise<void> {
+  if (params.adjustmentIds.length === 0) return;
+  const placeholders = params.adjustmentIds.map(() => "?").join(", ");
+  await conn.execute(
+    `UPDATE portal_billing_adjustments
+     SET adjustment_source = 'store_purchase',
+         description = CONCAT(
+           TRIM(TRAILING ' (cart)' FROM TRIM(TRAILING ' [cart]' FROM description)),
+           ' [store order #', ?, ']'
+         )
+     WHERE id IN (${placeholders})
+       AND adjustment_source = 'store_cart_pending'`,
+    [Math.trunc(params.orderId), ...params.adjustmentIds.map((id) => Math.trunc(id))],
+  );
 }
 
 export type PortalPaymentDbRow = {

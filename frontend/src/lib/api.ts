@@ -16,6 +16,46 @@ if (!API_BASE) {
 }
 
 const JSON_SNIPPET_MAX = 280
+const DEFAULT_API_TIMEOUT_MS = 20_000
+
+function mergeAbortSignals(signals: AbortSignal[]): AbortSignal {
+  const controller = new AbortController()
+  for (const signal of signals) {
+    if (signal.aborted) {
+      controller.abort(signal.reason)
+      return controller.signal
+    }
+    signal.addEventListener('abort', () => controller.abort(signal.reason), {
+      once: true,
+    })
+  }
+  return controller.signal
+}
+
+function apiFetchTimeoutSignal(init?: RequestInit): AbortSignal {
+  const timeoutSignal = AbortSignal.timeout(DEFAULT_API_TIMEOUT_MS)
+  if (init?.signal != null) {
+    return mergeAbortSignals([init.signal, timeoutSignal])
+  }
+  return timeoutSignal
+}
+
+function normalizeFetchError(error: unknown): Error {
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    return new Error(
+      `Request timed out after ${DEFAULT_API_TIMEOUT_MS / 1000}s. The server may be restarting — wait a moment and refresh.`,
+    )
+  }
+  if (error instanceof TypeError) {
+    const msg = error.message.toLowerCase()
+    if (msg.includes('failed to fetch') || msg.includes('networkerror')) {
+      return new Error(
+        'Could not reach the server. Confirm the API is running (port 3001) and refresh.',
+      )
+    }
+  }
+  return error instanceof Error ? error : new Error(String(error))
+}
 
 export class ApiError extends Error {
   status: number
@@ -36,7 +76,11 @@ const STUDENT_AUTH_STORAGE_KEYS = [
 ] as const
 
 function shouldAttachStudentAuthorization(path: string): boolean {
-  return path.startsWith('/api/student/') || path.startsWith('/api/students/')
+  return (
+    path.startsWith('/api/student/') ||
+    path.startsWith('/api/students/') ||
+    path.startsWith('/api/store/')
+  )
 }
 
 function readStudentAccessTokenFromStorage(): string | null {
@@ -105,13 +149,18 @@ export async function apiFetch(
 ): Promise<Response> {
   const url = buildApiUrl(path)
   console.debug('[api] request', url)
-  const res = await fetch(url, {
-    ...init,
-    credentials: init?.credentials ?? 'include',
-  })
-  const ct = res.headers.get('content-type') ?? ''
-  console.debug('[api] response', res.status, ct || '(no content-type)')
-  return res
+  try {
+    const res = await fetch(url, {
+      ...init,
+      signal: apiFetchTimeoutSignal(init),
+      credentials: init?.credentials ?? 'include',
+    })
+    const ct = res.headers.get('content-type') ?? ''
+    console.debug('[api] response', res.status, ct || '(no content-type)')
+    return res
+  } catch (error) {
+    throw normalizeFetchError(error)
+  }
 }
 
 /**
@@ -1702,6 +1751,8 @@ export type AuthorizeNetChargeRequest = {
   cardholderName: string
   /** US billing ZIP (5 digits or ZIP+4) for AVS. */
   billingZip: string
+  /** Paid portal billing adjustment ids from AMUbill ledger checkout. */
+  ledgerAdjustmentIds?: number[]
 }
 
 export type AuthorizeNetChargeResponse = {
@@ -1889,6 +1940,238 @@ export async function postAuthorizeNetClinicFeeCharge(
     return data as AuthorizeNetChargeResponse
   }
   throw new Error('Unexpected Authorize.net clinic fee charge response')
+}
+
+export type StoreCatalogItem = {
+  code: string
+  name: string
+  description: string
+  unitPriceUsd: number
+  allowQuantity: boolean
+  maxQuantity: number
+  catalogRef: string
+}
+
+export type StoreCatalogResponse = {
+  items: StoreCatalogItem[]
+}
+
+export type StoreCheckoutLineRequest = {
+  feeCode: string
+  quantity: number
+  notes?: string | null
+}
+
+export type StoreCheckoutRequest = {
+  term: string
+  year: number
+  items: StoreCheckoutLineRequest[]
+  opaqueData: { dataDescriptor: string; dataValue: string }
+  cardBinPrefix?: string
+  cardholderName: string
+  billingZip: string
+}
+
+export type StoreCheckoutResponse = {
+  orderId: number
+  amount: string
+  baseAmount: string
+  processingFee: string
+  cardFunding: 'credit' | 'debit' | 'unknown'
+  providerTransactionId: string
+  invoiceNumber: string
+  adjustmentIds: number[]
+}
+
+/** GET /api/store/catalog */
+export async function fetchStoreCatalog(options?: {
+  signal?: AbortSignal
+  authToken?: string
+  locale?: string
+}): Promise<StoreCatalogResponse> {
+  const headers: HeadersInit = {}
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const params = new URLSearchParams()
+  if (options?.locale != null && options.locale.trim() !== '') {
+    params.set('locale', options.locale.trim())
+  }
+  const qs = params.toString()
+  const data = (await fetchApiJson(`/api/store/catalog${qs ? `?${qs}` : ''}`, {
+    headers,
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as StoreCatalogResponse).items)
+  ) {
+    return data as StoreCatalogResponse
+  }
+  throw new Error('Unexpected store catalog response')
+}
+
+export type StoreCartLineResponse = {
+  feeCode: string
+  name: string
+  unitPriceUsd: number
+  quantity: number
+  allowQuantity: boolean
+  maxQuantity: number
+  notes: string | null
+  adjustmentId: number
+  lineTotal: number
+  onBill: boolean
+}
+
+export type StoreCartResponse = {
+  term: string
+  year: number
+  orderId: number | null
+  items: StoreCartLineResponse[]
+  subtotal: number
+}
+
+/** GET /api/store/cart?term=&year= */
+export async function fetchStoreCart(
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal; authToken?: string },
+): Promise<StoreCartResponse> {
+  const headers: HeadersInit = {}
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const params = new URLSearchParams()
+  params.set('term', term.trim())
+  params.set('year', String(Math.trunc(year)))
+  const data = (await fetchApiJson(`/api/store/cart?${params.toString()}`, {
+    headers,
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as StoreCartResponse).items)
+  ) {
+    return data as StoreCartResponse
+  }
+  throw new Error('Unexpected store cart response')
+}
+
+/** PUT /api/store/cart/lines */
+export async function putStoreCartLine(
+  body: { term: string; year: number; feeCode: string; quantity: number; notes?: string | null },
+  options?: { signal?: AbortSignal; authToken?: string },
+): Promise<StoreCartResponse> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const data = (await fetchApiJson('/api/store/cart/lines', {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as StoreCartResponse).items)
+  ) {
+    return data as StoreCartResponse
+  }
+  throw new Error('Unexpected store cart response')
+}
+
+/** DELETE /api/store/cart/lines?term=&year=&feeCode= */
+export async function deleteStoreCartLineApi(
+  term: string,
+  year: number,
+  feeCode: string,
+  options?: { signal?: AbortSignal; authToken?: string },
+): Promise<StoreCartResponse> {
+  const headers: HeadersInit = {}
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const params = new URLSearchParams()
+  params.set('term', term.trim())
+  params.set('year', String(Math.trunc(year)))
+  params.set('feeCode', feeCode.trim())
+  const data = (await fetchApiJson(`/api/store/cart/lines?${params.toString()}`, {
+    method: 'DELETE',
+    headers,
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as StoreCartResponse).items)
+  ) {
+    return data as StoreCartResponse
+  }
+  throw new Error('Unexpected store cart response')
+}
+
+/** POST /api/store/cart/commit-to-ledger?term=&year= */
+export async function postStoreCartCommitToLedger(
+  term: string,
+  year: number,
+  options?: { signal?: AbortSignal; authToken?: string },
+): Promise<StoreCartResponse> {
+  const headers: HeadersInit = {}
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const params = new URLSearchParams()
+  params.set('term', term.trim())
+  params.set('year', String(Math.trunc(year)))
+  const data = (await fetchApiJson(`/api/store/cart/commit-to-ledger?${params.toString()}`, {
+    method: 'POST',
+    headers,
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    Array.isArray((data as StoreCartResponse).items)
+  ) {
+    return data as StoreCartResponse
+  }
+  throw new Error('Unexpected store cart response')
+}
+
+/** POST /api/store/checkout */
+export async function postStoreCheckout(
+  body: StoreCheckoutRequest,
+  options?: { signal?: AbortSignal; authToken?: string },
+): Promise<StoreCheckoutResponse> {
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  }
+  if (options?.authToken != null && options.authToken.trim() !== '') {
+    headers.Authorization = `Bearer ${options.authToken.trim()}`
+  }
+  const data = (await fetchApiJson('/api/store/checkout', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+    signal: options?.signal,
+  })) as unknown
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as StoreCheckoutResponse).orderId === 'number' &&
+    typeof (data as StoreCheckoutResponse).amount === 'string' &&
+    typeof (data as StoreCheckoutResponse).providerTransactionId === 'string'
+  ) {
+    return data as StoreCheckoutResponse
+  }
+  throw new Error('Unexpected store checkout response')
 }
 
 /** GET /api/payments/authorize/current-term-summary?term=&year= */

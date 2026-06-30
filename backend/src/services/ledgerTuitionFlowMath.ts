@@ -39,6 +39,9 @@ function debitLooksExam(args: {
 
 export function inferPaymentChargeTypeFromMemo(memo: string): PaymentChargeBucket | null {
   const m = memo.trim().toLowerCase();
+  if (/authorize\.net\s+store\s+order\s+#\d+/i.test(m)) {
+    return null;
+  }
   const explicit = /authorize\.net\s+(tuition|clinic_fee|exam_fee|late_fee)\b/.exec(
     m,
   );

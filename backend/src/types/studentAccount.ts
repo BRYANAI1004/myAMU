@@ -155,6 +155,8 @@ export type CourseRecord = {
 export type BillingAdjustmentSource =
   | "manual"
   | "admin_manual_charge"
+  | "store_purchase"
+  | "store_cart_pending"
   | "system_late_fee"
   | "system_clinical"
   | "system_exam"

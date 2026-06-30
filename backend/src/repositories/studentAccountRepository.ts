@@ -70,6 +70,7 @@ function asAdjustmentSource(raw: unknown): BillingAdjustmentSource {
   if (s === "system_exam") return "system_exam";
   if (s === "system_late_fee_reversal") return "system_late_fee_reversal";
   if (s === "admin_manual_charge") return "admin_manual_charge";
+  if (s === "store_purchase") return "store_purchase";
   return "manual";
 }
 

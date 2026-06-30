@@ -19,6 +19,11 @@ export function isApplePayDemoEnabled(): boolean {
   return String(import.meta.env.VITE_APPLE_PAY_DEMO ?? '').trim().toLowerCase() === 'true'
 }
 
+/** Demo UI when VITE_APPLE_PAY_DEMO=true and no real merchant ID is configured. */
+export function isApplePayDemoMode(): boolean {
+  return isApplePayDemoEnabled() && !isApplePayFeatureEnabled()
+}
+
 export function preferApplePayOnMobile(): boolean {
   if (typeof window === 'undefined') return false
   return window.matchMedia('(max-width: 768px)').matches

@@ -69,3 +69,193 @@
   height: 1px;
   background: var(--portal-border, #ddd);
 }
+
+/* Demo Apple Pay sheet (no Apple Developer account required). */
+.apple-pay-demo-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgb(0 0 0 / 45%);
+  backdrop-filter: blur(2px);
+}
+
+.apple-pay-demo-sheet {
+  width: min(100%, 420px);
+  padding: 0.75rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
+  border-radius: 16px 16px 0 0;
+  background: #f2f2f7;
+  color: #111;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  box-shadow: 0 -8px 32px rgb(0 0 0 / 18%);
+  animation: apple-pay-demo-slide-up 0.28s ease-out;
+}
+
+@keyframes apple-pay-demo-slide-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.apple-pay-demo-sheet__handle {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 0.75rem;
+  border-radius: 999px;
+  background: #c7c7cc;
+}
+
+.apple-pay-demo-sheet__header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.apple-pay-demo-sheet__badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #ff9500;
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.apple-pay-demo-sheet__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.apple-pay-demo-sheet__merchant {
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.apple-pay-demo-sheet__merchant-name {
+  margin: 0;
+  color: #636366;
+  font-size: 0.875rem;
+}
+
+.apple-pay-demo-sheet__amount {
+  margin: 0.15rem 0 0;
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.apple-pay-demo-sheet__lines {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: #fff;
+  list-style: none;
+}
+
+.apple-pay-demo-sheet__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0;
+  font-size: 0.875rem;
+}
+
+.apple-pay-demo-sheet__card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border: none;
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.apple-pay-demo-sheet__card-icon {
+  width: 32px;
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #1a1f71, #00579f);
+}
+
+.apple-pay-demo-sheet__card-label {
+  flex: 1;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.apple-pay-demo-sheet__card-chevron {
+  color: #8e8e93;
+  font-size: 1.25rem;
+}
+
+.apple-pay-demo-sheet__pay {
+  width: 100%;
+  min-height: 50px;
+  margin-bottom: 0.5rem;
+  border: none;
+  border-radius: 12px;
+  background: #000;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apple-pay-demo-sheet__pay:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.apple-pay-demo-sheet__cancel {
+  width: 100%;
+  padding: 0.65rem;
+  border: none;
+  background: transparent;
+  color: #007aff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.apple-pay-demo-sheet__cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (min-width: 769px) {
+  .apple-pay-demo-backdrop {
+    align-items: center;
+    padding: 1rem;
+  }
+
+  .apple-pay-demo-sheet {
+    border-radius: 16px;
+    animation: apple-pay-demo-fade-in 0.22s ease-out;
+  }
+}
+
+@keyframes apple-pay-demo-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

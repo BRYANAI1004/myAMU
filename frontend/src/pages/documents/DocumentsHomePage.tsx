@@ -92,12 +92,12 @@ export function DocumentsHomePage() {
       } catch (e) {
         if (ac.signal.aborted) return
         const message =
-          e instanceof Error ? e.message : t('couldNotLoadDocumentRequirements')
+          e instanceof Error ? e.message : 'Could not load document requirements.'
         setDocs({ phase: 'error', message })
       }
     })()
     return () => ac.abort()
-  }, [currentStudentId, t])
+  }, [currentStudentId])
 
   const agreementRequirement = useMemo(() => {
     if (docs.phase !== 'ready') return undefined

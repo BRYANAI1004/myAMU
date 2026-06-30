@@ -2,6 +2,7 @@ import { pool } from "../lib/db.js";
 import { getAccountingLedgerPayload } from "./studentLedgerService.js";
 import { chargeAuthorizeOpaqueData } from "./authorizeNetGatewayService.js";
 import { recordAuthorizeNetPayment } from "../repositories/studentAuthorizePaymentRepository.js";
+import { finalizeStoreCartAdjustmentsOnPayment } from "./studentStoreCartService.js";
 import {
   inferCardFundingFromBinPrefix,
   normalizeCardBinPrefix,
@@ -50,6 +51,8 @@ export type AuthorizeChargeBody = {
   cardBinPrefix: string;
   cardholderName: string;
   billingZip: string;
+  /** Portal billing adjustment ids paid from AMUbill ledger selection (store cart lines). */
+  ledgerAdjustmentIds?: number[];
 };
 
 export type AuthorizeChargeResult = {
@@ -511,6 +514,14 @@ export function parseAuthorizeChargeBody(
   if (!billing.ok) {
     return billing;
   }
+  const ledgerAdjustmentIds: number[] = [];
+  const rawAdjIds = o.ledgerAdjustmentIds;
+  if (Array.isArray(rawAdjIds)) {
+    for (const rawId of rawAdjIds) {
+      const id = Math.trunc(Number(rawId));
+      if (Number.isFinite(id) && id > 0) ledgerAdjustmentIds.push(id);
+    }
+  }
   return {
     ok: true,
     value: {
@@ -527,6 +538,8 @@ export function parseAuthorizeChargeBody(
       cardBinPrefix,
       cardholderName: billing.value.cardholderName,
       billingZip: billing.value.billingZip,
+      ledgerAdjustmentIds:
+        ledgerAdjustmentIds.length > 0 ? ledgerAdjustmentIds : undefined,
     },
   };
 }
@@ -542,6 +555,7 @@ export async function processAuthorizeNetStudentPayment(input: {
   cardBinPrefix: string;
   cardholderName: string;
   billingZip: string;
+  ledgerAdjustmentIds?: number[];
 }): Promise<AuthorizeChargeResult> {
   const parsedTerm = parseTermCode(input.termInput);
   if (!parsedTerm) {
@@ -618,6 +632,17 @@ export async function processAuthorizeNetStudentPayment(input: {
     invoiceNumber,
     status: "succeeded",
   });
+
+  if (input.ledgerAdjustmentIds != null && input.ledgerAdjustmentIds.length > 0) {
+    await finalizeStoreCartAdjustmentsOnPayment({
+      studentId: input.studentId,
+      term: parsedTerm.term,
+      year: parsedTerm.year,
+      adjustmentIds: input.ledgerAdjustmentIds,
+      providerTransactionId: charged.transactionId,
+      invoiceNumber,
+    });
+  }
 
   return {
     amount: total.toFixed(2),

@@ -2,8 +2,10 @@ import { fetchApiJson } from '@/lib/api'
 import {
   applePayDisplayName,
   applePayMerchantId,
+  isApplePayDemoMode,
   isApplePayFeatureEnabled,
 } from '@/lib/applePayConfig'
+import { requestApplePayDemoPayment } from '@/lib/applePayDemoSession'
 import type { AcceptOpaqueData } from '@/lib/authorizeNet'
 
 declare global {
@@ -31,6 +33,7 @@ export type ApplePayCheckoutParams = {
 }
 
 export function canShowApplePayButton(): boolean {
+  if (isApplePayDemoMode()) return true
   if (!isApplePayFeatureEnabled()) return false
   if (typeof window === 'undefined') return false
   const APS = window.ApplePaySession
@@ -102,6 +105,10 @@ export type ApplePayPaymentResult = {
 export function requestApplePayPayment(
   params: ApplePayCheckoutParams,
 ): Promise<ApplePayPaymentResult> {
+  if (isApplePayDemoMode()) {
+    return requestApplePayDemoPayment(params)
+  }
+
   const merchantId = applePayMerchantId()
   if (merchantId === '') {
     return Promise.reject(new Error('Apple Pay is not configured for this site.'))

@@ -1,20 +1,28 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
 import {
   fetchAccountingLedger,
   fetchAccountingQuarters,
-  fetchAuthorizeCurrentTermSummary,
   type AccountingLedgerResponse,
-  type AccountingLedgerRow,
   type AccountingQuarterOption,
-  type CurrentTermBillingSummaryResponse,
   type ClinicalBookingPaymentHoldLedger,
 } from '../../lib/api'
 import type { StudentPortalKey } from '../../lib/i18n'
 import { formatMoney } from '../../lib/formatMoney'
 import { useIsNarrowMobile } from '../../hooks/useMatchMedia'
+import {
+  isLedgerRowPaySelectable,
+  ledgerRowKey,
+  ledgerRowsForBucket,
+  ledgerTabDisplayBalance,
+  ledgerTabPaymentsTotal,
+  selectableLedgerRowKeys,
+  sumSelectedLedgerDebits,
+  type LedgerPayBucket,
+  type LedgerRowRef,
+} from '../../lib/ledgerPaySelection'
 
 function dashText(value: string): string {
   return value.trim() !== '' ? value : '—'
@@ -43,6 +51,15 @@ function formatLedgerDate(iso: string, locale: string): string {
 
 function quarterKey(q: AccountingQuarterOption): string {
   return `${q.year}:${q.term}`
+}
+
+function paySegmentBtnClass(isActive: boolean): string {
+  return [
+    'portal-account-ledger__pay-segment-btn',
+    isActive ? 'portal-account-ledger__pay-segment-btn--active' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 function formatRemainingHms(totalSeconds: number): string {
@@ -91,73 +108,124 @@ function ClinicalBookingPaymentHoldCountdown({
   )
 }
 
-/**
- * Quarter selector + legacy `accounting` detail table (real students only; hidden when no quarters).
- */
 function AccountingLedgerMobileCards({
-  ledger,
+  visibleRows,
+  payTab,
   dateLocale,
   t,
+  selectedKeys,
+  onToggleRow,
+  selectedTotal,
+  totalPayments,
 }: {
-  ledger: AccountingLedgerResponse
+  visibleRows: LedgerRowRef[]
+  payTab: LedgerPayBucket
   dateLocale: string
   t: (key: StudentPortalKey) => string
+  selectedKeys: ReadonlySet<string>
+  onToggleRow: (key: string) => void
+  selectedTotal: number
+  totalPayments: number
 }) {
   return (
     <div className="portal-account-ledger-cards" aria-label={t('accountingLedgerByQuarter')}>
       <ul className="portal-account-ledger-cards__list">
-        {ledger.rows.map((row: AccountingLedgerRow, index) => (
-          <li key={`${row.date}-${index}-${row.memo}`} className="portal-account-ledger-card">
-            <dl className="portal-account-ledger-card__dl">
-              <div className="portal-account-ledger-card__row">
-                <dt>{t('date')}</dt>
-                <dd>{formatLedgerDate(row.date, dateLocale)}</dd>
-              </div>
-              <div className="portal-account-ledger-card__row">
-                <dt>{t('type')}</dt>
-                <dd className="portal-table-cell-capitalize">{dashText(row.type)}</dd>
-              </div>
-              <div className="portal-account-ledger-card__row">
-                <dt>{t('code')}</dt>
-                <dd>{dashText(row.code)}</dd>
-              </div>
-              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--block">
-                <dt>{t('description')}</dt>
-                <dd>
-                  <div>{dashText(row.memo)}</div>
-                  {row.clinicalBookingPaymentHold != null ? (
-                    <ClinicalBookingPaymentHoldCountdown hold={row.clinicalBookingPaymentHold} t={t} />
-                  ) : null}
-                </dd>
-              </div>
-              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
-                <dt>{t('charge')}</dt>
-                <dd>{ledgerChargeCell(row.debit)}</dd>
-              </div>
-              <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
-                <dt>{t('payment')}</dt>
-                <dd>{ledgerPaymentCell(row.credit)}</dd>
-              </div>
-            </dl>
-          </li>
-        ))}
+        {visibleRows.map(({ row, index }) => {
+          const rowKey = ledgerRowKey(row, index)
+          const selectable = isLedgerRowPaySelectable(row, payTab)
+          return (
+            <li key={`${row.date}-${index}-${row.memo}`} className="portal-account-ledger-card">
+              {selectable ? (
+                <label className="portal-account-ledger-card__select">
+                  <input
+                    type="checkbox"
+                    checked={selectedKeys.has(rowKey)}
+                    onChange={() => onToggleRow(rowKey)}
+                  />
+                  <span>{t('ledgerSelectRowAria')}</span>
+                </label>
+              ) : null}
+              <dl className="portal-account-ledger-card__dl">
+                <div className="portal-account-ledger-card__row">
+                  <dt>{t('date')}</dt>
+                  <dd>{formatLedgerDate(row.date, dateLocale)}</dd>
+                </div>
+                <div className="portal-account-ledger-card__row">
+                  <dt>{t('type')}</dt>
+                  <dd className="portal-table-cell-capitalize">{dashText(row.type)}</dd>
+                </div>
+                <div className="portal-account-ledger-card__row">
+                  <dt>{t('code')}</dt>
+                  <dd>{dashText(row.code)}</dd>
+                </div>
+                <div className="portal-account-ledger-card__row portal-account-ledger-card__row--block">
+                  <dt>{t('description')}</dt>
+                  <dd>
+                    <div>{dashText(row.memo)}</div>
+                    {row.clinicalBookingPaymentHold != null ? (
+                      <ClinicalBookingPaymentHoldCountdown hold={row.clinicalBookingPaymentHold} t={t} />
+                    ) : null}
+                  </dd>
+                </div>
+                <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
+                  <dt>{t('charge')}</dt>
+                  <dd>{ledgerChargeCell(row.debit)}</dd>
+                </div>
+                <div className="portal-account-ledger-card__row portal-account-ledger-card__row--money">
+                  <dt>{t('payment')}</dt>
+                  <dd>{ledgerPaymentCell(row.credit)}</dd>
+                </div>
+              </dl>
+            </li>
+          )
+        })}
       </ul>
       <div className="portal-account-ledger-cards__footer">
         <div className="portal-account-ledger-cards__footer-row">
           <span>{t('totalCharges')}</span>
-          <span>{formatMoney(ledger.summary.totalCharges)}</span>
+          <span>{formatMoney(selectedTotal)}</span>
         </div>
         <div className="portal-account-ledger-cards__footer-row">
           <span>{t('totalPayments')}</span>
-          <span>{formatMoney(ledger.summary.totalPayments)}</span>
-        </div>
-        <div className="portal-account-ledger-cards__footer-row portal-account-ledger-cards__footer-row--strong">
-          <span>{t('balance')}</span>
-          <span>{formatMoney(ledger.summary.balance)}</span>
+          <span>{formatMoney(totalPayments)}</span>
         </div>
       </div>
     </div>
   )
+}
+
+function AccountingLedgerCheckoutBar({
+  displayBalance,
+  onCheckout,
+  t,
+}: {
+  displayBalance: number
+  onCheckout: () => void
+  t: (key: StudentPortalKey) => string
+}) {
+  return (
+    <div className="portal-account-ledger__summary-bar">
+      <div className="portal-account-ledger__summary-bar-balance">
+        <span className="portal-account-ledger__summary-bar-label">{t('balance')}</span>
+        <span className="portal-account-ledger__summary-bar-amount">{formatMoney(displayBalance)}</span>
+      </div>
+      <button
+        type="button"
+        className="portal-account-ledger__checkout-btn"
+        disabled={displayBalance <= 0}
+        onClick={onCheckout}
+      >
+        {t('checkoutButton')}
+      </button>
+    </div>
+  )
+}
+
+type SelectedByTab = Record<LedgerPayBucket, ReadonlySet<string>>
+
+const EMPTY_SELECTION: SelectedByTab = {
+  tuition_fees: new Set(),
+  clinic: new Set(),
 }
 
 export function AccountingLedgerSection() {
@@ -165,19 +233,20 @@ export function AccountingLedgerSection() {
   const t = useStudentPortalT()
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const narrowMobile = useIsNarrowMobile()
   const dateLocale = locale === 'zh' ? 'zh-TW' : 'en-US'
-  const { currentStudentId, isAuthenticated, authToken } = useAccount()
+  const { currentStudentId, isAuthenticated } = useAccount()
   const [quarters, setQuarters] = useState<AccountingQuarterOption[]>([])
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [ledger, setLedger] = useState<AccountingLedgerResponse | null>(null)
   const [loadingQuarters, setLoadingQuarters] = useState(false)
   const [loadingLedger, setLoadingLedger] = useState(false)
-  const [loadingBillingSummary, setLoadingBillingSummary] = useState(false)
-  const [billingSummary, setBillingSummary] = useState<CurrentTermBillingSummaryResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ledgerReloadSeq, setLedgerReloadSeq] = useState(0)
   const [paymentToast, setPaymentToast] = useState<string | null>(null)
+  const [payTab, setPayTab] = useState<LedgerPayBucket>('tuition_fees')
+  const [selectedByTab, setSelectedByTab] = useState<SelectedByTab>(EMPTY_SELECTION)
 
   const studentId = currentStudentId?.trim() ?? ''
 
@@ -199,7 +268,13 @@ export function AccountingLedgerSection() {
         const res = await fetchAccountingQuarters(studentId, { signal: ac.signal })
         if (ac.signal.aborted) return
         setQuarters(res.quarters)
-        const newest = res.quarters[0]
+        const termParam = searchParams.get('term')?.trim() ?? ''
+        const yearParam = Number(searchParams.get('year') ?? NaN)
+        const fromQuery =
+          termParam !== '' && Number.isFinite(yearParam)
+            ? res.quarters.find((q) => q.term === termParam && q.year === yearParam)
+            : null
+        const newest = fromQuery ?? res.quarters[0]
         setSelectedKey(newest ? quarterKey(newest) : null)
         setLedger(null)
       } catch (e) {
@@ -214,7 +289,7 @@ export function AccountingLedgerSection() {
     })()
 
     return () => ac.abort()
-  }, [isAuthenticated, studentId])
+  }, [isAuthenticated, studentId, searchParams])
 
   const selectedQuarter = useMemo(() => {
     if (selectedKey == null) return null
@@ -233,36 +308,18 @@ export function AccountingLedgerSection() {
       | null
       | undefined
     const nextToast = state?.financePaymentToast?.trim() ?? ''
-    if (nextToast === '') return
-    setPaymentToast(nextToast)
     if (state?.financePaymentRefresh) {
       setLedgerReloadSeq((value) => value + 1)
     }
-    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
-  }, [location.pathname, location.search, location.state, navigate])
-
-  useEffect(() => {
-    if (selectedQuarter == null) {
-      setBillingSummary(null)
+    if (nextToast === '') {
+      if (state?.financePaymentRefresh) {
+        navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+      }
       return
     }
-    const ac = new AbortController()
-    setLoadingBillingSummary(true)
-    ;(async () => {
-      try {
-        const summary = await fetchAuthorizeCurrentTermSummary(selectedQuarter.term, selectedQuarter.year, {
-          signal: ac.signal,
-          authToken: authToken?.trim() || undefined,
-        })
-        if (!ac.signal.aborted) setBillingSummary(summary)
-      } catch {
-        if (!ac.signal.aborted) setBillingSummary(null)
-      } finally {
-        if (!ac.signal.aborted) setLoadingBillingSummary(false)
-      }
-    })()
-    return () => ac.abort()
-  }, [authToken, selectedQuarter])
+    setPaymentToast(nextToast)
+    navigate(`${location.pathname}${location.search}`, { replace: true, state: null })
+  }, [location.pathname, location.search, location.state, navigate])
 
   useEffect(() => {
     if (selectedQuarter == null || studentId === '') {
@@ -293,6 +350,85 @@ export function AccountingLedgerSection() {
     return () => ac.abort()
   }, [selectedQuarter, studentId, ledgerReloadSeq])
 
+  useEffect(() => {
+    if (ledger == null) {
+      setSelectedByTab(EMPTY_SELECTION)
+      return
+    }
+    setSelectedByTab({
+      tuition_fees: new Set(selectableLedgerRowKeys(ledger.rows, 'tuition_fees')),
+      clinic: new Set(selectableLedgerRowKeys(ledger.rows, 'clinic')),
+    })
+  }, [ledger])
+
+  const visibleRows = useMemo(
+    () => (ledger ? ledgerRowsForBucket(ledger.rows, payTab) : []),
+    [ledger, payTab],
+  )
+
+  const selectedKeys = selectedByTab[payTab]
+
+  const selectableKeys = useMemo(
+    () => (ledger ? selectableLedgerRowKeys(ledger.rows, payTab) : []),
+    [ledger, payTab],
+  )
+
+  const selectedTotal = useMemo(
+    () => (ledger ? sumSelectedLedgerDebits(ledger.rows, selectedKeys, payTab) : 0),
+    [ledger, selectedKeys, payTab],
+  )
+
+  const totalPayments = useMemo(() => ledgerTabPaymentsTotal(visibleRows), [visibleRows])
+
+  const displayBalance = useMemo(
+    () => ledgerTabDisplayBalance(visibleRows, selectedTotal, payTab),
+    [visibleRows, selectedTotal, payTab],
+  )
+
+  const allChargesSelected =
+    selectableKeys.length > 0 && selectableKeys.every((key) => selectedKeys.has(key))
+
+  const toggleRowSelection = (key: string) => {
+    setSelectedByTab((prev) => {
+      const tabSet = new Set(prev[payTab])
+      if (tabSet.has(key)) tabSet.delete(key)
+      else tabSet.add(key)
+      return { ...prev, [payTab]: tabSet }
+    })
+  }
+
+  const toggleAllCharges = () => {
+    setSelectedByTab((prev) => ({
+      ...prev,
+      [payTab]: allChargesSelected ? new Set() : new Set(selectableKeys),
+    }))
+  }
+
+  const proceedToCheckout = () => {
+    if (selectedQuarter == null || displayBalance <= 0) return
+    const params = new URLSearchParams()
+    params.set('term', selectedQuarter.term)
+    params.set('year', String(selectedQuarter.year))
+    if (selectedQuarter.label.trim() !== '') params.set('label', selectedQuarter.label)
+    params.set('amount', displayBalance.toFixed(2))
+    params.set('selection', 'ledger')
+    const selectedAdjIds = visibleRows.flatMap(({ row, index }) => {
+      const key = ledgerRowKey(row, index)
+      if (!selectedKeys.has(key)) return []
+      const sourceId = row.sourceId
+      const id = typeof sourceId === 'number' ? sourceId : Number(sourceId)
+      if (!Number.isFinite(id) || id <= 0) return []
+      if (row.billingAdjustmentSource === 'store_cart_pending') return [Math.trunc(id)]
+      return []
+    })
+    if (selectedAdjIds.length > 0) {
+      params.set('adjIds', selectedAdjIds.join(','))
+    }
+    const path =
+      payTab === 'clinic' ? '/finances/payment/clinic-fee' : '/finances/payment/tuition'
+    navigate(`${path}?${params.toString()}`)
+  }
+
   if (!isAuthenticated || studentId === '') {
     return null
   }
@@ -319,16 +455,16 @@ export function AccountingLedgerSection() {
   }
 
   const showMakePaymentControl = selectedQuarter != null && quarters.length > 0
-  const clinicActionDue = billingSummary == null ? null : Math.max(0, billingSummary.clinicFeeCharge.amountDue)
+
   return (
-    <section className="portal-stack" aria-label={t('accountingLedgerByQuarter')}>
-      <div className="portal-account-ledger__toolbar">
-        <div className="portal-account-ledger__toolbar-actions">
-          <label className="portal-account-ledger__quarter-label" htmlFor="accounting-quarter-select">
+    <section className="portal-account-ledger" aria-label={t('accountingLedgerByQuarter')}>
+      {showMakePaymentControl ? (
+        <div className="portal-account-ledger__control-bar">
+          <label className="portal-account-ledger__term-control" htmlFor="accounting-quarter-select">
             <span className="visually-hidden">{t('quarterVisuallyHidden')}</span>
             <select
               id="accounting-quarter-select"
-              className="portal-account-ledger__select"
+              className="portal-account-ledger__term-select"
               value={selectedKey ?? ''}
               onChange={(e) => {
                 const v = e.target.value
@@ -343,54 +479,32 @@ export function AccountingLedgerSection() {
               ))}
             </select>
           </label>
+          <div className="portal-account-ledger__pay-segment" role="tablist" aria-label={t('pageActionsAria')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={payTab === 'tuition_fees'}
+              className={paySegmentBtnClass(payTab === 'tuition_fees')}
+              onClick={() => setPayTab('tuition_fees')}
+            >
+              {t('payTuitionAndFees')}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={payTab === 'clinic'}
+              className={paySegmentBtnClass(payTab === 'clinic')}
+              onClick={() => setPayTab('clinic')}
+            >
+              {t('payClinicFee')}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
       {paymentToast ? (
         <p className="portal-finance-payment-toast" role="status" aria-live="polite">
           {paymentToast}
         </p>
-      ) : null}
-
-      {showMakePaymentControl ? (
-        <section className="portal-card portal-finance-entry-actions" aria-label={t('pageActionsAria')}>
-          {loadingBillingSummary ? (
-            <p className="portal-inline-note portal-inline-note--flush" role="status">
-              {t('loadingPaymentActionStatus')}
-            </p>
-          ) : null}
-          <div className="portal-finance-entry-actions__grid">
-            <button
-              type="button"
-              className="portal-finance-entry-actions__button"
-              onClick={() => {
-                if (selectedQuarter == null) return
-                const params = new URLSearchParams()
-                params.set('term', selectedQuarter.term)
-                params.set('year', String(selectedQuarter.year))
-                params.set('label', selectedQuarter.label)
-                navigate(`/finances/payment/tuition?${params.toString()}`)
-              }}
-            >
-              {t('payTuition')}
-            </button>
-            <button
-              type="button"
-              className="portal-finance-entry-actions__button"
-              disabled={clinicActionDue != null && clinicActionDue <= 0}
-              onClick={() => {
-                if (selectedQuarter == null) return
-                const params = new URLSearchParams()
-                params.set('term', selectedQuarter.term)
-                params.set('year', String(selectedQuarter.year))
-                params.set('label', selectedQuarter.label)
-                navigate(`/finances/payment/clinic-fee?${params.toString()}`)
-              }}
-            >
-              {t('payClinicFee')}
-            </button>
-
-          </div>
-        </section>
       ) : null}
 
       {error ? (
@@ -404,16 +518,26 @@ export function AccountingLedgerSection() {
           {t('loadingLedger')}
         </p>
       ) : ledger ? (
-        <>
+        <div className="portal-account-ledger__ledger-panel">
           {narrowMobile ? (
-            <AccountingLedgerMobileCards ledger={ledger} dateLocale={dateLocale} t={t} />
+            <AccountingLedgerMobileCards
+              visibleRows={visibleRows}
+              payTab={payTab}
+              dateLocale={dateLocale}
+              t={t}
+              selectedKeys={selectedKeys}
+              onToggleRow={toggleRowSelection}
+              selectedTotal={selectedTotal}
+              totalPayments={totalPayments}
+            />
           ) : (
-            <div className="portal-table-wrap">
+            <div className="portal-table-wrap portal-account-ledger__table-wrap">
               <table className="portal-table portal-table--courses portal-table--ledger">
                 <caption className="visually-hidden">
                   {t('ledgerCaptionPrefix')} {ledger.term} {ledger.year}
                 </caption>
                 <colgroup>
+                  <col className="portal-table--ledger-col-select" />
                   <col className="portal-table--ledger-col-date" />
                   <col className="portal-table--ledger-col-type" />
                   <col className="portal-table--ledger-col-code" />
@@ -423,6 +547,17 @@ export function AccountingLedgerSection() {
                 </colgroup>
                 <thead>
                   <tr>
+                    <th scope="col" className="portal-table--ledger-col-select">
+                      <label className="portal-account-ledger__select-all">
+                        <input
+                          type="checkbox"
+                          checked={allChargesSelected}
+                          onChange={toggleAllCharges}
+                          disabled={selectableKeys.length === 0}
+                          aria-label={t('ledgerSelectAll')}
+                        />
+                      </label>
+                    </th>
                     <th scope="col" className="portal-table--ledger-col-center">{t('date')}</th>
                     <th scope="col" className="portal-table--ledger-col-center">{t('type')}</th>
                     <th scope="col" className="portal-table--ledger-col-center">{t('code')}</th>
@@ -432,59 +567,69 @@ export function AccountingLedgerSection() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ledger.rows.map((row: AccountingLedgerRow, index) => (
-                    <tr key={`${row.date}-${index}-${row.memo}`}>
-                      <td className="portal-table--ledger-col-center">{formatLedgerDate(row.date, dateLocale)}</td>
-                      <td className="portal-table-cell-capitalize portal-table--ledger-col-center">{dashText(row.type)}</td>
-                      <td className="portal-table--ledger-col-center">{dashText(row.code)}</td>
-                      <td className="portal-table--ledger-col-description">
-                        <div className="portal-table--ledger-description-main">{dashText(row.memo)}</div>
-                        {row.clinicalBookingPaymentHold != null ? (
-                          <ClinicalBookingPaymentHoldCountdown
-                            hold={row.clinicalBookingPaymentHold}
-                            t={t}
-                            className="portal-table--ledger-description-subline"
-                          />
-                        ) : null}
-                      </td>
-                      <td className="portal-table--ledger-col-money">{ledgerChargeCell(row.debit)}</td>
-                      <td className="portal-table--ledger-col-money">{ledgerPaymentCell(row.credit)}</td>
-                    </tr>
-                  ))}
+                  {visibleRows.map(({ row, index }) => {
+                    const rowKey = ledgerRowKey(row, index)
+                    const selectable = isLedgerRowPaySelectable(row, payTab)
+                    return (
+                      <tr key={`${row.date}-${index}-${row.memo}`}>
+                        <td className="portal-table--ledger-col-select">
+                          {selectable ? (
+                            <input
+                              type="checkbox"
+                              checked={selectedKeys.has(rowKey)}
+                              onChange={() => toggleRowSelection(rowKey)}
+                              aria-label={`${t('ledgerSelectRowAria')}: ${row.memo}`}
+                            />
+                          ) : null}
+                        </td>
+                        <td className="portal-table--ledger-col-center">{formatLedgerDate(row.date, dateLocale)}</td>
+                        <td className="portal-table-cell-capitalize portal-table--ledger-col-center">{dashText(row.type)}</td>
+                        <td className="portal-table--ledger-col-center">{dashText(row.code)}</td>
+                        <td className="portal-table--ledger-col-description">
+                          <div className="portal-table--ledger-description-main">{dashText(row.memo)}</div>
+                          {row.clinicalBookingPaymentHold != null ? (
+                            <ClinicalBookingPaymentHoldCountdown
+                              hold={row.clinicalBookingPaymentHold}
+                              t={t}
+                              className="portal-table--ledger-description-subline"
+                            />
+                          ) : null}
+                        </td>
+                        <td className="portal-table--ledger-col-money">{ledgerChargeCell(row.debit)}</td>
+                        <td className="portal-table--ledger-col-money">{ledgerPaymentCell(row.credit)}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="portal-table--ledger-summary-row">
-                    <th scope="row" colSpan={4} className="portal-table--ledger-summary-label">
+                    <th scope="row" colSpan={5} className="portal-table--ledger-summary-label">
                       {t('totalCharges')}
                     </th>
                     <td className="portal-table--ledger-col-money portal-table--ledger-summary-value">
-                      {formatMoney(ledger.summary.totalCharges)}
+                      {formatMoney(selectedTotal)}
                     </td>
                     <td className="portal-table--ledger-col-money portal-table--ledger-summary-dash">—</td>
                   </tr>
                   <tr className="portal-table--ledger-summary-row">
-                    <th scope="row" colSpan={4} className="portal-table--ledger-summary-label">
+                    <th scope="row" colSpan={5} className="portal-table--ledger-summary-label">
                       {t('totalPayments')}
                     </th>
                     <td className="portal-table--ledger-col-money portal-table--ledger-summary-dash">—</td>
                     <td className="portal-table--ledger-col-money portal-table--ledger-summary-value">
-                      {formatMoney(ledger.summary.totalPayments)}
-                    </td>
-                  </tr>
-                  <tr className="portal-table--ledger-summary-row portal-table--ledger-summary-row--balance">
-                    <th scope="row" colSpan={4} className="portal-table--ledger-summary-label">
-                      {t('balance')}
-                    </th>
-                    <td className="portal-table--ledger-col-money portal-table--ledger-summary-dash">—</td>
-                    <td className="portal-table--ledger-col-money portal-table--ledger-summary-value">
-                      {formatMoney(ledger.summary.balance)}
+                      {formatMoney(totalPayments)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           )}
-        </>
+          <AccountingLedgerCheckoutBar
+            displayBalance={displayBalance}
+            onCheckout={proceedToCheckout}
+            t={t}
+          />
+        </div>
       ) : null}
     </section>
   )

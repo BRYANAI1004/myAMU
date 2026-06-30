@@ -162,6 +162,7 @@ export async function postAuthorizeNetChargeHandler(
       cardBinPrefix: parsed.value.cardBinPrefix,
       cardholderName: parsed.value.cardholderName,
       billingZip: parsed.value.billingZip,
+      ledgerAdjustmentIds: parsed.value.ledgerAdjustmentIds,
     });
     res.json({
       ok: true,
@@ -234,6 +235,7 @@ export async function postAuthorizeNetTuitionChargeHandler(
       cardBinPrefix: parsed.value.cardBinPrefix,
       cardholderName: parsed.value.cardholderName,
       billingZip: parsed.value.billingZip,
+      ledgerAdjustmentIds: parsed.value.ledgerAdjustmentIds,
     });
     res.json({
       ok: true,
@@ -296,6 +298,7 @@ export async function postAuthorizeNetClinicFeeChargeHandler(
       cardBinPrefix: parsed.value.cardBinPrefix,
       cardholderName: parsed.value.cardholderName,
       billingZip: parsed.value.billingZip,
+      ledgerAdjustmentIds: parsed.value.ledgerAdjustmentIds,
     });
     res.json({
       ok: true,

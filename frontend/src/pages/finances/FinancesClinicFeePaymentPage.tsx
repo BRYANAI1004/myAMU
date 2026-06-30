@@ -96,6 +96,12 @@ export function FinancesClinicFeePaymentPage() {
   const t = useStudentPortalT()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
+  const ledgerSelection = searchParams.get('selection') === 'ledger'
+  const ledgerSelectedAmount = useMemo(() => {
+    const raw = searchParams.get('amount')?.trim() ?? ''
+    const n = roundMoney(Number(raw))
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [searchParams])
   const { account, currentStudentId, authToken, isAuthenticated } = useAccount()
   const [term, setTerm] = useState(() => searchParams.get('term')?.trim() ?? '')
   const [year, setYear] = useState(() => Number(searchParams.get('year') ?? NaN))
@@ -114,7 +120,9 @@ export function FinancesClinicFeePaymentPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const studentId = currentStudentId?.trim() ?? ''
-  const clinicDue = Math.max(0, billingSummary?.clinicFeeCharge.amountDue ?? 0)
+  const summaryClinicDue = Math.max(0, billingSummary?.clinicFeeCharge.amountDue ?? 0)
+  const clinicDue =
+    ledgerSelection && ledgerSelectedAmount != null ? ledgerSelectedAmount : summaryClinicDue
 
   const amountNum = useMemo(() => {
     const n = Number(amount)
@@ -159,11 +167,20 @@ export function FinancesClinicFeePaymentPage() {
   const displayTerm = termLabel || portalTermLabel(account) || t('selectedTerm')
   const termCode = termCodeFromQuarter(term, year)
   const statusMessage = clinicStatusMessage(billingSummary, t)
-  const canPay = billingSummary?.clinicFeeStatus === 'pending' && clinicDue > 0
+  const canPay = ledgerSelection
+    ? ledgerSelectedAmount != null && ledgerSelectedAmount > 0
+    : billingSummary?.clinicFeeStatus === 'pending' && clinicDue > 0
+  const lockedAmountNote = ledgerSelection
+    ? t('amountMatchesLedgerSelection')
+    : t('clinicFeeMustBeFullPayment')
 
   useEffect(() => {
+    if (ledgerSelection && ledgerSelectedAmount != null) {
+      setAmount(ledgerSelectedAmount.toFixed(2))
+      return
+    }
     setAmount(clinicDue.toFixed(2))
-  }, [clinicDue])
+  }, [clinicDue, ledgerSelection, ledgerSelectedAmount])
 
   useEffect(() => {
     if (!isAuthenticated || studentId === '') {
@@ -195,14 +212,20 @@ export function FinancesClinicFeePaymentPage() {
           setTermLabel(nextLabel)
         }
 
-        const summary = await fetchAuthorizeClinicFeeSummary(nextTerm, nextYear, {
-          signal: ac.signal,
-          authToken: authToken?.trim() || undefined,
-        })
-        if (ac.signal.aborted) return
-        setBillingSummary(summary)
-        if (nextLabel.trim() === '') {
-          setTermLabel(`${summary.term} ${summary.year}`.trim())
+        if (ledgerSelection) {
+          if (nextLabel.trim() === '') {
+            setTermLabel(`${nextTerm} ${nextYear}`.trim())
+          }
+        } else {
+          const summary = await fetchAuthorizeClinicFeeSummary(nextTerm, nextYear, {
+            signal: ac.signal,
+            authToken: authToken?.trim() || undefined,
+          })
+          if (ac.signal.aborted) return
+          setBillingSummary(summary)
+          if (nextLabel.trim() === '') {
+            setTermLabel(`${summary.term} ${summary.year}`.trim())
+          }
         }
       } catch (e) {
         if (ac.signal.aborted) return
@@ -213,7 +236,7 @@ export function FinancesClinicFeePaymentPage() {
     })()
 
     return () => ac.abort()
-  }, [authToken, isAuthenticated, navigate, studentId, term, termLabel, year, t])
+  }, [authToken, isAuthenticated, ledgerSelection, navigate, studentId, term, termLabel, year, t])
 
   useEffect(() => {
     let mounted = true
@@ -264,7 +287,7 @@ export function FinancesClinicFeePaymentPage() {
       setCvv('')
       return
     }
-    if (amountNum !== clinicDue) {
+    if (!ledgerSelection && amountNum !== clinicDue) {
       setError(t('clinicFeeAmountMustMatchFull'))
       setCvv('')
       return
@@ -380,7 +403,7 @@ export function FinancesClinicFeePaymentPage() {
 
       {!loading ? (
         <>
-          {billingSummary != null ? (
+          {billingSummary != null && !ledgerSelection ? (
             <section className="portal-card portal-finance-payment-option" aria-labelledby="clinic-fee-heading">
               <header className="portal-finance-payment-option__header">
                 <h2 id="clinic-fee-heading" className="portal-section-heading">
@@ -411,7 +434,7 @@ export function FinancesClinicFeePaymentPage() {
               </p>
             </section>
           ) : null}
-          {!canPay ? (
+          {!canPay && !ledgerSelection ? (
             <p className="portal-inline-note portal-inline-note--flush" role="status">
               {t('clinicFeeNotCurrentlyDue')}
             </p>
@@ -439,7 +462,7 @@ export function FinancesClinicFeePaymentPage() {
                   cvv={cvv}
                   billingZip={billingZip}
                   allowPartialPayment={false}
-                  lockedAmountNote={t('clinicFeeMustBeFullPayment')}
+                  lockedAmountNote={lockedAmountNote}
                   disclosureNote={t('creditCardProcessingFeeDisclosure')}
                   submitLabel={t('payClinicFee')}
                   busy={submitting}

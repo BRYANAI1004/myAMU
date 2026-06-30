@@ -32,6 +32,8 @@ import { CourseSearchPage } from './pages/registration/CourseSearchPage'
 import { FinancesLayout } from './pages/finances/FinancesLayout'
 import { FinancesOverviewPage } from './pages/finances/FinancesOverviewPage'
 import { FinancesPaymentPage } from './pages/finances/FinancesPaymentPage'
+import { FinancesStoreCheckoutPage } from './pages/finances/FinancesStoreCheckoutPage'
+import { FinancesStorePage } from './pages/finances/FinancesStorePage'
 import { FinancesClinicFeePaymentPage } from './pages/finances/FinancesClinicFeePaymentPage'
 import { AcademicsLayout } from './pages/academics/AcademicsLayout'
 import { AcademicsPortalPage } from './pages/academics/AcademicsPortalPage'
@@ -222,6 +224,8 @@ export default function App() {
             <Route path="/finances" element={<FinancesLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<FinancesOverviewPage />} />
+              <Route path="store" element={<FinancesStorePage />} />
+              <Route path="store/checkout" element={<FinancesStoreCheckoutPage />} />
               <Route path="payment" element={<FinancesPaymentPage />} />
               <Route path="payment/tuition" element={<FinancesPaymentPage />} />
               <Route path="payment/clinic-fee" element={<FinancesClinicFeePaymentPage />} />

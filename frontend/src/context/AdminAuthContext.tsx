@@ -68,6 +68,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         const res = await fetch(buildApiUrl('/api/admin/auth/me'), {
           method: 'GET',
           credentials: 'include',
+          signal: AbortSignal.timeout(10_000),
         })
         const data: unknown = await res.json().catch(() => null)
         if (cancelled) return

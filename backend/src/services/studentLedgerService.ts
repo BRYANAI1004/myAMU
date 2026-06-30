@@ -390,6 +390,8 @@ function adjustmentMetaForLedger(
 > {
   const isLateFee = adj.adjustmentSource === "system_late_fee";
   const isSystemClinical = adj.adjustmentSource === "system_clinical";
+  const isStorePurchase = adj.adjustmentSource === "store_purchase";
+  const isStoreCartPending = adj.adjustmentSource === "store_cart_pending";
   const isLateFeeReversal =
     adj.adjustmentSource === "system_late_fee_reversal";
   const sid = adj.id != null && Number.isFinite(adj.id) ? adj.id : null;
@@ -401,7 +403,15 @@ function adjustmentMetaForLedger(
       isDeletable: false,
     };
   }
-  if (isSystemClinical) {
+  if (isStoreCartPending) {
+    return {
+      sourceType: "system",
+      sourceId: sid,
+      isEditable: false,
+      isDeletable: false,
+    };
+  }
+  if (isSystemClinical || isStorePurchase) {
     return {
       sourceType: "system",
       sourceId: sid,

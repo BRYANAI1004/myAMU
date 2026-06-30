@@ -155,14 +155,13 @@ async function resolveBrowseAccountSnapshot(
   studentId: string,
   term: string,
   year: number,
-  termYearMode: AccountTermYearInput["mode"],
+  _termYearMode: AccountTermYearInput["mode"],
   portalEnrollmentRows: Awaited<
     ReturnType<typeof listPortalEnrollmentRowsForStudentAcademics>
   >,
   allMarksRows: Awaited<ReturnType<typeof listMarksForStudent>>,
 ): Promise<Awaited<ReturnType<typeof loadLegacyAccountSnapshot>>> {
   if (snap != null) return snap;
-  if (termYearMode !== "explicit") return null;
 
   const hasPortal = portalEnrollmentRows.some(
     (p) => p.year === year && termsMatch(p.term, term),
@@ -291,10 +290,14 @@ async function getRealStudentAccountPayload(
     term = termYear.term;
     year = termYear.year;
   } else {
-    const latest = await findLatestLegacyTermYear(pool, studentId);
+    const [latestLegacy, latestPortal] = await Promise.all([
+      findLatestLegacyTermYear(pool, studentId),
+      findLatestPortalEnrollmentTermYear(studentId),
+    ]);
+    const latest = pickNewerRegistrationAnchor(latestLegacy, latestPortal);
     if (!latest) {
       console.debug(
-        "[account-debug] getStudentAccountPayload: no legacy registration for auto term",
+        "[account-debug] getStudentAccountPayload: no legacy or portal registration for auto term",
         JSON.stringify({ studentId }),
       );
       return null;
