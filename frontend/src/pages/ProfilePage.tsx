@@ -192,7 +192,6 @@ export function ProfilePage() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | null>(null)
-  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoFilename, setPhotoFilename] = useState<string | null>(null)
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoUploading, setPhotoUploading] = useState(false)
@@ -362,7 +361,6 @@ export function ProfilePage() {
         URL.revokeObjectURL(photoPreviewUrl)
       }
       setPhotoPreviewUrl(null)
-      setPhotoFile(null)
       setPhotoFilename(null)
       return
     }
@@ -371,7 +369,6 @@ export function ProfilePage() {
       URL.revokeObjectURL(photoPreviewUrl)
     }
     setPhotoPreviewUrl(nextUrl)
-    setPhotoFile(file)
     setPhotoFilename(file.name)
     setPhotoError(null)
     setPhotoSuccess(null)
@@ -388,7 +385,6 @@ export function ProfilePage() {
         URL.revokeObjectURL(previewUrl)
       }
       setPhotoPreviewUrl(null)
-      setPhotoFile(null)
       setPhotoFilename(null)
       if (photoInputRef.current) {
         photoInputRef.current.value = ''

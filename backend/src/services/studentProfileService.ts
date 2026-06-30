@@ -287,7 +287,7 @@ export async function updateLegacyStudentSensitiveProfile(
   if (id === "") return false;
 
   const updates: string[] = [];
-  const params: Array<string> = [];
+  const params: unknown[] = [];
   const assignText = (column: string, raw: string | null | undefined) => {
     if (raw === undefined) return;
     updates.push(`${column} = ?`);
@@ -297,7 +297,8 @@ export async function updateLegacyStudentSensitiveProfile(
   if (patch.dob !== undefined) {
     const iso = legacyDbDateToIso(patch.dob);
     updates.push("dob = ?");
-    params.push(iso ?? "0000-00-00");
+    // Postgres rejects MySQL sentinel `0000-00-00`; NULL means no date on file.
+    params.push(iso);
   }
   assignText("ssn", patch.ssn);
   assignText("visa", patch.visa);
