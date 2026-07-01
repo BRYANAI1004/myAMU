@@ -45,9 +45,15 @@ Repository migration **filenames must match** the `version` + `name` in that tab
 
 ### Pending (in repo, not yet on production)
 
-_None — keep this section updated when new migrations land before `db push`._
+| Version | Name |
+|---------|------|
+| `20260701100000` | `course_sections_portal_enrollments_academic_term_id` |
+| `20260701100100` | `backfill_academic_term_id_enrollment_facts` |
+| `20260701100200` | `academic_term_id_not_null_enrollment_facts` |
 
 After review: `supabase db push` from repo root.
+
+**Registration term keys:** `academic_terms.id` is the canonical term key for course sections and portal enrollments. Columns `term` / `year` on those tables are denormalized legacy display keys for finance and marks — do not use them as primary filters in new registration code.
 
 Verify repo filenames match the documented ledger:
 

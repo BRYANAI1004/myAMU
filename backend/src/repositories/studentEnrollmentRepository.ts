@@ -64,13 +64,15 @@ function normalizeEnrollmentStatusForCompare(raw: unknown): string {
 
 async function resolveRequestedEnrollmentSectionsForTermWithQueryable(
   db: MysqlQueryable,
-  term: string,
-  year: number,
+  academicTermId: string,
   sections: EnrollSectionInput[],
 ): Promise<
   { ok: true; sections: ResolvedEnrollmentSection[] } | { ok: false; error: string }
 > {
-  const trimmedTerm = term.trim();
+  const trimmedTermId = academicTermId.trim();
+  if (trimmedTermId === "") {
+    return { ok: false, error: "Academic term is required." };
+  }
   const resolvedSections: ResolvedEnrollmentSection[] = [];
 
   for (const raw of sections) {
@@ -100,10 +102,9 @@ async function resolveRequestedEnrollmentSectionsForTermWithQueryable(
               TRIM(cs.prerequisite_course_id)
          WHERE cs.course_code = ?
            AND cs.section_code = ?
-           AND cs.term = ?
-           AND cs.year = ?
+           AND cs.academic_term_id = ?
            AND cs.schedule_track = ?`,
-        [courseCode, sectionCode, trimmedTerm, year, raw.schedule_track],
+        [courseCode, sectionCode, trimmedTermId, raw.schedule_track],
       );
       secRows = rows;
     } else {
@@ -122,12 +123,11 @@ async function resolveRequestedEnrollmentSectionsForTermWithQueryable(
               TRIM(cs.prerequisite_course_id)
          WHERE cs.course_code = ?
            AND cs.section_code = ?
-           AND cs.term = ?
-           AND cs.year = ?
+           AND cs.academic_term_id = ?
          ORDER BY
            CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END,
            cs.id ASC`,
-        [courseCode, sectionCode, trimmedTerm, year],
+        [courseCode, sectionCode, trimmedTermId],
       );
       secRows = rows;
     }
@@ -169,16 +169,14 @@ async function resolveRequestedEnrollmentSectionsForTermWithQueryable(
 }
 
 export async function resolveRequestedEnrollmentSectionsForTerm(
-  term: string,
-  year: number,
+  academicTermId: string,
   sections: EnrollSectionInput[],
 ): Promise<
   { ok: true; sections: ResolvedEnrollmentSection[] } | { ok: false; error: string }
 > {
   return resolveRequestedEnrollmentSectionsForTermWithQueryable(
     pool,
-    term,
-    year,
+    academicTermId,
     sections,
   );
 }
@@ -266,11 +264,13 @@ export async function listStudentHistoricalCourseReferences(
 
 /**
  * Validates each section against `course_sections` and `portal_courses`, then inserts or reactivates
- * `portal_enrollments` rows. Duplicate / idempotency: same student + `course_section_id` + term + year
+ * `portal_enrollments` rows. Duplicate / idempotency: same student + `course_section_id` + `academic_term_id`
  * (active rows skipped; withdrawn rows reactivated). Legacy course-only rows are not used for new writes.
+ * `term` / `year` are denormalized from `academicTermId` for legacy finance and marks reads.
  */
 export async function enrollStudentInSections(
   studentExternalId: string,
+  academicTermId: string,
   term: string,
   year: number,
   sections: EnrollSectionInput[],
@@ -279,7 +279,11 @@ export async function enrollStudentInSections(
   { ok: true; insertedCount: number } | { ok: false; error: string }
 > {
   const sid = studentExternalId.trim();
+  const trimmedTermId = academicTermId.trim();
   const trimmedTerm = term.trim();
+  if (trimmedTermId === "") {
+    return { ok: false, error: "Academic term is required." };
+  }
   if (sections.length === 0) {
     return { ok: false, error: "At least one section is required." };
   }
@@ -293,8 +297,7 @@ export async function enrollStudentInSections(
         ? { ok: true as const, sections: options.resolvedSections }
         : await resolveRequestedEnrollmentSectionsForTermWithQueryable(
             conn,
-            trimmedTerm,
-            year,
+            trimmedTermId,
             sections,
           );
     if (!resolvedSections.ok) {
@@ -319,11 +322,9 @@ export async function enrollStudentInSections(
          WHERE TRIM(student_external_id) =
                TRIM(?)
            AND course_section_id = ?
-           AND term =
-               ?
-           AND year = ?
+           AND academic_term_id = ?
          LIMIT 2`,
-        [sid, courseSectionId, trimmedTerm, year],
+        [sid, courseSectionId, trimmedTermId],
       );
       if (existing != null) {
         const st = normalizeEnrollmentStatusForCompare(existing.status);
@@ -342,12 +343,18 @@ export async function enrollStudentInSections(
                  withdrawn_at = NULL,
                  course_id = ?,
                  section_code = ?,
-                 schedule_track = ?
+                 schedule_track = ?,
+                 academic_term_id = ?,
+                 term = ?,
+                 year = ?
              WHERE id = ?`,
             [
               courseId,
               secCodeStored,
               scheduleTrackStored,
+              trimmedTermId,
+              trimmedTerm,
+              year,
               Number(existing.id),
             ],
           );
@@ -358,14 +365,23 @@ export async function enrollStudentInSections(
 
       await conn.query<ResultSetHeader>(
         `INSERT INTO portal_enrollments (
-           student_external_id, course_id, course_section_id, section_code, schedule_track, term, year, status
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active')`,
+           student_external_id,
+           course_id,
+           course_section_id,
+           section_code,
+           schedule_track,
+           academic_term_id,
+           term,
+           year,
+           status
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
         [
           sid,
           courseId,
           courseSectionId,
           secCodeStored,
           scheduleTrackStored,
+          trimmedTermId,
           trimmedTerm,
           year,
         ],
@@ -410,27 +426,24 @@ export type StudentEnrolledSectionsQueryResult = {
 };
 
 /**
- * Scheduled section rows for a student's **active** `portal_enrollments` in one calendar term/year.
+ * Scheduled section rows for a student's **active** `portal_enrollments` in one academic term.
  *
  * When `portal_enrollments.course_section_id` is set, the timetable row is that exact section.
  * Legacy rows with `course_section_id` NULL resolve via {@link SQL_PORTAL_ENROLLMENT_LEGACY_SECTION_ID}.
  */
 export async function listStudentEnrolledSectionsForTerm(
   studentExternalId: string,
-  term: string,
-  year: number,
+  academicTermId: string,
 ): Promise<StudentEnrolledSectionsQueryResult> {
   const sid = studentExternalId.trim();
-  const t = term.trim();
+  const tid = academicTermId.trim();
 
   const countSql = `
     SELECT COUNT(*) AS cnt
     FROM portal_enrollments e
     WHERE TRIM(e.student_external_id) =
           TRIM(?)
-      AND e.term =
-          ?
-      AND e.year = ?
+      AND e.academic_term_id = ?
       AND ${SQL_ACTIVE_PORTAL_ENROLLMENT_E}
   `;
 
@@ -466,16 +479,14 @@ ${SQL_PORTAL_ENROLLMENT_CS_LEG_JOIN}
          TRIM(COALESCE(cs_direct.course_code, cs_leg.course_code))
     WHERE TRIM(e.student_external_id) =
           TRIM(?)
-      AND e.term =
-          ?
-      AND e.year = ?
+      AND e.academic_term_id = ?
       AND ${SQL_ACTIVE_PORTAL_ENROLLMENT_E}
       AND (cs_direct.id IS NOT NULL OR cs_leg.id IS NOT NULL)
     ORDER BY course_code ASC, weekday ASC, start_time ASC
   `;
 
-  const countParams = [sid, t, year];
-  const sectionParams = [sid, t, year];
+  const countParams = [sid, tid];
+  const sectionParams = [sid, tid];
 
   const [[countRows], [sectionRows]] = await Promise.all([
     pool.query<RowDataPacket[]>(countSql, countParams),
@@ -500,13 +511,11 @@ ${SQL_PORTAL_ENROLLMENT_CS_LEG_JOIN}
 /** @deprecated Prefer {@link listStudentEnrolledSectionsForTerm} for schedule metadata. */
 export async function listStudentEnrolledSectionRows(
   studentExternalId: string,
-  term: string,
-  year: number,
+  academicTermId: string,
 ): Promise<CourseSectionDetail[]> {
   const { sections } = await listStudentEnrolledSectionsForTerm(
     studentExternalId,
-    term,
-    year,
+    academicTermId,
   );
   return sections;
 }
@@ -611,12 +620,11 @@ export async function listPortalEnrollmentRosterBySectionId(
 
 export async function listAdminEnrollmentRowsForSection(
   courseCode: string,
-  term: string,
-  year: number,
+  academicTermId: string,
   options?: { courseSectionId?: number | null },
 ): Promise<AdminSectionEnrollmentRepositoryRow[]> {
   const code = courseCode.trim();
-  const t = term.trim();
+  const tid = academicTermId.trim();
   const sid = options?.courseSectionId;
   const sectionFilter =
     sid != null && Number.isFinite(sid) && sid > 0
@@ -654,9 +662,7 @@ export async function listAdminEnrollmentRowsForSection(
          TRIM(e.student_external_id)
     WHERE TRIM(pc.course_code) =
             TRIM(?)
-      AND TRIM(e.term) =
-            TRIM(?)
-      AND e.year = ?
+      AND e.academic_term_id = ?
       ${sectionFilter}
     ORDER BY
       CASE WHEN ps.full_name IS NULL OR TRIM(ps.full_name) = '' THEN 1 ELSE 0 END,
@@ -665,8 +671,8 @@ export async function listAdminEnrollmentRowsForSection(
   `;
   const params: unknown[] =
     sid != null && Number.isFinite(sid) && sid > 0
-      ? [code, t, year, sid, sid]
-      : [code, t, year];
+      ? [code, tid, sid, sid]
+      : [code, tid];
   const [rows] = await pool.query<RowDataPacket[]>(sql, params);
   return rows.map((r) => {
     const w = r.withdrawn_at;

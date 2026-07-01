@@ -182,8 +182,7 @@ export async function getStudentEnrolledSections(
     try {
       const result = await listStudentEnrolledSectionsForTerm(
         studentId,
-        row.term_name,
-        row.year,
+        academicTermId,
       );
       sections = result.sections;
       scheduleMeta = {

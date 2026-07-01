@@ -1,5 +1,6 @@
 import { env } from "../config/env.js";
 import { pool } from "../lib/db.js";
+import { getAcademicTermByCalendarTerm } from "../repositories/academicTermRepository.js";
 import { getCourseSectionById } from "../repositories/courseSectionRepository.js";
 import { listAdminEnrollmentRowsForSection } from "../repositories/studentEnrollmentRepository.js";
 import { mapLegacyStudentProfileExportRowsById } from "../repositories/studentLegacyAccountRepository.js";
@@ -106,10 +107,14 @@ export async function buildRegisteredStudentsCsvForSection(
   const term = section.term.trim();
   const year = section.year;
 
+  const termRow = await getAcademicTermByCalendarTerm(term, year);
+  if (termRow == null) {
+    return { ok: false, kind: "section_not_found" };
+  }
+
   const enrollments = await listAdminEnrollmentRowsForSection(
     courseCode,
-    term,
-    year,
+    termRow.id,
     { courseSectionId: sectionId },
   );
   const studentIds = enrollments

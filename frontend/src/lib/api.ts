@@ -5942,6 +5942,87 @@ export async function fetchCourses(options?: {
   return parseCourseCatalogList(data)
 }
 
+export type CourseCatalogPage = {
+  rows: CourseCatalogItem[]
+  total: number
+  page: number
+  limit: number
+}
+
+export type CourseCatalogPrefixCounts = {
+  total: number
+  byPrefix: Record<string, number>
+}
+
+export async function fetchAdminCourseCatalogSummary(options?: {
+  signal?: AbortSignal
+}): Promise<CourseCatalogPrefixCounts> {
+  const data = (await fetchApiJson('/api/admin/courses/catalog/summary', {
+    signal: options?.signal,
+  })) as unknown
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected course catalog summary response')
+  }
+  const o = data as Record<string, unknown>
+  const total =
+    typeof o.total === 'number' && Number.isFinite(o.total)
+      ? Math.trunc(o.total)
+      : 0
+  const byPrefix: Record<string, number> = {}
+  if (o.byPrefix != null && typeof o.byPrefix === 'object') {
+    for (const [k, v] of Object.entries(o.byPrefix as Record<string, unknown>)) {
+      const n = typeof v === 'number' ? v : Number(v)
+      if (Number.isFinite(n)) byPrefix[k.toUpperCase()] = Math.trunc(n)
+    }
+  }
+  return { total, byPrefix }
+}
+
+export async function fetchAdminCourseCatalog(params: {
+  q?: string
+  prefixes?: string[]
+  page?: number
+  limit?: number
+  signal?: AbortSignal
+}): Promise<CourseCatalogPage> {
+  const qs = new URLSearchParams()
+  const q = params.q?.trim() ?? ''
+  if (q !== '') qs.set('q', q)
+  const prefixes = (params.prefixes ?? [])
+    .map((p) => p.trim().toUpperCase())
+    .filter((p) => p.length >= 2)
+  if (prefixes.length > 0) qs.set('prefixes', prefixes.join(','))
+  if (params.page != null && params.page > 0) {
+    qs.set('page', String(Math.trunc(params.page)))
+  }
+  if (params.limit != null && params.limit > 0) {
+    qs.set('limit', String(Math.trunc(params.limit)))
+  }
+  const suffix = qs.toString()
+  const data = (await fetchApiJson(
+    `/api/admin/courses/catalog${suffix ? `?${suffix}` : ''}`,
+    { signal: params.signal },
+  )) as unknown
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected course catalog response')
+  }
+  const o = data as Record<string, unknown>
+  const rows = parseCourseCatalogList(o.rows)
+  const total =
+    typeof o.total === 'number' && Number.isFinite(o.total)
+      ? Math.trunc(o.total)
+      : rows.length
+  const page =
+    typeof o.page === 'number' && Number.isFinite(o.page)
+      ? Math.max(1, Math.trunc(o.page))
+      : 1
+  const limit =
+    typeof o.limit === 'number' && Number.isFinite(o.limit)
+      ? Math.max(1, Math.trunc(o.limit))
+      : rows.length || 25
+  return { rows, total, page, limit }
+}
+
 /** One row from `course_sections` (admin + student section APIs). */
 export type AdminCourseSection = {
   id: number

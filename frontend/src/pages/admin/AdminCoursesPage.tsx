@@ -1,80 +1,74 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParams'
 import {
   fetchAcademicTerms,
+  fetchAdminCourseCatalog,
+  fetchAdminCourseCatalogSummary,
   fetchAdminCoursesOpenForRegistration,
-  fetchCourses,
   fetchCurrentAcademicTerm,
   type AcademicTerm,
   type CourseCatalogItem,
+  type CourseCatalogPrefixCounts,
   type OpenRegistrationCourseRow,
 } from '../../lib/api'
 import { AllCoursesTable } from './courses/AllCoursesTable'
+import { catalogGroupById } from './courses/catalogPrefixGroups'
 import { CoursesTabBar, type AdminCoursesTabId } from './courses/CoursesTabBar'
-import { courseCatalogTitle } from './courses/courseCatalogDisplay'
 import { OpenRegistrationCoursesTable } from './courses/OpenRegistrationCoursesTable'
 
-export function AdminCoursesPage() {
-  const [tab, setTab] = useState<AdminCoursesTabId>('all')
+const CATALOG_PAGE_SIZE = 25
+const SEARCH_DEBOUNCE_MS = 300
+const DEFAULT_CATALOG_GROUP_ID = 'bs'
 
-  const [catalog, setCatalog] = useState<CourseCatalogItem[] | null>(null)
-  const [catalogLoading, setCatalogLoading] = useState(true)
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(value), delayMs)
+    return () => window.clearTimeout(t)
+  }, [value, delayMs])
+  return debounced
+}
+
+export function AdminCoursesPage() {
+  const [tab, setTab] = useState<AdminCoursesTabId>('catalog')
+
+  const [catalogRows, setCatalogRows] = useState<CourseCatalogItem[]>([])
+  const [catalogTotal, setCatalogTotal] = useState(0)
+  const [catalogPage, setCatalogPage] = useState(1)
+  const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState<string | null>(null)
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const debouncedCatalogSearch = useDebouncedValue(catalogSearch, SEARCH_DEBOUNCE_MS)
+  const [catalogReloadKey, setCatalogReloadKey] = useState(0)
+  const [catalogGroupId, setCatalogGroupId] = useState(DEFAULT_CATALOG_GROUP_ID)
+  const [prefixCounts, setPrefixCounts] = useState<CourseCatalogPrefixCounts | null>(
+    null,
+  )
 
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
   const [termsLoading, setTermsLoading] = useState(true)
   const [termsError, setTermsError] = useState<string | null>(null)
 
-  const [allSearch, setAllSearch] = useState('')
-
   const [openTermId, setOpenTermId] = useState('')
   const openTermAutoDone = useRef(false)
 
   const [openSearch, setOpenSearch] = useState('')
-  const [openRowsRaw, setOpenRowsRaw] = useState<OpenRegistrationCourseRow[] | null>(null)
+  const [openRowsRaw, setOpenRowsRaw] = useState<OpenRegistrationCourseRow[] | null>(
+    null,
+  )
   const [openLoading, setOpenLoading] = useState(false)
   const [openError, setOpenError] = useState<string | null>(null)
 
-  const reloadCatalog = useCallback(async () => {
-    setCatalogLoading(true)
-    setCatalogError(null)
-    try {
-      const c = await fetchCourses()
-      setCatalog(c)
-    } catch (e) {
-      setCatalog([])
-      setCatalogError(
-        e instanceof Error ? e.message : 'Could not load courses.',
-      )
-    } finally {
-      setCatalogLoading(false)
-    }
-  }, [])
+  const searchActive = debouncedCatalogSearch.trim() !== ''
+
+  const catalogPrefixes = useMemo(() => {
+    if (searchActive) return undefined
+    return catalogGroupById(catalogGroupId)?.prefixes
+  }, [searchActive, catalogGroupId])
 
   useEffect(() => {
     const ac = new AbortController()
-    setCatalogLoading(true)
     setTermsLoading(true)
-    setCatalogError(null)
     setTermsError(null)
-
-    ;(async () => {
-      try {
-        const c = await fetchCourses({ signal: ac.signal })
-        if (ac.signal.aborted) return
-        setCatalog(c)
-      } catch (e) {
-        if (ac.signal.aborted) return
-        setCatalog([])
-        setCatalogError(
-          e instanceof Error ? e.message : 'Could not load courses.',
-        )
-      } finally {
-        if (!ac.signal.aborted) setCatalogLoading(false)
-      }
-    })()
-
     ;(async () => {
       try {
         const t = await fetchAcademicTerms({ signal: ac.signal })
@@ -90,9 +84,64 @@ export function AdminCoursesPage() {
         if (!ac.signal.aborted) setTermsLoading(false)
       }
     })()
-
     return () => ac.abort()
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'catalog') return
+    const ac = new AbortController()
+    void (async () => {
+      try {
+        const summary = await fetchAdminCourseCatalogSummary({ signal: ac.signal })
+        if (ac.signal.aborted) return
+        setPrefixCounts(summary)
+      } catch {
+        if (!ac.signal.aborted) setPrefixCounts(null)
+      }
+    })()
+    return () => ac.abort()
+  }, [tab, catalogReloadKey])
+
+  useEffect(() => {
+    if (tab !== 'catalog') return
+    const ac = new AbortController()
+    setCatalogLoading(true)
+    setCatalogError(null)
+    ;(async () => {
+      try {
+        const result = await fetchAdminCourseCatalog({
+          q: debouncedCatalogSearch,
+          prefixes: catalogPrefixes,
+          page: catalogPage,
+          limit: CATALOG_PAGE_SIZE,
+          signal: ac.signal,
+        })
+        if (ac.signal.aborted) return
+        setCatalogRows(result.rows)
+        setCatalogTotal(result.total)
+      } catch (e) {
+        if (ac.signal.aborted) return
+        setCatalogRows([])
+        setCatalogTotal(0)
+        setCatalogError(
+          e instanceof Error ? e.message : 'Could not load course catalog.',
+        )
+      } finally {
+        if (!ac.signal.aborted) setCatalogLoading(false)
+      }
+    })()
+    return () => ac.abort()
+  }, [
+    tab,
+    debouncedCatalogSearch,
+    catalogPage,
+    catalogReloadKey,
+    catalogPrefixes,
+  ])
+
+  useEffect(() => {
+    setCatalogPage(1)
+  }, [debouncedCatalogSearch, catalogGroupId])
 
   useEffect(() => {
     if (!terms?.length || openTermAutoDone.current) return
@@ -132,7 +181,9 @@ export function AdminCoursesPage() {
         if (ac.signal.aborted) return
         setOpenRowsRaw(null)
         setOpenError(
-          e instanceof Error ? e.message : 'Could not load open-registration courses.',
+          e instanceof Error
+            ? e.message
+            : 'Could not load open-registration courses.',
         )
       } finally {
         if (!ac.signal.aborted) setOpenLoading(false)
@@ -141,15 +192,9 @@ export function AdminCoursesPage() {
     return () => ac.abort()
   }, [tab, openTermId])
 
-  const filteredAll = useMemo(() => {
-    const list = catalog ?? []
-    const s = allSearch.trim().toLowerCase()
-    if (!s) return list
-    return list.filter((r) => {
-      const title = courseCatalogTitle(r).toLowerCase()
-      return r.code.toLowerCase().includes(s) || title.includes(s)
-    })
-  }, [catalog, allSearch])
+  const reloadCatalogPage = useCallback(() => {
+    setCatalogReloadKey((k) => k + 1)
+  }, [])
 
   const filteredOpen = useMemo(() => {
     const list = openRowsRaw ?? []
@@ -166,19 +211,17 @@ export function AdminCoursesPage() {
     tab === 'open' &&
     (termsLoading || (terms !== null && terms.length > 0 && openTermId === ''))
 
-  const addCourseSearch = useMemo(
-    () =>
-      adminSchedulingQueryString({
-        term: terms?.[0]?.id ?? '',
-        course: catalog?.[0]?.code ?? '',
-      }),
-    [terms, catalog],
-  )
-
   return (
-    <main className="admin-page">
-      <div className="admin-page__toolbar">
-        <h1 className="admin-page__title admin-page__title--inline">COURSES</h1>
+    <main className="admin-page admin-courses-page">
+      <div className="admin-courses-page__header">
+        <div className="admin-courses-page__heading">
+          <h1 className="admin-page__title admin-page__title--inline">Courses</h1>
+          <p className="admin-courses-page__lede">
+            {tab === 'catalog'
+              ? 'Browse the master catalog by course-code family (BS, OM, AC…), or search across all courses.'
+              : 'See which catalog courses have open sections and active registrations for a term.'}
+          </p>
+        </div>
       </div>
 
       <CoursesTabBar
@@ -186,40 +229,26 @@ export function AdminCoursesPage() {
         onChange={(next) => {
           setTab(next)
           if (next === 'open') setOpenSearch('')
-          if (next === 'all') setAllSearch('')
+          if (next === 'catalog') setCatalogSearch('')
         }}
       />
 
-      {tab === 'all' ? (
-        <>
-          <div className="admin-page__toolbar">
-            <div className="admin-page__toolbar-actions">
-              <input
-                type="search"
-                className="admin-input admin-input--search"
-                placeholder="Search by course code or title"
-                value={allSearch}
-                onChange={(e) => setAllSearch(e.target.value)}
-                aria-label="Search courses"
-              />
-              <Link
-                to={{
-                  pathname: '/admin/course-sections',
-                  search: addCourseSearch ? `?${addCourseSearch}` : '',
-                }}
-                className="portal-btn portal-btn--primary"
-              >
-                Add Course
-              </Link>
-            </div>
-          </div>
-          <AllCoursesTable
-            rows={filteredAll}
-            loading={catalogLoading}
-            error={catalogError}
-            onCourseSaved={reloadCatalog}
-          />
-        </>
+      {tab === 'catalog' ? (
+        <AllCoursesTable
+          rows={catalogRows}
+          total={catalogTotal}
+          page={catalogPage}
+          pageSize={CATALOG_PAGE_SIZE}
+          loading={catalogLoading}
+          error={catalogError}
+          search={catalogSearch}
+          onSearchChange={setCatalogSearch}
+          onPageChange={setCatalogPage}
+          catalogGroupId={catalogGroupId}
+          onCatalogGroupChange={setCatalogGroupId}
+          prefixCounts={prefixCounts}
+          onCourseSaved={reloadCatalogPage}
+        />
       ) : (
         <OpenRegistrationCoursesTable
           terms={terms}

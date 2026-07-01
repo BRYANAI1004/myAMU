@@ -159,6 +159,7 @@ const SECTION_SELECT = `
 const UPDATABLE_COLUMNS = [
   "course_code",
   "prerequisite_course_id",
+  "academic_term_id",
   "term",
   "year",
   "section_code",
@@ -175,6 +176,8 @@ const UPDATABLE_COLUMNS = [
 export type CourseSectionCreateInput = {
   course_code: string;
   prerequisite_course_id?: string | null;
+  /** Canonical term from `academic_terms.id`; required for admin/API creates. */
+  academic_term_id?: string | null;
   term: string;
   year: number;
   section_code: string;
@@ -201,13 +204,13 @@ export async function getCourseSectionById(
 }
 
 export type CourseSectionTermFilter = {
-  term: string;
-  year: number;
+  /** Canonical term id from `academic_terms` (registration / admin reads). */
+  academicTermId: string;
 };
 
 /**
  * Sections for a catalog course, from `course_sections` keyed by `course_code`.
- * When `termFilter` is set, restricts rows to that legacy `term` + `year` (matches `academic_terms.term_name` / `year`).
+ * When `termFilter` is set, restricts rows to that `academic_term_id`.
  */
 export async function listCourseSectionsByCourseCode(
   courseCode: string,
@@ -215,12 +218,9 @@ export async function listCourseSectionsByCourseCode(
 ): Promise<CourseSectionDetail[]> {
   const code = courseCode.trim();
   if (termFilter) {
-    const sql = `${SECTION_SELECT} WHERE cs.course_code = ? AND cs.term = ? AND cs.year = ? ORDER BY CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC`;
-    const [rows] = await pool.query<RowDataPacket[]>(sql, [
-      code,
-      termFilter.term.trim(),
-      termFilter.year,
-    ]);
+    const tid = termFilter.academicTermId.trim();
+    const sql = `${SECTION_SELECT} WHERE cs.course_code = ? AND cs.academic_term_id = ? ORDER BY CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC`;
+    const [rows] = await pool.query<RowDataPacket[]>(sql, [code, tid]);
     return rows.map((r) => mapCourseSectionRow(withZeroEnrollment(r)));
   }
   const sql = `${SECTION_SELECT} WHERE cs.course_code = ? ORDER BY cs.year ASC, cs.term ASC, CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC`;
@@ -232,24 +232,22 @@ function withZeroEnrollment(r: RowDataPacket): RowDataPacket {
   return { ...r, enrolled_count: 0, enrolled_students_json: null };
 }
 
-/** All sections offered in a legacy term + year (for admin timetable). */
-export async function listCourseSectionsByTermYear(
-  term: string,
-  year: number,
+/** All sections offered in one academic term (for admin timetable). */
+export async function listCourseSectionsByAcademicTermId(
+  academicTermId: string,
 ): Promise<CourseSectionDetail[]> {
-  return listCourseSectionsWithEnrollmentAggregates(term, year, {});
+  return listCourseSectionsWithEnrollmentAggregates(academicTermId.trim(), {});
 }
 
 /**
- * Sections for a term/year with `portal_enrollments` rollups **per section row** (exact `course_section_id`,
+ * Sections for an academic term with `portal_enrollments` rollups **per section row** (exact `course_section_id`,
  * plus legacy course-level rows attributed to the canonical `MIN(course_sections.id)` for that course).
  */
 export async function listCourseSectionsWithEnrollmentAggregates(
-  term: string,
-  year: number,
+  academicTermId: string,
   options?: { courseCode?: string | null },
 ): Promise<CourseSectionDetail[]> {
-  const t = term.trim();
+  const tid = academicTermId.trim();
   const cc = (options?.courseCode ?? "").trim();
   const courseClauseOuter = cc !== "" ? "AND cs.course_code = ?" : "";
   const courseClauseAgg = cc !== "" ? "AND csx.course_code = ?" : "";
@@ -297,9 +295,7 @@ export async function listCourseSectionsWithEnrollmentAggregates(
           (e.course_section_id IS NOT NULL AND e.course_section_id = csx.id)
           OR (
             e.course_section_id IS NULL
-            AND TRIM(e.term) =
-                TRIM(csx.term)
-            AND e.year = csx.year
+            AND e.academic_term_id = csx.academic_term_id
             AND EXISTS (
               SELECT 1 FROM portal_courses pc
               WHERE pc.course_id = e.course_id
@@ -309,25 +305,24 @@ export async function listCourseSectionsWithEnrollmentAggregates(
             AND csx.id = ${SQL_PORTAL_ENROLLMENT_LEGACY_SECTION_ID}
           )
         )
+        AND e.academic_term_id = csx.academic_term_id
         AND (e.status IS NULL OR LOWER(TRIM(e.status)) = 'active')
       LEFT JOIN portal_students ps
         ON ps.student_external_id =
            e.student_external_id
-      WHERE TRIM(csx.term) =
-            ?
-        AND csx.year = ?
+      WHERE csx.academic_term_id = ?
         ${courseClauseAgg}
       GROUP BY csx.id
     ) agg ON agg.section_row_id = cs.id
-    WHERE cs.term = ? AND cs.year = ?
+    WHERE cs.academic_term_id = ?
     ${courseClauseOuter}
     ORDER BY CASE cs.schedule_track WHEN 'EN' THEN 0 WHEN 'CN' THEN 1 ELSE 2 END,
       cs.course_code ASC, cs.weekday ASC, cs.start_time ASC, cs.section_code ASC
   `;
   const params: unknown[] =
     cc !== ""
-      ? [t, year, cc, t, year, cc]
-      : [t, year, t, year];
+      ? [tid, cc, tid, cc]
+      : [tid, tid];
   const [rows] = await pool.query<RowDataPacket[]>(sql, params);
   return rows.map((r) => mapCourseSectionRow(r));
 }
@@ -352,9 +347,8 @@ export type PortalEnrollmentRollupByCourse = {
   enrolled_students?: CourseSectionDetail["enrolled_students"];
 };
 
-export async function listPortalEnrollmentRollupsByCourseForTermYear(
-  term: string,
-  year: number,
+export async function listPortalEnrollmentRollupsByCourseForAcademicTermId(
+  academicTermId: string,
 ): Promise<PortalEnrollmentRollupByCourse[]> {
   const sql = `
     SELECT
@@ -369,14 +363,12 @@ export async function listPortalEnrollmentRollupsByCourseForTermYear(
     FROM portal_enrollments e
     INNER JOIN portal_courses pc ON pc.course_id = e.course_id
     LEFT JOIN portal_students ps ON ps.student_external_id = e.student_external_id
-    WHERE e.term =
-          ?
-      AND e.year = ?
+    WHERE e.academic_term_id = ?
       AND (e.status IS NULL OR e.status = 'active')
     GROUP BY pc.course_code
     ORDER BY pc.course_code ASC
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [term.trim(), year]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [academicTermId.trim()]);
   return rows.map((r) => {
     const code = String(r.rollup_course_code ?? "").trim();
     const enrolled_students = parseEnrolledStudentsJson(
@@ -392,21 +384,17 @@ export async function listPortalEnrollmentRollupsByCourseForTermYear(
   });
 }
 
-export async function countCourseSectionsByCourseForTermYear(
-  term: string,
-  year: number,
+export async function countCourseSectionsByCourseForAcademicTermId(
+  academicTermId: string,
 ): Promise<CourseSectionCountByCourse[]> {
   const sql = `
     SELECT course_code, COUNT(*) AS section_count
     FROM course_sections
-    WHERE term = ? AND year = ?
+    WHERE academic_term_id = ?
     GROUP BY course_code
     ORDER BY course_code ASC
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [
-    term.trim(),
-    year,
-  ]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [academicTermId.trim()]);
   return rows.map((r) => ({
     course_code: String(r.course_code ?? ""),
     section_count: Number(r.section_count ?? 0),
@@ -419,9 +407,8 @@ export async function countCourseSectionsByCourseForTermYear(
  * Returns one row per section so the service layer can deterministically pick a
  * course-level prerequisite and optionally warn when sections disagree.
  */
-export async function listCoursePrerequisiteCandidatesByCourseForTermYear(
-  term: string,
-  year: number,
+export async function listCoursePrerequisiteCandidatesByCourseForAcademicTermId(
+  academicTermId: string,
 ): Promise<CoursePrerequisiteCandidateByCourse[]> {
   const sql = `
     SELECT
@@ -433,7 +420,7 @@ export async function listCoursePrerequisiteCandidatesByCourseForTermYear(
     LEFT JOIN portal_courses pc
       ON TRIM(pc.course_id) =
          TRIM(cs.prerequisite_course_id)
-    WHERE cs.term = ? AND cs.year = ?
+    WHERE cs.academic_term_id = ?
     ORDER BY
       cs.course_code ASC,
       CASE
@@ -443,7 +430,7 @@ export async function listCoursePrerequisiteCandidatesByCourseForTermYear(
       cs.prerequisite_course_id ASC,
       cs.id ASC
   `;
-  const [rows] = await pool.query<RowDataPacket[]>(sql, [term.trim(), year]);
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [academicTermId.trim()]);
   return rows.map((r) => ({
     course_code: String(r.course_code ?? "").trim(),
     prerequisite_course_id: trimNullableString(r.prerequisite_course_id),
@@ -459,6 +446,7 @@ export async function createCourseSection(
     INSERT INTO course_sections (
       course_code,
       prerequisite_course_id,
+      academic_term_id,
       term,
       year,
       section_code,
@@ -470,11 +458,12 @@ export async function createCourseSection(
       room,
       instructor,
       notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     input.course_code,
     input.prerequisite_course_id ?? null,
+    input.academic_term_id?.trim() || null,
     input.term,
     input.year,
     input.section_code,

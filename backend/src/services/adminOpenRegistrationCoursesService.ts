@@ -2,9 +2,9 @@ import { env } from "../config/env.js";
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import { listCoursesFromMysql, type CourseListItem } from "../repositories/courseRepository.js";
 import {
-  countCourseSectionsByCourseForTermYear,
-  listCoursePrerequisiteCandidatesByCourseForTermYear,
-  listPortalEnrollmentRollupsByCourseForTermYear,
+  countCourseSectionsByCourseForAcademicTermId,
+  listCoursePrerequisiteCandidatesByCourseForAcademicTermId,
+  listPortalEnrollmentRollupsByCourseForAcademicTermId,
 } from "../repositories/courseSectionRepository.js";
 
 export type AdminOpenRegistrationCourseRow = {
@@ -66,7 +66,7 @@ type CoursePrerequisiteSummary = Pick<
 
 function summarizeCoursePrerequisites(
   candidates: Awaited<
-    ReturnType<typeof listCoursePrerequisiteCandidatesByCourseForTermYear>
+    ReturnType<typeof listCoursePrerequisiteCandidatesByCourseForAcademicTermId>
   >,
 ): Map<string, CoursePrerequisiteSummary> {
   const out = new Map<string, CoursePrerequisiteSummary>();
@@ -125,9 +125,9 @@ export async function listAdminOpenRegistrationCourses(
   if (!term) return null;
 
   const [counts, prerequisiteCandidates, enrollmentRollups] = await Promise.all([
-    countCourseSectionsByCourseForTermYear(term.term_name, term.year),
-    listCoursePrerequisiteCandidatesByCourseForTermYear(term.term_name, term.year),
-    listPortalEnrollmentRollupsByCourseForTermYear(term.term_name, term.year),
+    countCourseSectionsByCourseForAcademicTermId(term.id),
+    listCoursePrerequisiteCandidatesByCourseForAcademicTermId(term.id),
+    listPortalEnrollmentRollupsByCourseForAcademicTermId(term.id),
   ]);
   if (counts.length === 0) return [];
 

@@ -22,6 +22,7 @@ import {
   getFeedbackSubmittedAtMapForStudent,
 } from "./studentCourseFeedbackService.js";
 import { courseSectionDetailsToAcademicsScheduleItems } from "./portalEnrollmentSchedule.js";
+import { getAcademicTermByCalendarTerm } from "../repositories/academicTermRepository.js";
 import { listStudentEnrolledSectionsForTerm } from "../repositories/studentEnrollmentRepository.js";
 import { loadUnifiedStudentAcademicContext } from "./studentUnifiedAcademicRecordsService.js";
 
@@ -47,10 +48,14 @@ async function loadCurrentScheduleForActiveTerm(
 ): Promise<StudentAcademicsScheduleItem[]> {
   if (currentTerm == null) return [];
   try {
-    const { sections } = await listStudentEnrolledSectionsForTerm(
-      studentId,
+    const termRow = await getAcademicTermByCalendarTerm(
       currentTerm.term,
       currentTerm.year,
+    );
+    if (termRow == null) return [];
+    const { sections } = await listStudentEnrolledSectionsForTerm(
+      studentId,
+      termRow.id,
     );
     return courseSectionDetailsToAcademicsScheduleItems(sections);
   } catch (e) {

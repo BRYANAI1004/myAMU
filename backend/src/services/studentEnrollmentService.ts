@@ -70,16 +70,14 @@ function formatMissingPrerequisiteError(
 
 async function validateEnrollmentPrerequisites(
   studentId: string,
-  term: string,
-  year: number,
+  academicTermId: string,
   sections: EnrollSectionInput[],
 ): Promise<
   | { ok: true; resolvedSections: ResolvedEnrollmentSection[] }
   | { ok: false; error: string; details?: MissingPrerequisiteDetail[] }
 > {
   const resolved = await resolveRequestedEnrollmentSectionsForTerm(
-    term,
-    year,
+    academicTermId,
     sections,
   );
   if (!resolved.ok) {
@@ -169,8 +167,7 @@ export async function enrollStudentForAcademicTerm(
 
   const validation = await validateEnrollmentPrerequisites(
     studentId,
-    row.term_name,
-    row.year,
+    row.id,
     sections,
   );
   if (!validation.ok) {
@@ -179,6 +176,7 @@ export async function enrollStudentForAcademicTerm(
 
   const result = await enrollStudentInSections(
     studentId,
+    row.id,
     row.term_name,
     row.year,
     sections,

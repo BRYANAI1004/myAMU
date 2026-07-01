@@ -14,6 +14,7 @@ export const SQL_PORTAL_ENROLLMENT_LEGACY_SECTION_ID = `
     INNER JOIN portal_courses pc_resolve
       ON pc_resolve.course_id = e.course_id
     WHERE TRIM(cs2.course_code) = TRIM(pc_resolve.course_code)
+      AND cs2.academic_term_id = e.academic_term_id
       AND TRIM(cs2.term) = TRIM(e.term)
       AND cs2.year = e.year
       AND (
@@ -35,8 +36,7 @@ export const SQL_PORTAL_ENROLLMENT_CS_DIRECT_JOIN = `
     LEFT JOIN course_sections cs_direct
       ON e.course_section_id IS NOT NULL
       AND cs_direct.id = e.course_section_id
-      AND TRIM(cs_direct.term) = TRIM(e.term)
-      AND cs_direct.year = e.year`;
+      AND cs_direct.academic_term_id = e.academic_term_id`;
 
 /** Standard `cs_leg` join when `course_section_id` is NULL. */
 export const SQL_PORTAL_ENROLLMENT_CS_LEG_JOIN = `

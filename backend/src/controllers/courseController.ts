@@ -47,14 +47,14 @@ export async function getCourseSections(
       return;
     }
     const termId = parseAcademicTermIdQuery(req);
-    let termFilter: { term: string; year: number } | undefined;
+    let termFilter: { academicTermId: string } | undefined;
     if (termId) {
       const row = await getAcademicTermById(termId);
       if (!row) {
         res.status(400).json({ error: "Unknown academic term." });
         return;
       }
-      termFilter = { term: row.term_name, year: row.year };
+      termFilter = { academicTermId: row.id };
     }
     const sections = await getSectionsForCourseCode(code, termFilter);
     res.json(sections);

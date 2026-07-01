@@ -51,6 +51,10 @@ import {
 } from "../controllers/adminCatalogCourseController.js";
 import { getAdminCoursesOpenForRegistration } from "../controllers/adminOpenRegistrationCoursesController.js";
 import {
+  getAdminCourseCatalog,
+  getAdminCourseCatalogSummary,
+} from "../controllers/adminCourseCatalogController.js";
+import {
   deleteCourseBinForTermHandler,
   deleteCourseBinItemHandler,
   getCourseBin,
@@ -356,6 +360,8 @@ adminRouter.get(
   "/courses/open-for-registration",
   getAdminCoursesOpenForRegistration,
 );
+adminRouter.get("/courses/catalog/summary", getAdminCourseCatalogSummary);
+adminRouter.get("/courses/catalog", getAdminCourseCatalog);
 adminRouter.get("/course-categories", getAdminCourseCategories);
 adminRouter.patch(
   "/catalog/courses/:sequenceNumber",

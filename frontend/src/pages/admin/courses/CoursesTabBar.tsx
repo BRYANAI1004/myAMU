@@ -1,4 +1,4 @@
-export type AdminCoursesTabId = 'all' | 'open'
+export type AdminCoursesTabId = 'catalog' | 'open'
 
 type CoursesTabBarProps = {
   active: AdminCoursesTabId
@@ -15,24 +15,30 @@ export function CoursesTabBar({ active, onChange }: CoursesTabBarProps) {
       <button
         type="button"
         role="tab"
-        aria-selected={active === 'all'}
-        className={['portal-tab', active === 'all' ? 'portal-tab--active' : '']
+        aria-selected={active === 'catalog'}
+        className={[
+          'portal-tab',
+          active === 'catalog' ? 'portal-tab--active' : '',
+        ]
           .filter(Boolean)
           .join(' ')}
-        onClick={() => onChange('all')}
+        onClick={() => onChange('catalog')}
       >
-        All Courses
+        Course catalog
       </button>
       <button
         type="button"
         role="tab"
         aria-selected={active === 'open'}
-        className={['portal-tab', active === 'open' ? 'portal-tab--active' : '']
+        className={[
+          'portal-tab',
+          active === 'open' ? 'portal-tab--active' : '',
+        ]
           .filter(Boolean)
           .join(' ')}
         onClick={() => onChange('open')}
       >
-        Open for Registration
+        Open for registration
       </button>
     </div>
   )

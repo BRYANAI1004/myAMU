@@ -202,8 +202,7 @@ export async function getAdminCourseSectionEnrollments(
     const courseSectionId = parseOptionalCourseSectionIdQuery(req);
     const rows = await listAdminEnrollmentRowsForSection(
       courseCode,
-      termRow.term_name,
-      termRow.year,
+      academicTermId,
       courseSectionId != null ? { courseSectionId } : undefined,
     );
     res.json(

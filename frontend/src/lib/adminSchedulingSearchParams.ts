@@ -3,13 +3,13 @@
  * Values are the query string without a leading `?`.
  */
 export function adminSchedulingQueryString(params: {
-  term: string
-  course: string
+  term?: string
+  course?: string
   q?: string
 }): string {
   const n = new URLSearchParams()
-  const term = params.term.trim()
-  const course = params.course.trim()
+  const term = (params.term ?? '').trim()
+  const course = (params.course ?? '').trim()
   const q = (params.q ?? '').trim()
   if (term) n.set('term', term)
   if (course) n.set('course', course)
@@ -19,12 +19,12 @@ export function adminSchedulingQueryString(params: {
 
 export function applyAdminSchedulingToSearchParams(
   base: URLSearchParams,
-  params: { term: string; course: string; q?: string },
+  params: { term?: string; course?: string; q?: string },
   options?: { clearEdit?: boolean },
 ): URLSearchParams {
   const n = new URLSearchParams(base)
-  const term = params.term.trim()
-  const course = params.course.trim()
+  const term = (params.term ?? '').trim()
+  const course = (params.course ?? '').trim()
   const q = (params.q ?? '').trim()
   if (term) n.set('term', term)
   else n.delete('term')

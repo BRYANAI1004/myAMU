@@ -3,9 +3,10 @@
  * for the dashboard. Upstream services keep registration, attempts, transcript, and clinic progress separate.
  * Degree audit: `computeDegreeAudit` in `domain/studentDomainModels.ts` when wired — not inside transcript services.
  *
- * Portal schedule truth: `portal_enrollments` (by `student_external_id`, calendar `term`/`year`, `status`) maps through
- * `portal_courses` to timetable `course_sections` — see `listStudentEnrolledSectionsForTerm`. `academic_terms.id`
- * values (e.g. `2026-FAL`) are metadata for API routing only; calendar term names come from `academic_terms.term_name`.
+ * Portal schedule truth: `portal_enrollments` keyed by `academic_term_id` (and denormalized `term`/`year`
+ * for legacy finance/marks). Timetable rows join via `course_sections` — see `listStudentEnrolledSectionsForTerm`.
+ * `academic_terms.id` is the canonical term key for registration reads/writes; calendar `term`/`year` on
+ * enrollment rows are redundant display/legacy keys — do not use them as primary filters in new code.
  */
 
 import { DEMO_STUDENT_ID } from "../config/constants.js";
@@ -39,7 +40,10 @@ import {
   termSortOrder,
   termsMatch,
 } from "./studentAcademicCourseRecords.js";
-import { listAcademicTerms } from "../repositories/academicTermRepository.js";
+import {
+  getAcademicTermByCalendarTerm,
+  listAcademicTerms,
+} from "../repositories/academicTermRepository.js";
 import type { AcademicTermDetail } from "../types/academicTerm.js";
 import { buildClinicalProgress } from "./clinicalProgressService.js";
 import { assembleLegacyStudentAccountPayload } from "./studentLegacyAccountAssembler.js";
@@ -392,13 +396,18 @@ async function getRealStudentAccountPayload(
   let enrolledSectionsScheduleRows;
   if (activePortalEnrollmentCountForBrowseTerm > 0) {
     try {
-      const { sections } = await listStudentEnrolledSectionsForTerm(
-        studentId,
+      const termRow = await getAcademicTermByCalendarTerm(
         effectiveSnap.term,
         effectiveSnap.year,
       );
-      enrolledSectionsScheduleRows =
-        courseSectionDetailsToAccountScheduleRows(sections);
+      if (termRow != null) {
+        const { sections } = await listStudentEnrolledSectionsForTerm(
+          studentId,
+          termRow.id,
+        );
+        enrolledSectionsScheduleRows =
+          courseSectionDetailsToAccountScheduleRows(sections);
+      }
     } catch (e) {
       console.warn(
         "[account] enrolled-sections schedule for browse term failed",

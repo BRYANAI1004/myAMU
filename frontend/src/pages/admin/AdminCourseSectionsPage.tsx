@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   adminSchedulingQueryString,
@@ -46,11 +46,6 @@ import type { AdminInstructorSuggestion } from '../../lib/api'
 import { scheduleTrackTableLabel } from '../../lib/scheduleTrack'
 import { formatCatalogCredits } from './courses/courseCatalogDisplay'
 
-function displayCell(value: string | null | undefined): string {
-  if (value == null || String(value).trim() === '') return '—'
-  return String(value)
-}
-
 type FormState = {
   section_code: string
   schedule_track: 'EN' | 'CN'
@@ -88,99 +83,163 @@ function toggleWeekday(
   return WEEKDAYS_FULL_ORDERED.filter((d) => set.has(d))
 }
 
-type AdminCourseSectionsTableColumn = {
-  key: string
-  label: string
-  mobileLabel?: string
-  title?: string
-  width: number
-  align?: 'left' | 'center'
+const WEEKDAY_SHORT: Record<WeekdayFull, string> = {
+  Monday: 'Mon',
+  Tuesday: 'Tue',
+  Wednesday: 'Wed',
+  Thursday: 'Thu',
+  Friday: 'Fri',
+  Saturday: 'Sat',
+  Sunday: 'Sun',
 }
 
-const ADMIN_COURSE_SECTIONS_TABLE_COLUMNS: AdminCourseSectionsTableColumn[] = [
-  { key: 'section', label: 'Section', width: 80 },
-  { key: 'course_title', label: 'Course Title', width: 200 },
-  {
-    key: 'prerequisite',
-    label: 'Prereq',
-    mobileLabel: 'Pre',
-    title: 'Prerequisite',
-    width: 190,
-  },
-  {
-    key: 'credits',
-    label: 'Credits',
-    mobileLabel: 'Cr',
-    title: 'Credits',
-    width: 80,
-    align: 'center',
-  },
-  { key: 'track', label: 'Track', width: 120 },
-  { key: 'weekdays', label: 'Weekdays', width: 100 },
-  { key: 'start', label: 'Start', width: 90 },
-  { key: 'end', label: 'End', width: 90 },
-  { key: 'delivery', label: 'Delivery', width: 100 },
-  { key: 'room', label: 'Room', width: 80 },
-  { key: 'instructor', label: 'Instructor', width: 130 },
-  { key: 'enrolled', label: 'Enrolled', width: 90, align: 'center' },
-  { key: 'registrations', label: 'Registrations', width: 130 },
-  { key: 'notes', label: 'Notes', width: 120 },
-  { key: 'actions', label: 'Actions', width: 140 },
-]
-const ADMIN_COURSE_SECTIONS_TABLE_MIN_WIDTH = `${ADMIN_COURSE_SECTIONS_TABLE_COLUMNS.reduce((sum, col) => sum + col.width, 0)}px`
-
-function AdminCourseSectionsTableHead() {
-  return (
-    <thead>
-      <tr>
-        {ADMIN_COURSE_SECTIONS_TABLE_COLUMNS.map((column) => (
-          <th
-            key={column.key}
-            scope="col"
-            className={`admin-course-sections-table__head admin-course-sections-table__head--${column.key}`}
-            style={{
-              textAlign: column.align === 'center' ? 'center' : undefined,
-            }}
-          >
-            <span
-              className="admin-course-sections-table__header-label admin-course-sections-table__header-label--desktop"
-              title={column.title}
-            >
-              {column.label}
-            </span>
-            {column.mobileLabel != null ? (
-              <span
-                className="admin-course-sections-table__header-label admin-course-sections-table__header-label--mobile"
-                title={column.title}
-              >
-                {column.mobileLabel}
-              </span>
-            ) : null}
-          </th>
-        ))}
-      </tr>
-    </thead>
-  )
-}
-
-type AdminCourseSectionGroupTableProps = {
-  ariaLabelledBy: string
+type SectionCardProps = {
+  row: AdminCourseSection
   title: string
-  rows: AdminCourseSection[]
-  emptyMessage: string
-  /** Per-row title from catalog (eng/chi) and section track + optional legacy `course_title`. */
-  resolveRowTitle: (row: AdminCourseSection) => string
-  resolvePrerequisiteCode: (row: AdminCourseSection) => string
+  prereqCode: string
   busy: boolean
   csvExportSectionId: number | null
   feedbackExportSectionId: number | null
+  onEdit: (row: AdminCourseSection) => void
   onViewRoster: (row: AdminCourseSection) => void
   onExportCsv: (row: AdminCourseSection) => void
   onExportFeedback: (row: AdminCourseSection) => void
   onDeleteRow: (row: AdminCourseSection) => void
 }
 
-function AdminCourseSectionGroupTable({
+function SectionCard({
+  row,
+  title,
+  prereqCode,
+  busy,
+  csvExportSectionId,
+  feedbackExportSectionId,
+  onEdit,
+  onViewRoster,
+  onExportCsv,
+  onExportFeedback,
+  onDeleteRow,
+}: SectionCardProps) {
+  const scheduleLine = [
+    formatWeekdaysShortFromStored(row.weekday),
+    `${formatTimeHmsForDisplay(row.start_time)} – ${formatTimeHmsForDisplay(row.end_time)}`,
+    row.room?.trim() ? row.room.trim() : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  const metaLine = [
+    row.instructor?.trim() ? row.instructor.trim() : null,
+    formatDeliveryModeForDisplay(row.delivery_mode),
+  ]
+    .filter((x) => x && x !== '—')
+    .join(' · ')
+
+  return (
+    <article className="admin-course-section-card">
+      <div className="admin-course-section-card__header">
+        <div className="admin-course-section-card__identity">
+          <div className="admin-course-section-card__code-row">
+            <span className="admin-course-section-card__code">
+              {row.section_code}
+            </span>
+            <span
+              className={`admin-course-section-card__track admin-course-section-card__track--${row.schedule_track === 'CN' ? 'cn' : 'en'}`}
+            >
+              {scheduleTrackTableLabel(row.schedule_track)}
+            </span>
+          </div>
+          <h3 className="admin-course-section-card__title">{title}</h3>
+        </div>
+        <div className="admin-course-section-card__enrolled">
+          <span className="admin-course-section-card__enrolled-count">
+            {row.enrolled_count}
+          </span>
+          <span className="admin-course-section-card__enrolled-label">
+            enrolled
+          </span>
+        </div>
+      </div>
+
+      <div className="admin-course-section-card__body">
+        <p className="admin-course-section-card__schedule">{scheduleLine}</p>
+        {metaLine ? (
+          <p className="admin-course-section-card__meta">{metaLine}</p>
+        ) : null}
+        {prereqCode !== '—' ? (
+          <p className="admin-course-section-card__prereq">
+            Prerequisite: {prereqCode}
+          </p>
+        ) : null}
+        {row.notes?.trim() ? (
+          <p className="admin-course-section-card__notes">{row.notes.trim()}</p>
+        ) : null}
+      </div>
+
+      <div className="admin-course-section-card__footer">
+        <button
+          type="button"
+          className="admin-course-section-card__action"
+          disabled={busy}
+          onClick={() => onEdit(row)}
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          className="admin-course-section-card__action"
+          disabled={busy}
+          onClick={() => onViewRoster(row)}
+        >
+          Roster
+        </button>
+        <button
+          type="button"
+          className="admin-course-section-card__action"
+          disabled={busy || feedbackExportSectionId != null}
+          onClick={() => onExportCsv(row)}
+        >
+          {csvExportSectionId === row.id ? 'Exporting…' : 'Students CSV'}
+        </button>
+        <button
+          type="button"
+          className="admin-course-section-card__action"
+          disabled={busy || csvExportSectionId != null}
+          onClick={() => onExportFeedback(row)}
+        >
+          {feedbackExportSectionId === row.id ? 'Exporting…' : 'Feedback CSV'}
+        </button>
+        <button
+          type="button"
+          className="admin-course-section-card__action admin-course-section-card__action--danger"
+          disabled={busy}
+          onClick={() => void onDeleteRow(row)}
+        >
+          Delete
+        </button>
+      </div>
+    </article>
+  )
+}
+
+type SectionGroupProps = {
+  ariaLabelledBy: string
+  title: string
+  rows: AdminCourseSection[]
+  emptyMessage: string
+  resolveRowTitle: (row: AdminCourseSection) => string
+  resolvePrerequisiteCode: (row: AdminCourseSection) => string
+  busy: boolean
+  csvExportSectionId: number | null
+  feedbackExportSectionId: number | null
+  onEdit: (row: AdminCourseSection) => void
+  onViewRoster: (row: AdminCourseSection) => void
+  onExportCsv: (row: AdminCourseSection) => void
+  onExportFeedback: (row: AdminCourseSection) => void
+  onDeleteRow: (row: AdminCourseSection) => void
+}
+
+function SectionGroup({
   ariaLabelledBy,
   title,
   rows,
@@ -190,11 +249,12 @@ function AdminCourseSectionGroupTable({
   busy,
   csvExportSectionId,
   feedbackExportSectionId,
+  onEdit,
   onViewRoster,
   onExportCsv,
   onExportFeedback,
   onDeleteRow,
-}: AdminCourseSectionGroupTableProps) {
+}: SectionGroupProps) {
   return (
     <section
       className="admin-course-sections-group"
@@ -202,106 +262,342 @@ function AdminCourseSectionGroupTable({
     >
       <h3 id={ariaLabelledBy} className="admin-course-sections-group__title">
         {title}
+        <span className="admin-course-sections-group__count">{rows.length}</span>
       </h3>
-      <div className="portal-table-wrap admin-table-wrap">
-        <table
-          className="portal-table portal-data-table admin-course-sections-table"
-          style={{ minWidth: ADMIN_COURSE_SECTIONS_TABLE_MIN_WIDTH }}
-        >
-          <colgroup>
-            {ADMIN_COURSE_SECTIONS_TABLE_COLUMNS.map((column) => (
-              <col key={column.key} style={{ width: `${column.width}px` }} />
-            ))}
-          </colgroup>
-          <AdminCourseSectionsTableHead />
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td
-                  colSpan={ADMIN_COURSE_SECTIONS_TABLE_COLUMNS.length}
-                  className="admin-course-sections-table__empty-row"
-                >
-                  {emptyMessage}
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.section_code}</td>
-                  <td>{resolveRowTitle(row)}</td>
-                  <td>{resolvePrerequisiteCode(row)}</td>
-                  <td className="admin-course-sections-table__numeric">
-                    {formatCatalogCredits(row.units)}
-                  </td>
-                  <td>{scheduleTrackTableLabel(row.schedule_track)}</td>
-                  <td>{formatWeekdaysShortFromStored(row.weekday)}</td>
-                  <td>{formatTimeHmsForDisplay(row.start_time)}</td>
-                  <td>{formatTimeHmsForDisplay(row.end_time)}</td>
-                  <td>{formatDeliveryModeForDisplay(row.delivery_mode)}</td>
-                  <td>{displayCell(row.room)}</td>
-                  <td>{displayCell(row.instructor)}</td>
-                  <td className="admin-course-sections-table__numeric">
-                    {row.enrolled_count}
-                  </td>
-                  <td>
-                    {row.enrolled_count > 0 ? (
-                      <span className="admin-course-sections-table__reg-open">
-                        Open
-                      </span>
-                    ) : (
-                      <span className="admin-course-sections-table__reg-none">
-                        None
-                      </span>
-                    )}
-                  </td>
-                  <td className="admin-course-sections-table__notes">
-                    {displayCell(row.notes)}
-                  </td>
-                  <td className="admin-course-sections-table__actions">
-                    <div className="admin-course-sections-table__action-stack">
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy}
-                        onClick={() => onViewRoster(row)}
-                      >
-                        View Roster
-                      </button>
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy || feedbackExportSectionId != null}
-                        onClick={() => onExportCsv(row)}
-                      >
-                        {csvExportSectionId === row.id ? 'Exporting…' : 'Export CSV'}
-                      </button>
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy || csvExportSectionId != null}
-                        onClick={() => onExportFeedback(row)}
-                      >
-                        {feedbackExportSectionId === row.id
-                          ? 'Exporting…'
-                          : 'Export Feedback'}
-                      </button>
-                      <button
-                        type="button"
-                        className="portal-btn portal-btn--secondary portal-btn--compact"
-                        disabled={busy}
-                        onClick={() => void onDeleteRow(row)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.length === 0 ? (
+        <p className="admin-course-sections-group__empty">{emptyMessage}</p>
+      ) : (
+        <div className="admin-course-sections-group__list">
+          {rows.map((row) => (
+            <SectionCard
+              key={row.id}
+              row={row}
+              title={resolveRowTitle(row)}
+              prereqCode={resolvePrerequisiteCode(row)}
+              busy={busy}
+              csvExportSectionId={csvExportSectionId}
+              feedbackExportSectionId={feedbackExportSectionId}
+              onEdit={onEdit}
+              onViewRoster={onViewRoster}
+              onExportCsv={onExportCsv}
+              onExportFeedback={onExportFeedback}
+              onDeleteRow={onDeleteRow}
+            />
+          ))}
+        </div>
+      )}
     </section>
+  )
+}
+
+type SectionFormModalProps = {
+  open: boolean
+  editingId: number | null
+  busy: boolean
+  form: FormState
+  formMessage: string | null
+  courseTitleDraft: string
+  courseCode: string
+  academicTermId: string
+  fullCatalogPrerequisiteOptions: CourseCatalogItem[]
+  courseCatalogById: Map<string, CourseCatalogItem>
+  onClose: () => void
+  onSubmitCreate: () => void
+  onSubmitUpdate: () => void
+  onDelete: () => void
+  setForm: Dispatch<SetStateAction<FormState>>
+  setCourseTitleDraft: (v: string) => void
+  setCourseTitleLocked: (v: boolean) => void
+  setInstructorLocked: (v: boolean) => void
+}
+
+function SectionFormModal({
+  open,
+  editingId,
+  busy,
+  form,
+  formMessage,
+  courseTitleDraft,
+  courseCode,
+  academicTermId,
+  fullCatalogPrerequisiteOptions,
+  courseCatalogById,
+  onClose,
+  onSubmitCreate,
+  onSubmitUpdate,
+  onDelete,
+  setForm,
+  setCourseTitleDraft,
+  setCourseTitleLocked,
+  setInstructorLocked,
+}: SectionFormModalProps) {
+  if (!open) return null
+
+  const isEdit = editingId != null
+
+  return (
+    <div
+      className="admin-section-detail-backdrop"
+      role="presentation"
+      onMouseDown={(ev) => {
+        if (ev.target === ev.currentTarget && !busy) onClose()
+      }}
+    >
+      <div
+        className="admin-section-detail-modal admin-section-detail-modal--course-section-form"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="course-section-form-title"
+      >
+        <h2 id="course-section-form-title" className="admin-section-detail-modal__title">
+          {isEdit ? `Edit section ${form.section_code}` : 'Add section'}
+        </h2>
+        <p className="admin-section-detail-modal__meta admin-course-section-form__meta">
+          {courseCode.trim() !== '' && academicTermId.trim() !== ''
+            ? `Creating for ${courseCode} in the selected term.`
+            : 'Select a term and course above first.'}
+        </p>
+
+        {formMessage != null ? (
+          <p className="admin-course-section-form__error" role="alert">
+            {formMessage}
+          </p>
+        ) : null}
+
+        <div className="admin-course-section-form">
+          <section className="admin-course-section-form__section">
+            <h3 className="admin-course-section-form__section-title">Section details</h3>
+            <div className="admin-course-section-form__row admin-course-section-form__row--3">
+              <label className="admin-course-section-form__field">
+                <span>Section code</span>
+                <input
+                  className="admin-input admin-course-section-form__input"
+                  value={form.section_code}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, section_code: e.target.value }))
+                  }
+                  autoComplete="off"
+                  disabled={busy}
+                />
+              </label>
+              <label className="admin-course-section-form__field">
+                <span>Schedule track</span>
+                <select
+                  className="admin-input admin-course-section-form__input"
+                  value={form.schedule_track}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      schedule_track:
+                        e.target.value === 'CN' ? ('CN' as const) : ('EN' as const),
+                    }))
+                  }
+                  disabled={busy}
+                >
+                  <option value="EN">English timetable</option>
+                  <option value="CN">Chinese timetable</option>
+                </select>
+              </label>
+              <label className="admin-course-section-form__field">
+                <span>Delivery mode</span>
+                <select
+                  className="admin-input admin-course-section-form__input"
+                  value={form.delivery_mode.trim()}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, delivery_mode: e.target.value }))
+                  }
+                  disabled={busy}
+                >
+                  <option value="">Not selected</option>
+                  {DELIVERY_MODE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                  {form.delivery_mode.trim() !== '' &&
+                    canonicalDeliveryMode(form.delivery_mode) == null && (
+                      <option value={form.delivery_mode.trim()}>
+                        {form.delivery_mode.trim()} (legacy)
+                      </option>
+                    )}
+                </select>
+              </label>
+            </div>
+            <div className="admin-course-section-form__row admin-course-section-form__row--2">
+              <label className="admin-course-section-form__field">
+                <span>Course title</span>
+                <input
+                  type="text"
+                  className="admin-input admin-course-section-form__input"
+                  value={courseTitleDraft}
+                  onChange={(e) => {
+                    setCourseTitleLocked(true)
+                    setCourseTitleDraft(e.target.value)
+                  }}
+                  disabled={busy}
+                  autoComplete="off"
+                />
+              </label>
+              <label className="admin-course-section-form__field">
+                <span>Prerequisite course</span>
+                <select
+                  className="admin-input admin-course-section-form__input"
+                  value={form.prerequisite_course_id}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      prerequisite_course_id: e.target.value,
+                    }))
+                  }
+                  disabled={busy || fullCatalogPrerequisiteOptions.length === 0}
+                >
+                  <option value="">None</option>
+                  {fullCatalogPrerequisiteOptions.map((c) => {
+                    const courseId = c.course_id?.trim() ?? ''
+                    const unmapped = courseId === ''
+                    return (
+                      <option
+                        key={unmapped ? `unmapped:${c.code}` : courseId}
+                        value={unmapped ? `unmapped:${c.code}` : courseId}
+                        disabled={unmapped}
+                      >
+                        {formatCourseCatalogSelectLabel(c)}
+                        {unmapped ? ' (no portal course_id)' : ''}
+                      </option>
+                    )
+                  })}
+                  {form.prerequisite_course_id.trim() !== '' &&
+                    !courseCatalogById.has(form.prerequisite_course_id) && (
+                      <option value={form.prerequisite_course_id}>
+                        {form.prerequisite_course_id} (unavailable)
+                      </option>
+                    )}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="admin-course-section-form__section">
+            <h3 className="admin-course-section-form__section-title">Schedule</h3>
+            <div
+              className="admin-course-section-form__weekdays"
+              role="group"
+              aria-label="Weekdays"
+            >
+              {WEEKDAYS_FULL_ORDERED.map((d) => {
+                const active = form.weekdays.includes(d)
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    className={`admin-course-section-form__weekday${active ? ' admin-course-section-form__weekday--active' : ''}`}
+                    aria-pressed={active}
+                    disabled={busy}
+                    onClick={() =>
+                      setForm((f) => ({
+                        ...f,
+                        weekdays: toggleWeekday(f.weekdays, d, !active),
+                      }))
+                    }
+                  >
+                    {WEEKDAY_SHORT[d]}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="admin-course-section-form__row admin-course-section-form__row--2 admin-course-section-form__row--time">
+              <AdminTime12hFields
+                idPrefix="section-start"
+                label="Start time"
+                value={form.start_time}
+                onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
+                disabled={busy}
+              />
+              <AdminTime12hFields
+                idPrefix="section-end"
+                label="End time"
+                value={form.end_time}
+                onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+                disabled={busy}
+              />
+            </div>
+          </section>
+
+          <section className="admin-course-section-form__section">
+            <h3 className="admin-course-section-form__section-title">Location &amp; staff</h3>
+            <div className="admin-course-section-form__row admin-course-section-form__row--2">
+              <label className="admin-course-section-form__field">
+                <span>Room</span>
+                <input
+                  className="admin-input admin-course-section-form__input"
+                  value={form.room}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, room: e.target.value }))
+                  }
+                  disabled={busy}
+                />
+              </label>
+              <label className="admin-course-section-form__field">
+                <span>Instructor</span>
+                <input
+                  className="admin-input admin-course-section-form__input"
+                  value={form.instructor}
+                  onChange={(e) => {
+                    setInstructorLocked(true)
+                    setForm((f) => ({ ...f, instructor: e.target.value }))
+                  }}
+                  disabled={busy}
+                />
+              </label>
+            </div>
+            <label className="admin-course-section-form__field">
+              <span>Notes</span>
+              <textarea
+                className="admin-input admin-textarea admin-course-section-form__textarea"
+                rows={2}
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
+                disabled={busy}
+              />
+            </label>
+          </section>
+        </div>
+
+        <div className="admin-section-detail-modal__actions admin-course-section-form__actions">
+          {isEdit ? (
+            <button
+              type="button"
+              className="portal-btn portal-btn--admin-danger portal-btn--compact"
+              disabled={busy}
+              style={{ marginRight: 'auto' }}
+              onClick={() => void onDelete()}
+            >
+              Delete
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="portal-btn portal-btn--secondary portal-btn--compact"
+            disabled={busy}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="admin-academic-terms-page__save-btn portal-btn portal-btn--compact"
+            disabled={
+              busy || academicTermId.trim() === '' || courseCode.trim() === ''
+            }
+            onClick={() => void (isEdit ? onSubmitUpdate() : onSubmitCreate())}
+          >
+            {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create section'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -327,6 +623,7 @@ export function AdminCourseSectionsPage() {
   >(null)
   const [csvExportError, setCsvExportError] = useState<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | null>(null)
+  const [showSectionForm, setShowSectionForm] = useState(false)
   /** Bumped after create/update/delete so the sections query re-runs without changing term/course. */
   const [listVersion, setListVersion] = useState(0)
   /**
@@ -353,6 +650,7 @@ export function AdminCourseSectionsPage() {
     setFormMessage(null)
     setCourseTitleLocked(false)
     setInstructorLocked(false)
+    setShowSectionForm(false)
   }, [])
 
   /** Create flow: clear section fields but keep the admin's timetable track (EN/CN) when only the course changes. */
@@ -362,6 +660,7 @@ export function AdminCourseSectionsPage() {
     setFormMessage(null)
     setCourseTitleLocked(false)
     setInstructorLocked(false)
+    setShowSectionForm(false)
   }, [])
 
   useEffect(() => {
@@ -646,7 +945,22 @@ export function AdminCourseSectionsPage() {
       notes: row.notes ?? '',
     })
     setFormMessage(null)
+    setShowSectionForm(true)
   }, [])
+
+  const openCreateForm = useCallback(() => {
+    setForm(emptyForm())
+    setEditingId(null)
+    setFormMessage(null)
+    setCourseTitleLocked(false)
+    setInstructorLocked(false)
+    setShowSectionForm(true)
+  }, [])
+
+  const closeSectionForm = useCallback(() => {
+    if (busy) return
+    resetForm()
+  }, [busy, resetForm])
 
   /** Browser back/forward and in-app links: keep selects aligned with URL (term/course/q are source of truth). */
   useEffect(() => {
@@ -796,6 +1110,7 @@ export function AdminCourseSectionsPage() {
       setInstructorLocked(false)
       setSectionsError(null)
       setListVersion((v) => v + 1)
+      setShowSectionForm(false)
     } catch (e) {
       setFormMessage(
         e instanceof Error ? e.message : 'Create failed.',
@@ -936,95 +1251,100 @@ export function AdminCourseSectionsPage() {
     })()
   }, [])
 
+  const selectedTermLabel = useMemo(() => {
+    const term = terms?.find((t) => t.id === academicTermId.trim())
+    return term?.term_label ?? academicTermId
+  }, [terms, academicTermId])
+
+  const totalSections = sections?.length ?? 0
+
   return (
-    <main className="admin-page">
-      <div className="admin-page__toolbar admin-course-sections-toolbar">
-        <div className="admin-course-sections-toolbar__row admin-course-sections-toolbar__row--title">
-          <h1 className="admin-page__title admin-page__title--inline admin-course-sections-toolbar__title">
+    <main className="admin-page admin-course-sections-page">
+      <div className="admin-course-sections-page__header">
+        <div className="admin-course-sections-page__heading">
+          <h1 className="admin-page__title admin-page__title--inline">
             Course Sections
           </h1>
-          <div className="admin-course-sections-toolbar__group admin-course-sections-toolbar__group--primary">
-            <Link
-              to={{
-                pathname: '/admin/course-sections/timetable',
-                search: (() => {
-                  const qs = adminSchedulingQueryString({
-                    term: academicTermId,
-                    course: courseCode,
-                    q: courseSearch,
-                  })
-                  return qs ? `?${qs}` : ''
-                })(),
-              }}
-              className="portal-btn portal-btn--secondary portal-btn--compact admin-course-sections-toolbar__timetable"
-            >
-              View Timetable
-            </Link>
-            <label className="admin-field admin-field--inline admin-course-sections-toolbar__field admin-course-sections-toolbar__term">
-              <span className="admin-field__label admin-course-sections-toolbar__label">
-                Academic term
+          <p className="admin-course-sections-page__lede">
+            Manage class sections for each term and course. Use the timetable view
+            to see the full weekly schedule.
+            {!sectionsLoading && sections != null ? (
+              <span className="admin-course-sections-page__count">
+                {' '}
+                {totalSections} {totalSections === 1 ? 'section' : 'sections'}
               </span>
-              <select
-                className="admin-input"
-                value={academicTermId}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setAcademicTermId(v)
-                  pushSchedulingContext({
-                    term: v,
-                    course: courseCode,
-                    q: courseSearch,
-                  })
-                  resetForm()
-                }}
-                disabled={terms == null || terms.length === 0}
-                aria-label="Academic term"
-              >
-                {terms == null ? (
-                  <option value="">Loading…</option>
-                ) : (
-                  terms.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.term_label} ({t.id})
-                    </option>
-                  ))
-                )}
-              </select>
-            </label>
-          </div>
+            ) : null}
+          </p>
         </div>
-        <div className="admin-course-sections-toolbar__row admin-course-sections-toolbar__row--filters">
-          <label className="admin-field admin-field--inline admin-course-sections-toolbar__field admin-course-sections-toolbar__search">
-            <span className="admin-field__label admin-course-sections-toolbar__label">
-              Search courses
+        <div className="admin-course-sections-page__header-actions">
+          <Link
+            to={{
+              pathname: '/admin/course-sections/timetable',
+              search: (() => {
+                const qs = adminSchedulingQueryString({
+                  term: academicTermId,
+                  course: courseCode,
+                  q: courseSearch,
+                })
+                return qs ? `?${qs}` : ''
+              })(),
+            }}
+            className="admin-course-sections-page__timetable-link"
+          >
+            View timetable
+          </Link>
+          <button
+            type="button"
+            className="admin-academic-terms-page__add-btn"
+            disabled={
+              sectionsLoading ||
+              academicTermId.trim() === '' ||
+              courseCode.trim() === ''
+            }
+            onClick={openCreateForm}
+          >
+            <span className="admin-academic-terms-page__add-icon" aria-hidden="true">
+              +
             </span>
-            <input
-              type="search"
-              className="admin-input admin-input--search"
-              value={courseSearch}
+            Add section
+          </button>
+        </div>
+      </div>
+
+      <section className="admin-course-sections-filters portal-card" aria-label="Filters">
+        <div className="admin-course-sections-filters__row">
+          <label className="admin-course-sections-filters__field">
+            <span className="admin-course-sections-filters__label">Academic term</span>
+            <select
+              className="admin-input admin-course-sections-filters__input"
+              value={academicTermId}
               onChange={(e) => {
                 const v = e.target.value
-                setCourseSearch(v)
-                pushSchedulingContext(
-                  {
-                    term: academicTermId,
-                    course: courseCode,
-                    q: v,
-                  },
-                  { clearEdit: false },
-                )
+                setAcademicTermId(v)
+                pushSchedulingContext({
+                  term: v,
+                  course: courseCode,
+                  q: courseSearch,
+                })
+                resetForm()
               }}
-              placeholder="Code, English title, or Chinese title…"
-              aria-label="Filter courses by code or English or Chinese title"
-              disabled={sortedCourses.length === 0}
-            />
+              disabled={terms == null || terms.length === 0}
+            >
+              {terms == null ? (
+                <option value="">Loading…</option>
+              ) : (
+                terms.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.term_label}
+                  </option>
+                ))
+              )}
+            </select>
           </label>
-          <label className="admin-field admin-field--inline admin-course-sections-toolbar__field admin-course-sections-toolbar__course">
-            <span className="admin-field__label admin-course-sections-toolbar__label">
-              Course
-            </span>
+          <label className="admin-course-sections-filters__field admin-course-sections-filters__field--course">
+            <span className="admin-course-sections-filters__label">Course</span>
             <select
-              className="admin-input admin-input--wide"
+              className="admin-input admin-course-sections-filters__input"
               value={courseCode}
               onChange={(e) => {
                 const v = e.target.value
@@ -1041,7 +1361,6 @@ export function AdminCourseSectionsPage() {
                 }
               }}
               disabled={sortedCourses.length === 0}
-              aria-label="Course"
             >
               {courseSelectOptions.length === 0 ? (
                 <option value="">No matches</option>
@@ -1054,81 +1373,114 @@ export function AdminCourseSectionsPage() {
               )}
             </select>
           </label>
-          <div className="admin-field admin-field--inline admin-course-sections-toolbar__field admin-course-sections-toolbar__credits">
-            <span className="admin-field__label admin-course-sections-toolbar__label">
-              Credits
+          <div className="admin-course-sections-filters__credits">
+            <span className="admin-course-sections-filters__label">Credits</span>
+            <span className="admin-course-sections-filters__credits-value">
+              {formatCatalogCredits(selectedCourseCatalog?.units)}
             </span>
-            <input
-              type="text"
-              className="admin-input admin-course-sections-toolbar__credits-input"
-              readOnly
-              aria-readonly="true"
-              value={formatCatalogCredits(selectedCourseCatalog?.units)}
-              title="Catalog credits for the selected course"
-            />
           </div>
         </div>
-      </div>
+        <label className="admin-course-sections-filters__field admin-course-sections-filters__field--search">
+          <span className="admin-course-sections-filters__label">Search courses</span>
+          <input
+            type="search"
+            className="admin-input admin-input--search admin-course-sections-filters__input"
+            value={courseSearch}
+            onChange={(e) => {
+              const v = e.target.value
+              setCourseSearch(v)
+              pushSchedulingContext(
+                {
+                  term: academicTermId,
+                  course: courseCode,
+                  q: v,
+                },
+                { clearEdit: false },
+              )
+            }}
+            placeholder="Filter by code or title…"
+            disabled={sortedCourses.length === 0}
+          />
+        </label>
+        {selectedCourseCatalog ? (
+          <p className="admin-course-sections-filters__context">
+            Showing sections for{' '}
+            <strong>{selectedCourseCatalog.code}</strong> in{' '}
+            <strong>{selectedTermLabel}</strong>
+          </p>
+        ) : null}
+      </section>
 
-      {sectionsError != null && (
-        <p className="portal-text-muted" role="alert">
+      {sectionsError != null ? (
+        <p className="admin-course-sections-page__alert" role="alert">
           {sectionsError}
         </p>
-      )}
-
-      {csvExportError != null && (
-        <p className="admin-form-message" role="alert">
-          {csvExportError}
-        </p>
-      )}
-
-      {sectionsLoading ? (
-        <div
-          className="portal-table-wrap admin-table-wrap admin-course-sections-list__state-wrap"
-          role="status"
-          aria-live="polite"
-        >
-          <p className="admin-course-sections-list__state">Loading sections…</p>
-        </div>
       ) : null}
 
-      {!sectionsLoading &&
-      sections != null &&
-      sections.length === 0 ? (
-        <div className="portal-table-wrap admin-table-wrap admin-course-sections-list__state-wrap">
-          <p className="admin-course-sections-list__state">
-            No sections for this term and course.
+      {csvExportError != null ? (
+        <p className="admin-course-sections-page__alert" role="alert">
+          {csvExportError}
+        </p>
+      ) : null}
+
+      {sectionsLoading ? (
+        <section className="portal-card portal-profile-state" aria-busy="true">
+          <p className="portal-profile-state__title">Loading sections</p>
+          <p className="portal-profile-state__detail">
+            Fetching sections for the selected term and course.
           </p>
-        </div>
+        </section>
+      ) : null}
+
+      {!sectionsLoading && sections != null && sections.length === 0 ? (
+        <section className="admin-course-sections-empty portal-card">
+          <p className="admin-course-sections-empty__title">No sections yet</p>
+          <p className="admin-course-sections-empty__detail">
+            Add a section to schedule this course for {selectedTermLabel}.
+          </p>
+          <button
+            type="button"
+            className="admin-academic-terms-page__add-btn"
+            disabled={academicTermId.trim() === '' || courseCode.trim() === ''}
+            onClick={openCreateForm}
+          >
+            <span className="admin-academic-terms-page__add-icon" aria-hidden="true">
+              +
+            </span>
+            Add section
+          </button>
+        </section>
       ) : null}
 
       {!sectionsLoading && sections != null && sections.length > 0 ? (
-        <div className="admin-course-sections-page admin-course-sections-list">
-          <AdminCourseSectionGroupTable
+        <div className="admin-course-sections-list">
+          <SectionGroup
             ariaLabelledBy="admin-course-sections-en-heading"
-            title="English Timetable Sections"
+            title="English timetable"
             rows={enSectionRows}
-            emptyMessage="None for this course in this term."
+            emptyMessage="No English sections for this course."
             resolveRowTitle={resolveSectionRowTitle}
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
             feedbackExportSectionId={feedbackExportSectionId}
+            onEdit={beginEdit}
             onViewRoster={openRosterForSection}
             onExportCsv={onExportCsvForSection}
             onExportFeedback={onExportFeedbackForSection}
             onDeleteRow={onDeleteRow}
           />
-          <AdminCourseSectionGroupTable
+          <SectionGroup
             ariaLabelledBy="admin-course-sections-cn-heading"
-            title="Chinese Timetable Sections"
+            title="Chinese timetable"
             rows={cnSectionRows}
-            emptyMessage="None for this course in this term."
+            emptyMessage="No Chinese sections for this course."
             resolveRowTitle={resolveSectionRowTitle}
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
             feedbackExportSectionId={feedbackExportSectionId}
+            onEdit={beginEdit}
             onViewRoster={openRosterForSection}
             onExportCsv={onExportCsvForSection}
             onExportFeedback={onExportFeedbackForSection}
@@ -1137,244 +1489,26 @@ export function AdminCourseSectionsPage() {
         </div>
       ) : null}
 
-      <section
-        className="admin-form-section"
-        aria-labelledby="course-section-form-title"
-      >
-        <h2 id="course-section-form-title" className="admin-page__subtitle">
-          {editingId == null ? 'Create section' : `Edit section #${editingId}`}
-        </h2>
-        <p className="portal-text-muted admin-form-hint">
-          Term and course are taken from the selections above. The server maps{' '}
-          <code className="admin-code">academic_term_id</code> to catalog term
-          name and year on <code className="admin-code">course_sections</code>.
-          Multiple weekdays are stored as a comma-separated list in{' '}
-          <code className="admin-code">weekday</code>.
-        </p>
-        {formMessage != null && (
-          <p className="admin-form-message" role="alert">
-            {formMessage}
-          </p>
-        )}
-        <div className="admin-form-grid">
-          <label className="admin-field admin-field--span-2">
-            <span className="admin-field__label">Course title</span>
-            <input
-              type="text"
-              className="admin-input"
-              value={courseTitleDraft}
-              onChange={(e) => {
-                setCourseTitleLocked(true)
-                setCourseTitleDraft(e.target.value)
-              }}
-              disabled={busy}
-              title="Defaults from catalog English/Chinese names for the selected timetable track; edit to override without changing the catalog."
-              autoComplete="off"
-            />
-          </label>
-          <label className="admin-field admin-field--span-2">
-            <span className="admin-field__label">Prerequisite course</span>
-            <select
-              className="admin-input"
-              value={form.prerequisite_course_id}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  prerequisite_course_id: e.target.value,
-                }))
-              }
-              disabled={busy || fullCatalogPrerequisiteOptions.length === 0}
-              aria-label="Prerequisite course"
-            >
-              <option value="">None</option>
-              {fullCatalogPrerequisiteOptions.map((c) => {
-                const courseId = c.course_id?.trim() ?? ''
-                const unmapped = courseId === ''
-                return (
-                  <option
-                    key={unmapped ? `unmapped:${c.code}` : courseId}
-                    value={unmapped ? `unmapped:${c.code}` : courseId}
-                    disabled={unmapped}
-                  >
-                    {formatCourseCatalogSelectLabel(c)}
-                    {unmapped ? ' (no portal course_id)' : ''}
-                  </option>
-                )
-              })}
-              {form.prerequisite_course_id.trim() !== '' &&
-                !courseCatalogById.has(form.prerequisite_course_id) && (
-                  <option value={form.prerequisite_course_id}>
-                    {form.prerequisite_course_id} (unavailable)
-                  </option>
-                )}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span className="admin-field__label">Section code</span>
-            <input
-              className="admin-input"
-              value={form.section_code}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, section_code: e.target.value }))
-              }
-              autoComplete="off"
-            />
-          </label>
-          <label className="admin-field">
-            <span className="admin-field__label">Schedule track</span>
-            <select
-              className="admin-input"
-              value={form.schedule_track}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  schedule_track:
-                    e.target.value === 'CN' ? ('CN' as const) : ('EN' as const),
-                }))
-              }
-              disabled={busy}
-              aria-label="Schedule track"
-            >
-              <option value="EN">English timetable</option>
-              <option value="CN">Chinese timetable</option>
-            </select>
-          </label>
-          <fieldset className="admin-field admin-field--weekdays">
-            <legend className="admin-field__label">Weekdays</legend>
-            <div
-              className="admin-weekday-checkboxes"
-              role="group"
-              aria-label="Weekdays"
-            >
-              {WEEKDAYS_FULL_ORDERED.map((d) => (
-                <label key={d} className="admin-weekday-checkboxes__item">
-                  <input
-                    type="checkbox"
-                    checked={form.weekdays.includes(d)}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        weekdays: toggleWeekday(f.weekdays, d, e.target.checked),
-                      }))
-                    }
-                  />
-                  <span>{d}</span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-          <AdminTime12hFields
-            idPrefix="section-start"
-            label="Start time"
-            value={form.start_time}
-            onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
-            disabled={busy}
-          />
-          <AdminTime12hFields
-            idPrefix="section-end"
-            label="End time"
-            value={form.end_time}
-            onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
-            disabled={busy}
-          />
-          <label className="admin-field">
-            <span className="admin-field__label">Delivery mode</span>
-            <select
-              className="admin-input"
-              value={form.delivery_mode.trim()}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, delivery_mode: e.target.value }))
-              }
-              disabled={busy}
-              aria-label="Delivery mode"
-            >
-              <option value="">Not selected</option>
-              {DELIVERY_MODE_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-              {form.delivery_mode.trim() !== '' &&
-                canonicalDeliveryMode(form.delivery_mode) == null && (
-                  <option value={form.delivery_mode.trim()}>
-                    {form.delivery_mode.trim()} (legacy)
-                  </option>
-                )}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span className="admin-field__label">Room</span>
-            <input
-              className="admin-input"
-              value={form.room}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, room: e.target.value }))
-              }
-            />
-          </label>
-          <label className="admin-field admin-field--span-2">
-            <span className="admin-field__label">Instructor</span>
-            <input
-              className="admin-input"
-              value={form.instructor}
-              onChange={(e) => {
-                setInstructorLocked(true)
-                setForm((f) => ({ ...f, instructor: e.target.value }))
-              }}
-            />
-          </label>
-          <label className="admin-field admin-field--span-2">
-            <span className="admin-field__label">Notes</span>
-            <textarea
-              className="admin-input admin-textarea"
-              rows={2}
-              value={form.notes}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, notes: e.target.value }))
-              }
-            />
-          </label>
-        </div>
-        <div className="admin-form-actions">
-          {editingId == null ? (
-            <button
-              type="button"
-              className="portal-btn portal-btn--primary"
-              disabled={busy || academicTermId.trim() === '' || courseCode.trim() === ''}
-              onClick={() => void onCreate()}
-            >
-              Create Section
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                className="portal-btn portal-btn--primary"
-                disabled={busy}
-                onClick={() => void onUpdate()}
-              >
-                Update Section
-              </button>
-              <button
-                type="button"
-                className="portal-btn portal-btn--secondary"
-                disabled={busy}
-                onClick={() => void onDelete()}
-              >
-                Delete Section
-              </button>
-              <button
-                type="button"
-                className="portal-btn portal-btn--secondary"
-                disabled={busy}
-                onClick={resetForm}
-              >
-                Cancel Edit
-              </button>
-            </>
-          )}
-        </div>
-      </section>
+      <SectionFormModal
+        open={showSectionForm}
+        editingId={editingId}
+        busy={busy}
+        form={form}
+        formMessage={formMessage}
+        courseTitleDraft={courseTitleDraft}
+        courseCode={courseCode}
+        academicTermId={academicTermId}
+        fullCatalogPrerequisiteOptions={fullCatalogPrerequisiteOptions}
+        courseCatalogById={courseCatalogById}
+        onClose={closeSectionForm}
+        onSubmitCreate={onCreate}
+        onSubmitUpdate={onUpdate}
+        onDelete={onDelete}
+        setForm={setForm}
+        setCourseTitleDraft={setCourseTitleDraft}
+        setCourseTitleLocked={setCourseTitleLocked}
+        setInstructorLocked={setInstructorLocked}
+      />
     </main>
   )
 }

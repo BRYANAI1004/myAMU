@@ -218,6 +218,24 @@ export async function getAcademicTermById(
   return row ? normalizeRow(row) : null;
 }
 
+/** Legacy calendar `term_name` + `year` → canonical `academic_terms` row (account/marks boundaries). */
+export async function getAcademicTermByCalendarTerm(
+  termName: string,
+  year: number,
+): Promise<AcademicTermDetail | null> {
+  const name = termName.trim();
+  const y = Math.trunc(Number(year));
+  if (name === "" || !Number.isFinite(y)) return null;
+  const sel = await termSelectSql();
+  const sql = `${sel}
+    WHERE year = ?
+      AND LOWER(TRIM(term_name)) = LOWER(?)
+    LIMIT 1`;
+  const [rows] = await pool.query<RowDataPacket[]>(sql, [y, name]);
+  const row = rows[0];
+  return row ? normalizeRow(row) : null;
+}
+
 export async function getCurrentRegistrationOpenTerm(): Promise<AcademicTermDetail | null> {
   const sel = await termSelectSql();
   const sql = `${sel} WHERE status = 'registration_open' ORDER BY sequence_no DESC LIMIT 1`;
