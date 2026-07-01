@@ -538,7 +538,7 @@ export type AdminStudentUpdatePayload = {
   name: string
   program: StudentProgram
   email: string | null
-  amuEmail: string | null
+  amuEmail?: string | null
   gender: string | null
   backgroundSchool: string | null
   highestDegree: string | null
@@ -1300,7 +1300,9 @@ export type StudentLoginEmailStatus = {
   verifiedAt: string | null
 }
 
-function parseStudentLoginEmailStatus(data: unknown): StudentLoginEmailStatus {
+export type LoginEmailStatus = StudentLoginEmailStatus
+
+function parseLoginEmailStatus(data: unknown): LoginEmailStatus {
   if (data == null || typeof data !== 'object') {
     throw new Error('Unexpected login email response')
   }
@@ -1325,7 +1327,7 @@ export async function fetchStudentLoginEmailStatus(
   const data = await fetchApiJson('/api/student/login-email', {
     signal: options?.signal,
   })
-  return parseStudentLoginEmailStatus(data)
+  return parseLoginEmailStatus(data)
 }
 
 /** POST /api/student/login-email/send-code */
@@ -1364,7 +1366,56 @@ export async function verifyStudentLoginEmailCode(
     body: JSON.stringify({ email: email.trim(), code: code.trim() }),
     signal: options?.signal,
   })
-  return parseStudentLoginEmailStatus(data)
+  return parseLoginEmailStatus(data)
+}
+
+/** GET /api/admin/login-email — verified login email for admin OTP sign-in. */
+export async function fetchAdminLoginEmailStatus(
+  options?: { signal?: AbortSignal },
+): Promise<LoginEmailStatus> {
+  const data = await fetchApiJson('/api/admin/login-email', {
+    signal: options?.signal,
+  })
+  return parseLoginEmailStatus(data)
+}
+
+/** POST /api/admin/login-email/send-code */
+export async function sendAdminLoginEmailCode(
+  email: string,
+  options?: { signal?: AbortSignal },
+): Promise<{ ok: true; expiresInSeconds: number }> {
+  const data = await fetchApiJson('/api/admin/login-email/send-code', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim() }),
+    signal: options?.signal,
+  })
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected send-code response')
+  }
+  const row = data as Record<string, unknown>
+  return {
+    ok: true,
+    expiresInSeconds:
+      typeof row.expiresInSeconds === 'number' && Number.isFinite(row.expiresInSeconds)
+        ? row.expiresInSeconds
+        : 600,
+  }
+}
+
+/** POST /api/admin/login-email/verify */
+export async function verifyAdminLoginEmailCode(
+  email: string,
+  code: string,
+  options?: { signal?: AbortSignal },
+): Promise<LoginEmailStatus> {
+  const data = await fetchApiJson('/api/admin/login-email/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email.trim(), code: code.trim() }),
+    signal: options?.signal,
+  })
+  return parseLoginEmailStatus(data)
 }
 
 export type AdminDivision = 'Chinese' | 'English'
@@ -1621,6 +1672,242 @@ export async function sendAdminBulkEmail(
     }
   }
   throw new Error('Unexpected bulk-email response')
+}
+
+export type SendAdminMassEmailAttachmentInput = {
+  filename: string
+  contentBase64: string
+}
+
+export type SendAdminMassEmailInput = {
+  recipients: string[]
+  subject: string
+  body: string
+  attachments?: SendAdminMassEmailAttachmentInput[]
+}
+
+export type SendAdminMassEmailResponse = {
+  delivered: boolean
+  messageId: string | null
+  profileId: string | null
+  recipientCount: number
+  fromAddress: string | null
+  note: string | null
+}
+
+/** POST /api/admin/mass-email/send — BCC students; From = admin verified login email. */
+export async function sendAdminMassEmail(
+  input: SendAdminMassEmailInput,
+  options?: { signal?: AbortSignal },
+): Promise<SendAdminMassEmailResponse> {
+  const data = (await fetchApiJson('/api/admin/mass-email/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      recipients: input.recipients,
+      subject: input.subject,
+      body: input.body,
+      ...(input.attachments != null && input.attachments.length > 0
+        ? { attachments: input.attachments }
+        : {}),
+    }),
+    signal: options?.signal,
+  })) as unknown
+
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as { delivered?: unknown }).delivered === 'boolean' &&
+    typeof (data as { recipientCount?: unknown }).recipientCount === 'number'
+  ) {
+    const o = data as {
+      delivered: boolean
+      messageId?: unknown
+      profileId?: unknown
+      recipientCount: number
+      fromAddress?: unknown
+      note?: unknown
+    }
+    return {
+      delivered: o.delivered,
+      messageId: typeof o.messageId === 'string' ? o.messageId : null,
+      profileId: typeof o.profileId === 'string' ? o.profileId : null,
+      recipientCount: Math.trunc(o.recipientCount),
+      fromAddress: typeof o.fromAddress === 'string' ? o.fromAddress : null,
+      note: typeof o.note === 'string' ? o.note : null,
+    }
+  }
+  throw new Error('Unexpected mass-email response')
+}
+
+export type AdminEmailLogKind = 'mass_email' | 'bulk_email'
+export type AdminEmailLogDeliveryMode = 'bcc' | 'to'
+
+export type AdminEmailLogAttachmentItem = {
+  id: number
+  filename: string
+  byteSize: number
+  contentType: string | null
+}
+
+export type AdminEmailLogListItem = {
+  id: number
+  kind: AdminEmailLogKind
+  sentByAdminEmail: string
+  sentByDisplayName: string | null
+  fromAddress: string
+  subject: string
+  recipientCount: number
+  deliveryMode: AdminEmailLogDeliveryMode
+  delivered: boolean
+  messageId: string | null
+  smtpProfileId: string | null
+  attachmentCount: number
+  attachmentNames: string[]
+  attachments: AdminEmailLogAttachmentItem[]
+  note: string | null
+  createdAt: string
+}
+
+export type AdminEmailLogListPageResponse = {
+  items: AdminEmailLogListItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+function parseAdminEmailLogRow(o: Record<string, unknown>): AdminEmailLogListItem | null {
+  if (typeof o.id !== 'number') return null
+  const kindRaw = o.kind
+  const deliveryRaw = o.deliveryMode
+  const attachmentNamesRaw = o.attachmentNames
+  const attachmentNames = Array.isArray(attachmentNamesRaw)
+    ? attachmentNamesRaw.filter((v): v is string => typeof v === 'string')
+    : []
+  const attachmentsRaw = o.attachments
+  const attachments: AdminEmailLogAttachmentItem[] = []
+  if (Array.isArray(attachmentsRaw)) {
+    for (const item of attachmentsRaw) {
+      if (item == null || typeof item !== 'object') continue
+      const row = item as Record<string, unknown>
+      if (typeof row.id !== 'number' || typeof row.filename !== 'string') continue
+      attachments.push({
+        id: Math.trunc(row.id),
+        filename: row.filename,
+        byteSize: typeof row.byteSize === 'number' ? Math.trunc(row.byteSize) : 0,
+        contentType: typeof row.contentType === 'string' ? row.contentType : null,
+      })
+    }
+  }
+
+  return {
+    id: Math.trunc(o.id),
+    kind: kindRaw === 'bulk_email' ? 'bulk_email' : 'mass_email',
+    sentByAdminEmail:
+      typeof o.sentByAdminEmail === 'string' ? o.sentByAdminEmail : '',
+    sentByDisplayName:
+      typeof o.sentByDisplayName === 'string' ? o.sentByDisplayName : null,
+    fromAddress: typeof o.fromAddress === 'string' ? o.fromAddress : '',
+    subject: typeof o.subject === 'string' ? o.subject : '',
+    recipientCount:
+      typeof o.recipientCount === 'number' ? Math.trunc(o.recipientCount) : 0,
+    deliveryMode: deliveryRaw === 'to' ? 'to' : 'bcc',
+    delivered: o.delivered === true,
+    messageId: typeof o.messageId === 'string' ? o.messageId : null,
+    smtpProfileId: typeof o.smtpProfileId === 'string' ? o.smtpProfileId : null,
+    attachmentCount:
+      typeof o.attachmentCount === 'number' ? Math.trunc(o.attachmentCount) : 0,
+    attachmentNames,
+    attachments,
+    note: typeof o.note === 'string' ? o.note : null,
+    createdAt: typeof o.createdAt === 'string' ? o.createdAt : '',
+  }
+}
+
+function parseAdminEmailLogListPageResponse(
+  data: unknown,
+): AdminEmailLogListPageResponse {
+  if (data == null || typeof data !== 'object') {
+    throw new Error('Unexpected email-logs response')
+  }
+  const o = data as {
+    items?: unknown
+    total?: unknown
+    page?: unknown
+    pageSize?: unknown
+  }
+  if (!Array.isArray(o.items) || typeof o.total !== 'number') {
+    throw new Error('Unexpected email-logs response')
+  }
+  const items: AdminEmailLogListItem[] = []
+  for (const row of o.items) {
+    if (row == null || typeof row !== 'object') continue
+    const parsed = parseAdminEmailLogRow(row as Record<string, unknown>)
+    if (parsed != null) items.push(parsed)
+  }
+  return {
+    items,
+    total: Math.trunc(o.total),
+    page: typeof o.page === 'number' ? Math.trunc(o.page) : 1,
+    pageSize: typeof o.pageSize === 'number' ? Math.trunc(o.pageSize) : 25,
+  }
+}
+
+/** GET /api/admin/email-logs — paginated admin email send history. */
+export async function fetchAdminEmailLogs(options?: {
+  signal?: AbortSignal
+  page?: number
+  pageSize?: number
+}): Promise<AdminEmailLogListPageResponse> {
+  const params = new URLSearchParams()
+  const page = options?.page ?? 1
+  const pageSize = options?.pageSize ?? 25
+  params.set('page', String(Math.max(1, Math.trunc(page))))
+  params.set('pageSize', String(Math.max(1, Math.trunc(pageSize))))
+  const data = (await fetchApiJson(`/api/admin/email-logs?${params.toString()}`, {
+    signal: options?.signal,
+  })) as unknown
+  return parseAdminEmailLogListPageResponse(data)
+}
+
+export type AdminEmailLogAttachmentUrlResponse = {
+  url: string
+  filename: string
+  contentType: string | null
+  byteSize: number
+}
+
+/** GET /api/admin/email-logs/:logId/attachments/:attachmentId/url */
+export async function fetchAdminEmailLogAttachmentUrl(
+  logId: number,
+  attachmentId: number,
+  options?: { signal?: AbortSignal },
+): Promise<AdminEmailLogAttachmentUrlResponse> {
+  const data = (await fetchApiJson(
+    `/api/admin/email-logs/${logId}/attachments/${attachmentId}/url`,
+    { signal: options?.signal },
+  )) as unknown
+
+  if (
+    data != null &&
+    typeof data === 'object' &&
+    typeof (data as { url?: unknown }).url === 'string' &&
+    typeof (data as { filename?: unknown }).filename === 'string'
+  ) {
+    const o = data as {
+      url: string
+      filename: string
+      contentType?: unknown
+      byteSize?: unknown
+    }
+    return {
+      url: o.url,
+      filename: o.filename,
+      contentType: typeof o.contentType === 'string' ? o.contentType : null,
+      byteSize: typeof o.byteSize === 'number' ? Math.trunc(o.byteSize) : 0,
+    }
+  }
+  throw new Error('Unexpected email-log attachment response')
 }
 
 export async function downloadAdminStudentsCsv(options?: {

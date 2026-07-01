@@ -18,7 +18,7 @@
   --portal-red-nav-gutter-x: 0.875rem;
   --portal-red-nav-link-pad-y: 0.5625rem;
   --portal-red-nav-link-pad-x: 0.75rem;
-  --portal-red-nav-icon-size: 1.125rem;
+  --portal-red-nav-icon-size: 1.25rem;
   --portal-red-nav-icon-gap: 0.625rem;
   --portal-red-nav-item-gap: 0.125rem;
   --portal-red-nav-text-inset: calc(var(--portal-red-nav-gutter-x) + var(--portal-red-nav-link-pad-x));
@@ -745,7 +745,11 @@
 .admin-portal .admin-sidebar .portal-nav-link-icon {
   width: var(--portal-red-nav-icon-size);
   height: var(--portal-red-nav-icon-size);
-  opacity: 0.9;
+  opacity: 1;
+}
+
+.admin-portal .admin-sidebar .portal-nav-link-icon svg {
+  stroke: currentColor;
 }
 
 .portal-shell--internal-module .portal-sidebar .sidebar-item,
@@ -10546,131 +10550,437 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   cursor: not-allowed;
 }
 
-.admin-section-detail-modal--course-section-form {
-  max-width: min(46rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
-  overflow: visible;
-  padding: 0.95rem 1.15rem 1rem;
+.admin-course-section-form-panel {
+  --csf-label: 0.75rem;
+  --csf-text: 0.8125rem;
+  --csf-title: 1.125rem;
+  --csf-section: 0.6875rem;
+  --csf-control-h: 2.375rem;
+  --csf-radius: 8px;
+  --csf-gap-label: 0.375rem;
+  --csf-gap-field: 1.125rem;
+  --csf-gap-panel: 1.25rem;
+  --csf-pad-x: 1.75rem;
+  --csf-pad-y: 1.375rem;
+
+  margin-bottom: 1.35rem;
+  padding: 0;
+  overflow: hidden;
+  border-top: 3px solid var(--amu-gold);
+  box-shadow: 0 2px 14px rgba(140, 29, 44, 0.05);
+  font-size: var(--csf-text);
+  line-height: 1.45;
 }
 
-.admin-course-section-form {
+.admin-course-section-form__header {
   display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: var(--csf-pad-y) var(--csf-pad-x) calc(var(--csf-pad-y) - 0.15rem);
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--portal-accent-soft) 45%, var(--amu-card)) 0%,
+    var(--amu-card) 100%
+  );
 }
 
-.admin-course-section-form__meta {
-  margin-bottom: 0.45rem;
-  font-size: 0.75rem;
+.admin-course-section-form__header-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem 0.875rem;
+  min-width: 0;
+}
+
+.admin-course-section-form__title {
+  margin: 0;
+  font-size: var(--csf-title);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--amu-red-dark);
+}
+
+.admin-course-section-form__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.admin-course-section-form__context-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.625rem;
+  padding: 0.15rem 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--portal-text-muted);
+  background: var(--portal-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--amu-red) 10%, var(--portal-border-subtle));
+  border-radius: 999px;
+}
+
+.admin-course-section-form__context-chip--course {
+  color: var(--amu-red-dark);
+  background: color-mix(in srgb, var(--portal-accent-soft) 75%, var(--amu-card));
+  border-color: color-mix(in srgb, var(--amu-red) 18%, var(--portal-border-subtle));
+}
+
+.admin-course-section-form__context-hint {
+  margin: 0;
+  font-size: var(--csf-text);
+  color: var(--portal-text-muted);
+}
+
+.admin-course-section-form__close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  margin: 0.05rem -0.15rem 0 0;
+  padding: 0;
+  font-family: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 400;
+  color: var(--portal-text-faint);
+  background: transparent;
+  border: none;
+  border-radius: var(--csf-radius);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.admin-course-section-form__close:hover:not(:disabled) {
+  color: var(--amu-red-dark);
+  background: var(--portal-accent-soft);
+}
+
+.admin-course-section-form__close:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .admin-course-section-form__error {
-  margin: 0 0 0.45rem;
-  font-size: 0.8125rem;
-  color: #b91c1c;
+  margin: 0;
+  padding: 0.625rem var(--csf-pad-x);
+  font-size: var(--csf-text);
+  line-height: 1.45;
+  color: var(--amu-red-dark);
+  background: var(--portal-accent-soft);
+  border-bottom: 1px solid color-mix(in srgb, var(--amu-red) 15%, var(--portal-border));
 }
 
-.admin-course-section-form__section {
+.admin-course-section-form__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.28fr) minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+.admin-course-section-form__panel {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: var(--csf-gap-panel);
+  min-width: 0;
+  min-height: 100%;
+  padding: var(--csf-pad-y) var(--csf-pad-x) calc(var(--csf-pad-y) + 0.125rem);
 }
 
-.admin-course-section-form__section + .admin-course-section-form__section {
-  padding-top: 0.55rem;
+.admin-course-section-form__panel + .admin-course-section-form__panel {
+  border-left: 1px solid var(--portal-border-subtle);
+}
+
+.admin-course-section-form__panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin: 0;
+  flex-shrink: 0;
+  font-size: var(--csf-section);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--amu-red-dark);
+}
+
+.admin-course-section-form__panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--csf-gap-panel);
+  min-height: 0;
+}
+
+.admin-course-section-form__panel-body .admin-course-section-form__textarea {
+  flex: 1;
+  min-height: 5.25rem;
+}
+
+.admin-course-section-form__times {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-top: var(--csf-gap-panel);
   border-top: 1px solid var(--portal-border-subtle);
 }
 
-.admin-course-section-form__section-title {
-  margin: 0;
+.admin-course-section-form__times .admin-course-section-form__time-slot:first-child {
+  padding-bottom: 0;
+}
+
+.admin-course-section-form__time-separator {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0.625rem 0;
   font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-course-section-form__time-separator::before,
+.admin-course-section-form__time-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--portal-border-subtle);
+}
+
+.admin-course-section-form__time-slot {
+  min-width: 0;
+}
+
+.admin-course-section-form__time-slot .admin-field {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--csf-gap-label);
+}
+
+.admin-course-section-form__time-slot .admin-field__label {
+  font-size: var(--csf-label);
+  font-weight: 600;
+  letter-spacing: 0.015em;
+  color: var(--portal-text-muted);
+}
+
+.admin-course-section-form__time-slot .admin-time12h--stacked {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.admin-course-section-form__time-slot .admin-time12h__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-course-section-form__time-slot .admin-time12h__cell-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--portal-text-faint);
 }
 
-.admin-course-section-form__row {
-  display: grid;
-  gap: 0.45rem 0.65rem;
+.admin-course-section-form__time-slot .admin-time12h__select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--csf-control-h);
+  padding: 0.4375rem 0.5rem;
+  font-size: var(--csf-text);
+  line-height: 1.35;
+  text-align: center;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--csf-radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.admin-course-section-form__row--1 {
-  grid-template-columns: minmax(0, 1fr);
+.admin-course-section-form__time-slot .admin-time12h__select--hour,
+.admin-course-section-form__time-slot .admin-time12h__select--minute,
+.admin-course-section-form__time-slot .admin-time12h__select--ap {
+  min-width: 0;
+}
+
+.admin-course-section-form__time-slot .admin-time12h__select:focus {
+  border-color: var(--amu-red);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+  outline: none;
+}
+
+.admin-course-section-form__panel-title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 0.8125rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--amu-gold) 0%, var(--amu-red) 100%);
+}
+
+.admin-course-section-form__row {
+  display: grid;
+  gap: var(--csf-gap-field);
 }
 
 .admin-course-section-form__row--2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.admin-course-section-form__row--3 {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.admin-course-section-form__row--time .admin-field {
-  margin: 0;
-}
-
-.admin-course-section-form__row--time .admin-time12h {
-  flex-wrap: wrap;
-}
-
 .admin-course-section-form__field {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: var(--csf-gap-label);
   min-width: 0;
 }
 
-.admin-course-section-form__field > span {
-  font-size: 0.75rem;
+.admin-course-section-form__field > span,
+.admin-course-section-form__field-label {
+  font-size: var(--csf-label);
   font-weight: 600;
-  color: var(--portal-text);
+  letter-spacing: 0.015em;
+  color: var(--portal-text-muted);
 }
 
 .admin-course-section-form__input,
 .admin-course-section-form__textarea {
   box-sizing: border-box;
   width: 100%;
-  min-height: 2rem;
-  padding: 0.3rem 0.45rem;
-  font-size: 0.8125rem;
+  min-height: var(--csf-control-h);
+  padding: 0.4375rem 0.6875rem;
+  font-size: var(--csf-text);
+  line-height: 1.35;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--csf-radius);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-course-section-form__input:focus,
+.admin-course-section-form__textarea:focus {
+  border-color: var(--amu-red);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+  outline: none;
 }
 
 .admin-course-section-form__textarea {
-  min-height: 3.25rem;
+  min-height: 5.25rem;
+  padding-top: 0.5625rem;
   resize: vertical;
+  line-height: 1.5;
+}
+
+.admin-course-section-form__track-toggle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.admin-course-section-form__track-option {
+  min-height: var(--csf-control-h);
+  padding: 0.4375rem 0.5rem;
+  font-family: inherit;
+  font-size: var(--csf-text);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--portal-text-muted);
+  text-align: center;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--csf-radius);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.admin-course-section-form__track-option:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--amu-red) 22%, var(--portal-border-subtle));
+  color: var(--portal-text);
+  background: color-mix(in srgb, var(--portal-accent-soft) 35%, var(--amu-card));
+}
+
+.admin-course-section-form__track-option--active.admin-course-section-form__track-option--en {
+  color: var(--amu-red-dark);
+  background: var(--portal-accent-soft);
+  border-color: color-mix(in srgb, var(--amu-red) 28%, var(--portal-border-subtle));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amu-red) 8%, transparent);
+}
+
+.admin-course-section-form__track-option--active.admin-course-section-form__track-option--cn {
+  color: #6b4e00;
+  background: color-mix(in srgb, var(--amu-gold) 18%, var(--amu-card));
+  border-color: color-mix(in srgb, var(--amu-gold) 45%, var(--portal-border-subtle));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amu-gold) 12%, transparent);
+}
+
+.admin-course-section-form__track-option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+.admin-course-section-form__track-option:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .admin-course-section-form__weekdays {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.4375rem;
 }
 
 .admin-course-section-form__weekday {
-  min-width: 2.35rem;
-  padding: 0.28rem 0.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--csf-control-h);
+  padding: 0 0.125rem;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
   color: var(--portal-text-muted);
-  background: #f1f5f9;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  text-align: center;
+  background: var(--amu-card);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--csf-radius);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.admin-course-section-form__weekday:hover:not(:disabled) {
-  background: #e2e8f0;
+.admin-course-section-form__weekday:hover:not(:disabled):not(.admin-course-section-form__weekday--active) {
+  border-color: color-mix(in srgb, var(--amu-red) 18%, var(--portal-border-subtle));
   color: var(--portal-text);
+  background: color-mix(in srgb, var(--portal-accent-soft) 40%, var(--amu-card));
 }
 
 .admin-course-section-form__weekday--active {
-  color: #1e293b;
-  background: #e2e8f0;
-  border-color: #cbd5e1;
+  color: var(--amu-red-dark);
+  font-weight: 700;
+  background: var(--portal-accent-soft);
+  border-color: color-mix(in srgb, var(--amu-red) 26%, var(--portal-border-subtle));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amu-red) 6%, transparent);
+}
+
+.admin-course-section-form__weekday:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
 }
 
 .admin-course-section-form__weekday:disabled {
@@ -10678,10 +10988,67 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   cursor: not-allowed;
 }
 
-.admin-course-section-form__actions {
-  margin-top: 0.15rem;
-  padding-top: 0.65rem;
+.admin-course-section-form__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+  padding: 0.875rem var(--csf-pad-x) 1.0625rem;
   border-top: 1px solid var(--portal-border-subtle);
+  background: color-mix(in srgb, var(--portal-accent-soft) 22%, var(--amu-card));
+}
+
+.admin-course-section-form__footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.admin-course-section-form__footer .portal-btn--compact {
+  min-height: var(--csf-control-h);
+  padding: 0.4375rem 1.0625rem;
+  font-size: var(--csf-text);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--csf-radius);
+}
+
+@media (max-width: 960px) {
+  .admin-course-section-form-panel {
+    --csf-pad-x: 1.375rem;
+  }
+
+  .admin-course-section-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-course-section-form__panel + .admin-course-section-form__panel {
+    border-left: none;
+    border-top: 1px solid var(--portal-border-subtle);
+  }
+}
+
+@media (max-width: 540px) {
+  .admin-course-section-form-panel {
+    --csf-pad-x: 1.125rem;
+    --csf-gap-panel: 1.0625rem;
+  }
+
+  .admin-course-section-form__row--2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-course-section-form__weekday {
+    font-size: 0.625rem;
+    letter-spacing: 0.03em;
+  }
+
+  .admin-course-section-form__track-toggle {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ─── Admin Courses: catalog panel ─────────────────────────────────────── */
@@ -12626,6 +12993,1216 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
   padding: 0.75rem 0 0;
   text-align: left;
   color: var(--portal-text-muted);
+}
+
+.admin-settings-card {
+  max-width: 42rem;
+  padding: 1.25rem 1.35rem 1.35rem;
+}
+
+.admin-settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 42rem;
+}
+
+.admin-settings-card--login-email {
+  padding-top: 1rem;
+}
+
+.admin-settings-card--login-email .portal-login-email-embedded {
+  margin: 0;
+}
+
+.admin-settings-card--login-email .portal-login-email-actions .portal-btn--primary {
+  background: var(--amu-card);
+  color: var(--amu-red-dark);
+  border-color: rgba(140, 29, 44, 0.32);
+  box-shadow: var(--portal-shadow);
+  font-weight: 600;
+}
+
+.admin-settings-card--login-email .portal-login-email-actions .portal-btn--primary:hover:not(:disabled) {
+  background: var(--portal-accent-soft);
+  border-color: rgba(140, 29, 44, 0.48);
+  color: var(--amu-red-dark);
+}
+
+.admin-settings-card--login-email .portal-login-email-actions .portal-btn--secondary {
+  color: var(--portal-text-muted);
+  border-color: var(--portal-border);
+}
+
+.admin-settings-card--login-email .portal-login-email-actions .portal-btn--secondary:hover:not(:disabled) {
+  background: #fafbfc;
+  color: var(--portal-text);
+}
+
+.admin-settings-card__title {
+  margin: 0 0 1rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--amu-red-dark);
+}
+
+/* —— Mass Email —— */
+.admin-mass-email-page {
+  padding-bottom: 2rem;
+}
+
+.admin-mass-email-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-mass-email-header__intro {
+  flex: 1;
+  min-width: min(100%, 18rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
+}
+
+.admin-mass-email-page-tabs {
+  margin-top: 0.15rem;
+}
+
+.admin-mass-email-header__title {
+  margin: 0 0 0.35rem;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a6192e;
+}
+
+.admin-mass-email-header__lede {
+  margin: 0;
+  max-width: 36rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--portal-text-muted);
+}
+
+.admin-mass-email-header__stats {
+  display: flex;
+  gap: 0.625rem;
+}
+
+.admin-mass-email-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 5.5rem;
+  padding: 0.625rem 1rem;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 8px;
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-mass-email-stat__value {
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--portal-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-mass-email-stat__label {
+  margin-top: 0.15rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.admin-mass-email-compose,
+.admin-mass-email-roster {
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-mass-email-compose {
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.admin-mass-email-compose__section {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-mass-email-compose__heading,
+.admin-mass-email-roster__title {
+  margin: 0 0 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--amu-red-dark);
+}
+
+.admin-mass-email-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.875rem;
+  background: #fafbfc;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 8px;
+}
+
+.admin-mass-email-meta__row {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.admin-mass-email-meta__key {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-meta__value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  min-width: 0;
+}
+
+.admin-mass-email-meta__row--bcc {
+  align-items: flex-start;
+}
+
+.admin-mass-email-meta__value--bcc {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+}
+
+.admin-mass-email-bcc-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  width: 100%;
+  max-height: 7.5rem;
+  overflow: auto;
+  padding-right: 0.15rem;
+}
+
+.admin-mass-email-chip--recipient {
+  gap: 0.25rem;
+  padding-right: 0.35rem;
+  white-space: normal;
+  border-radius: 999px;
+}
+
+.admin-mass-email-chip__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  margin-left: 0.1rem;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--portal-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.admin-mass-email-chip__remove:hover {
+  color: var(--amu-red);
+  background: rgba(140, 29, 44, 0.08);
+}
+
+.admin-mass-email-attachments {
+  margin-top: 0.25rem;
+}
+
+.admin-mass-email-attachments__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.admin-mass-email-attachments__input {
+  display: none;
+}
+
+.admin-mass-email-attach-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.875rem;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-mass-email-attach-btn:hover:not(:disabled) {
+  background: #fafbfc;
+  border-color: #c8ced8;
+}
+
+.admin-mass-email-attach-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-mass-email-attachments__hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.6875rem;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-attachment-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.admin-mass-email-attachment-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.8125rem;
+  background: #fafbfc;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 6px;
+}
+
+.admin-mass-email-attachment-item__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--portal-text);
+}
+
+.admin-mass-email-attachment-item__size {
+  font-size: 0.6875rem;
+  color: var(--portal-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-mass-email-attachment-item__remove {
+  padding: 0;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.admin-mass-email-attachment-item__remove:hover:not(:disabled) {
+  color: var(--amu-red);
+}
+
+.admin-mass-email-filter {
+  position: relative;
+}
+
+.admin-mass-email-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2.375rem;
+  padding: 0 0.75rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-mass-email-filter-btn:hover,
+.admin-mass-email-filter-btn--open {
+  background: #fafbfc;
+  border-color: #c8ced8;
+}
+
+.admin-mass-email-filter-btn--active {
+  border-color: rgba(140, 29, 44, 0.35);
+  color: var(--amu-red-dark);
+}
+
+.admin-mass-email-filter-btn__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--amu-red);
+  border-radius: 999px;
+}
+
+.admin-mass-email-filter-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  width: min(16rem, calc(100vw - 2rem));
+  padding: 0.875rem;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(28, 35, 51, 0.12);
+}
+
+.admin-mass-email-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+}
+
+.admin-mass-email-filter-field__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-filter-field__select {
+  height: 2.25rem;
+  padding: 0 0.65rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid #d4d8df;
+  border-radius: 6px;
+}
+
+.admin-mass-email-filter-field__select:focus {
+  outline: none;
+  border-color: rgba(140, 29, 44, 0.45);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+.admin-mass-email-filter-panel__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+
+.admin-mass-email-meta__muted {
+  font-size: 0.8125rem;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-meta__error {
+  font-size: 0.8125rem;
+  color: var(--amu-red);
+  line-height: 1.4;
+}
+
+.admin-mass-email-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  border-radius: 999px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-mass-email-chip--verified {
+  color: var(--amu-red-dark);
+  background: var(--portal-accent-soft);
+  border-color: rgba(140, 29, 44, 0.18);
+}
+
+.admin-mass-email-link {
+  color: var(--amu-red);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.admin-mass-email-link:hover {
+  text-decoration: underline;
+}
+
+.admin-mass-email-link-btn {
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.admin-mass-email-link-btn:hover {
+  color: var(--amu-red);
+}
+
+.admin-mass-email-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.875rem;
+}
+
+.admin-mass-email-field--body {
+  margin-bottom: 0;
+}
+
+.admin-mass-email-field__label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-field__input,
+.admin-mass-email-field__textarea,
+.admin-mass-email-search {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid #d4d8df;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-mass-email-field__input {
+  height: 2.5rem;
+  padding: 0 0.75rem;
+}
+
+.admin-mass-email-field__textarea {
+  min-height: 11rem;
+  padding: 0.75rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.admin-mass-email-field__input:focus,
+.admin-mass-email-field__textarea:focus,
+.admin-mass-email-search:focus {
+  outline: none;
+  border-color: rgba(140, 29, 44, 0.45);
+  box-shadow: 0 0 0 3px var(--amu-red-ring);
+}
+
+.admin-mass-email-field__input:disabled,
+.admin-mass-email-field__textarea:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background: #f5f6f8;
+}
+
+.admin-mass-email-field__count {
+  align-self: flex-end;
+  margin-top: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--portal-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-mass-email-banner {
+  margin: 0.75rem 0 0;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  border-radius: 8px;
+}
+
+.admin-mass-email-banner--error {
+  color: #8b1a1a;
+  background: #fef2f2;
+  border: 1px solid #f5c6c6;
+}
+
+.admin-mass-email-banner--success {
+  color: #1f5f3a;
+  background: #eef8f2;
+  border: 1px solid #b8dfc8;
+}
+
+.admin-mass-email-compose__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--portal-border-subtle);
+}
+
+.admin-mass-email-compose__hint {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0 1.125rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--amu-red-dark);
+  background: var(--portal-surface);
+  border: 1px solid rgba(140, 29, 44, 0.32);
+  border-radius: 8px;
+  box-shadow: var(--portal-shadow);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-mass-email-send-btn:hover:not(:disabled) {
+  background: var(--portal-accent-soft);
+  border-color: rgba(140, 29, 44, 0.48);
+}
+
+.admin-mass-email-send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-mass-email-roster {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1.25rem;
+}
+
+.admin-mass-email-roster__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.875rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.admin-mass-email-roster__subtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+}
+
+.admin-mass-email-roster__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem 0.875rem;
+}
+
+.admin-mass-email-search {
+  min-width: min(100%, 15rem);
+  width: 15rem;
+  height: 2.375rem;
+  padding: 0 0.75rem;
+}
+
+.admin-mass-email-roster__range {
+  font-size: 0.75rem;
+  color: var(--portal-text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.admin-mass-email-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 8px;
+}
+
+.admin-mass-email-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.admin-mass-email-table thead {
+  background: #f7f8fa;
+}
+
+.admin-mass-email-table th {
+  padding: 0.625rem 0.875rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--portal-text-faint);
+  border-bottom: 1px solid var(--portal-border-subtle);
+}
+
+.admin-mass-email-table td {
+  padding: 0.625rem 0.875rem;
+  vertical-align: middle;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.admin-mass-email-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-mass-email-table tbody tr:hover:not(.admin-mass-email-table__row--disabled) {
+  background: #fafbfc;
+}
+
+.admin-mass-email-table__row--selected {
+  background: #fdf8f9;
+}
+
+.admin-mass-email-table__row--selected:hover {
+  background: #f9f0f2 !important;
+}
+
+.admin-mass-email-table__row--disabled {
+  opacity: 0.55;
+}
+
+.admin-mass-email-table__check {
+  width: 2.75rem;
+  padding-left: 0.875rem !important;
+}
+
+.admin-mass-email-checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--amu-red);
+  cursor: pointer;
+}
+
+.admin-mass-email-checkbox:disabled {
+  cursor: not-allowed;
+}
+
+.admin-mass-email-table__id {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--portal-text-faint);
+}
+
+.admin-mass-email-table__name {
+  display: block;
+  margin-top: 0.1rem;
+  font-weight: 500;
+  color: var(--portal-text);
+}
+
+.admin-mass-email-table__email {
+  color: var(--portal-text-muted);
+  word-break: break-word;
+}
+
+.admin-mass-email-table__program {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--portal-text-muted);
+  background: #f0f2f5;
+  border-radius: 4px;
+}
+
+.admin-mass-email-table__empty {
+  padding: 2rem 1rem !important;
+  text-align: center;
+  color: var(--portal-text-muted);
+}
+
+.admin-mass-email-roster__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+}
+
+.admin-mass-email-roster__page {
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-mass-email-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0 0.875rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--portal-text);
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.admin-mass-email-pager-btn:hover:not(:disabled) {
+  background: #fafbfc;
+  border-color: #c8ced8;
+}
+
+.admin-mass-email-pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1024px) {
+  .admin-mass-email-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-mass-email-compose {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-mass-email-header__stats {
+    width: 100%;
+  }
+
+  .admin-mass-email-stat {
+    flex: 1;
+  }
+
+  .admin-mass-email-roster__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-mass-email-roster__tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-mass-email-search {
+    width: 100%;
+  }
+
+  .admin-mass-email-filter {
+    width: 100%;
+  }
+
+  .admin-mass-email-filter-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-mass-email-filter-panel {
+    right: auto;
+    left: 0;
+    width: 100%;
+  }
+}
+
+/* —— Email Logs —— */
+.admin-email-logs-panel {
+  padding-bottom: 0.5rem;
+}
+
+.admin-email-logs-panel__head {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.admin-email-logs-panel__count {
+  font-size: 0.8125rem;
+  color: var(--portal-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-email-logs-page {
+  padding-bottom: 2rem;
+}
+
+.admin-email-logs-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-email-logs-header__title {
+  margin: 0;
+  font-family: 'Cinzel', 'Times New Roman', Times, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a6192e;
+}
+
+.admin-email-logs-header__count {
+  font-size: 0.8125rem;
+  color: var(--portal-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-email-logs-table-wrap {
+  overflow: auto;
+  background: var(--portal-surface);
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--portal-shadow);
+}
+
+.admin-email-logs-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.admin-email-logs-table__col--when {
+  width: 12%;
+}
+
+.admin-email-logs-table__col--type {
+  width: 7%;
+}
+
+.admin-email-logs-table__col--sender {
+  width: 10%;
+}
+
+.admin-email-logs-table__col--from {
+  width: 16%;
+}
+
+.admin-email-logs-table__col--subject {
+  width: 12%;
+}
+
+.admin-email-logs-table__col--recipients {
+  width: 7%;
+}
+
+.admin-email-logs-table__col--attachments {
+  width: 24%;
+}
+
+.admin-email-logs-table__col--status {
+  width: 12%;
+}
+
+.admin-email-logs-table thead {
+  background: #f7f8fa;
+}
+
+.admin-email-logs-table th {
+  padding: 0.625rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--portal-text-faint);
+  border-bottom: 1px solid var(--portal-border-subtle);
+  vertical-align: bottom;
+}
+
+.admin-email-logs-table th:nth-child(6),
+.admin-email-logs-table td:nth-child(6) {
+  text-align: center;
+}
+
+.admin-email-logs-table th:nth-child(8),
+.admin-email-logs-table td:nth-child(8) {
+  text-align: center;
+}
+
+.admin-email-logs-table td {
+  padding: 0.75rem 0.75rem;
+  vertical-align: top;
+  border-bottom: 1px solid #eef0f3;
+  overflow-wrap: anywhere;
+}
+
+.admin-email-logs-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.admin-email-logs-table tbody tr:hover {
+  background: #fafbfc;
+}
+
+.admin-email-logs-table__empty {
+  padding: 2rem 1rem !important;
+  text-align: center;
+  color: var(--portal-text-muted);
+}
+
+.admin-email-logs-table__when {
+  white-space: nowrap;
+  color: var(--portal-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-email-logs-table__kind {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--portal-text-muted);
+  background: #f0f2f5;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.admin-email-logs-table__sender,
+.admin-email-logs-table__from {
+  color: var(--portal-text);
+  line-height: 1.45;
+}
+
+.admin-email-logs-table__subject {
+  color: var(--portal-text);
+  line-height: 1.45;
+}
+
+.admin-email-logs-table__count {
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-text);
+  text-align: center;
+}
+
+.admin-email-logs-table__attachments {
+  min-width: 0;
+}
+
+.admin-email-logs-table__muted {
+  color: var(--portal-text-faint);
+}
+
+.admin-email-logs-attachments {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+}
+
+.admin-email-logs-attachments--names-only {
+  gap: 0.25rem;
+}
+
+.admin-email-logs-attachment-link {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.4rem;
+  max-width: 100%;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--amu-red-dark);
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+.admin-email-logs-attachment-link:hover:not(:disabled) {
+  color: var(--amu-red);
+}
+
+.admin-email-logs-attachment-link:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.admin-email-logs-attachment-link__size {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--portal-text-faint);
+  text-decoration: none;
+}
+
+.admin-email-logs-attachment-name {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  word-break: break-word;
+}
+
+.admin-email-logs-attachments__note,
+.admin-email-logs-attachments__error {
+  font-size: 0.6875rem;
+  color: var(--portal-text-faint);
+}
+
+.admin-email-logs-attachments__error {
+  color: var(--amu-red);
+}
+
+.admin-email-logs-table__status {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.admin-email-logs-table__status--ok {
+  color: #1f5f3a;
+  background: #eef8f2;
+}
+
+.admin-email-logs-table__status--fail {
+  color: #8b1a1a;
+  background: #fef2f2;
+}
+
+.admin-email-logs-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 0.875rem;
+}
+
+.admin-email-logs-footer__meta {
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-settings-card__note {
+  margin: 1rem 0 0;
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  margin: 0;
+}
+
+.admin-settings-field {
+  margin: 0;
+  min-width: 0;
+}
+
+.admin-settings-field--full {
+  grid-column: 1 / -1;
+}
+
+.admin-settings-field__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--portal-text-muted);
+}
+
+.admin-settings-field__value {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--portal-text);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .admin-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-loa-editor {

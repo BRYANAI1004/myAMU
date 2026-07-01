@@ -8,6 +8,9 @@ import { apiRouter } from "./routes/index.js";
 
 export const app = express();
 
+/** Mass email may include several attachments as base64 JSON. */
+const JSON_BODY_LIMIT = "100mb";
+
 const isWorkersRuntime =
   process.env.USE_HYPERDRIVE === "1" && process.env.NODE_ENV === "production";
 
@@ -52,6 +55,28 @@ if (isWorkersRuntime) {
   app.use(workersDbMiddleware);
   app.use(workersJsonBodyParser);
 } else {
-  app.use(express.json());
+  app.use(express.json({ limit: JSON_BODY_LIMIT }));
 }
 app.use("/api", apiRouter);
+
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    if (
+      err != null &&
+      typeof err === "object" &&
+      "type" in err &&
+      (err as { type?: string }).type === "entity.too.large"
+    ) {
+      res.status(413).json({
+        error: "Request too large. Try fewer or smaller attachments.",
+      });
+      return;
+    }
+    next(err);
+  },
+);

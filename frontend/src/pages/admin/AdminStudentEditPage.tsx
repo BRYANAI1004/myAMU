@@ -60,7 +60,6 @@ function detailToFormState(d: AdminStudentDetail): Record<string, string> {
     name: d.name,
     program: d.program,
     email: d.email ?? '',
-    amuEmail: d.amuEmail ?? '',
     gender,
     backgroundSchool: d.backgroundSchool ?? '',
     highestDegree,
@@ -88,7 +87,6 @@ function formToPayload(f: Record<string, string>): AdminStudentUpdatePayload {
     name: f.name.trim(),
     program: f.program as StudentProgram,
     email: nullableTrim(f.email),
-    amuEmail: nullableTrim(f.amuEmail),
     gender: nullableTrim(f.gender),
     backgroundSchool: nullableTrim(f.backgroundSchool),
     highestDegree: nullableTrim(f.highestDegree),
@@ -401,7 +399,6 @@ export function AdminStudentEditPage() {
               </div>
             ) : null}
             {field('email', 'Personal email')}
-            {field('amuEmail', 'AMU email')}
             {form ? (
               <div className="portal-stack" style={{ gap: '0.35rem' }}>
                 <label

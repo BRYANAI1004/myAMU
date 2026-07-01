@@ -10,6 +10,9 @@ import {
   testSupabaseConnection,
 } from "./lib/supabaseAdmin.js";
 import {
+  ensureAdminEmailLogStorageBucket,
+} from "./services/adminEmailLogStorageService.js";
+import {
   logOpenAiModelConfiguration,
   verifyOpenAiResponsesApi,
 } from "./config/openai.js";
@@ -19,6 +22,7 @@ if (env.nodeEnv === "development") {
     host: supabaseProjectHost() ?? "(not set)",
     database: "postgres",
     storageBucket: env.supabase.storageBucket,
+    emailLogsStorageBucket: env.supabase.emailLogsStorageBucket,
     hasServiceRoleKey: Boolean(env.supabase.serviceRoleKey),
     hasAnonKey: Boolean(env.supabase.anonKey),
   });
@@ -51,6 +55,16 @@ async function start(): Promise<void> {
         msg,
       );
     });
+    if (useSupabaseDb && env.supabase.serviceRoleKey) {
+      await ensureAdminEmailLogStorageBucket().catch((storageErr: unknown) => {
+        const msg =
+          storageErr instanceof Error ? storageErr.message : String(storageErr);
+        console.warn(
+          "[server] admin email-log storage bucket setup skipped:",
+          msg,
+        );
+      });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (env.nodeEnv === "development") {

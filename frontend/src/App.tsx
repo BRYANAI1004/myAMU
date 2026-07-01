@@ -22,6 +22,8 @@ import { AdminCourseSectionRosterPage } from './pages/admin/AdminCourseSectionRo
 import { AdminSchedulingTimetablePage } from './pages/admin/AdminSchedulingTimetablePage'
 import { AdminFinancePage } from './pages/admin/AdminFinancePage'
 import { AdminAcademicTermsPage } from './pages/admin/AdminAcademicTermsPage'
+import { AdminSettingsPage } from './pages/admin/AdminSettingsPage'
+import { AdminMassEmailPage } from './pages/admin/AdminMassEmailPage'
 import { LoginPage } from './pages/LoginPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ForgotStudentIdPage } from './pages/ForgotStudentIdPage'
@@ -182,6 +184,12 @@ export default function App() {
           </Route>
           <Route element={<RequireAdminModule module="finance" />}>
             <Route path="finance" element={<AdminFinancePage />} />
+          </Route>
+          <Route element={<RequireAdminModule module="mass_email" />}>
+            <Route path="mass-email" element={<AdminMassEmailPage />} />
+          </Route>
+          <Route element={<RequireAdminModule module="settings" />}>
+            <Route path="settings" element={<AdminSettingsPage />} />
           </Route>
         </Route>
       </Route>

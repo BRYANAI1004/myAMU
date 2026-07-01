@@ -125,6 +125,11 @@ import {
   postAdminAuthLogin,
   postAdminAuthLogout,
 } from "../controllers/adminAuthController.js";
+import {
+  getAdminLoginEmailHandler,
+  postAdminLoginEmailSendCodeHandler,
+  postAdminLoginEmailVerifyHandler,
+} from "../controllers/adminLoginEmailController.js";
 import { requireAdminAuth } from "../middleware/requireAdminAuth.js";
 import {
   requireStudentAuth,
@@ -136,6 +141,8 @@ import {
   getAdminEmailProfiles,
   postAdminBulkEmail,
 } from "../controllers/adminBulkEmailController.js";
+import { postAdminMassEmail } from "../controllers/adminMassEmailController.js";
+import { getAdminEmailLogs, getAdminEmailLogAttachmentUrl } from "../controllers/adminEmailLogController.js";
 import {
   getStudentEnrolledSections,
   postStudentEnroll,
@@ -324,6 +331,9 @@ adminRouter.post("/auth/login", postAdminAuthLogin);
 adminRouter.post("/auth/logout", postAdminAuthLogout);
 adminRouter.get("/auth/me", getAdminAuthMe);
 adminRouter.use(requireAdminAuth);
+adminRouter.get("/login-email", getAdminLoginEmailHandler);
+adminRouter.post("/login-email/send-code", postAdminLoginEmailSendCodeHandler);
+adminRouter.post("/login-email/verify", postAdminLoginEmailVerifyHandler);
 adminRouter.get("/students", getAdminStudents);
 adminRouter.get("/students/next-id", getNextAdminStudentId);
 adminRouter.post("/students", postAdminStudent);
@@ -331,6 +341,12 @@ adminRouter.post("/students/delete-selected", postDeleteSelectedAdminStudents);
 adminRouter.post("/students/export.csv", postExportAdminStudentsCsv);
 adminRouter.get("/email/profiles", getAdminEmailProfiles);
 adminRouter.post("/email/bulk", postAdminBulkEmail);
+adminRouter.post("/mass-email/send", postAdminMassEmail);
+adminRouter.get("/email-logs", getAdminEmailLogs);
+adminRouter.get(
+  "/email-logs/:logId/attachments/:attachmentId/url",
+  getAdminEmailLogAttachmentUrl,
+);
 adminRouter.post("/students/:studentId/loa", postAdminStudentLoa);
 adminRouter.post(
   "/students/:studentId/photo",

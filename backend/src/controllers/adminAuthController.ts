@@ -5,6 +5,10 @@ import {
   resolveAuthenticatedAdminFromRequest,
 } from "../lib/adminAuthToken.js";
 import { pool } from "../lib/db.js";
+import {
+  findAdminUserByIdentifier,
+  toAdminUserPublic,
+} from "../repositories/adminUserRepository.js";
 import { authenticateAdminLogin } from "../services/adminAuthService.js";
 
 function readLoginBody(req: Request): { identifier: string; password: string } {
@@ -95,15 +99,30 @@ export async function postAdminAuthLogout(_req: Request, res: Response): Promise
  * GET /api/admin/auth/me
  */
 export async function getAdminAuthMe(req: Request, res: Response): Promise<void> {
-  const user = resolveAuthenticatedAdminFromRequest(req);
+  const auth = resolveAuthenticatedAdminFromRequest(req);
 
-  if (user == null) {
+  if (auth == null) {
     res.status(200).json({ ok: false });
     return;
   }
 
-  res.status(200).json({
-    ok: true,
-    user: { email: user.email, role: user.role },
-  });
+  try {
+    const row = await findAdminUserByIdentifier(pool, auth.email);
+    if (row != null) {
+      res.status(200).json({ ok: true, user: toAdminUserPublic(row) });
+      return;
+    }
+    res.status(200).json({
+      ok: true,
+      user: {
+        email: auth.email,
+        role: auth.role,
+        username: "",
+        displayName: auth.email,
+      },
+    });
+  } catch (e) {
+    console.error("[admin/auth/me] failed:", e);
+    res.status(500).json({ ok: false, error: "Failed to load admin profile." });
+  }
 }

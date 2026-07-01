@@ -883,10 +883,13 @@ export async function updateAdminStudent(
     return { ok: false, status: 400, message: zip.message };
   }
 
+  const amuEmailRaw =
+    body.amuEmail !== undefined ? str(body.amuEmail) : str(existing.amu_email);
+
   const patch = {
     name,
     email: str(body.email),
-    amu_email: str(body.amuEmail),
+    amu_email: amuEmailRaw,
     program: body.program,
     gender: str(body.gender),
     background: str(body.backgroundSchool),

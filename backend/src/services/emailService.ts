@@ -25,6 +25,10 @@ export type SendEmailInput = {
    * first configured profile is used. When no profiles exist, the message is logged
    * with `delivered: false` instead of being sent. */
   profileId?: string | null;
+  /** When set, overrides the profile's From address (SMTP auth still uses the profile). */
+  fromAddress?: string | null;
+  /** Display name paired with `fromAddress`. Falls back to profile fromName. */
+  fromName?: string | null;
 };
 
 export type SendEmailResult = {
@@ -145,8 +149,13 @@ export async function sendEmail(
   }
 
   const transporter = getTransporter(profile);
+  const fromAddress =
+    input.fromAddress?.trim() !== "" ? input.fromAddress!.trim() : profile.fromAddress;
+  const fromName =
+    input.fromName?.trim() !== "" ? input.fromName!.trim() : profile.fromName;
+  const fromHeader = `"${fromName.replace(/"/g, "")}" <${fromAddress}>`;
   const info = await transporter.sendMail({
-    from: buildFromHeader(profile),
+    from: fromHeader,
     to: input.to && input.to.length > 0 ? input.to : undefined,
     bcc: input.bcc && input.bcc.length > 0 ? input.bcc : undefined,
     replyTo: input.replyTo ?? undefined,

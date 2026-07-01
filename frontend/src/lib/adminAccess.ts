@@ -25,6 +25,8 @@ export type AdminModuleKey =
   | 'course_sections'
   | 'scheduling_timetable'
   | 'finance'
+  | 'mass_email'
+  | 'settings'
 
 export type AdminModuleDefinition = {
   key: AdminModuleKey
@@ -32,6 +34,8 @@ export type AdminModuleDefinition = {
   path: string
   end?: boolean
   schedulingContext?: boolean
+  /** Pinned to the bottom of the admin sidebar (e.g. Setting). */
+  footer?: boolean
 }
 
 export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
@@ -48,12 +52,17 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
   },
   {
     key: 'scheduling_timetable',
-    label: 'Scheduling Timetable',
+    label: 'Timetable',
     path: '/admin/course-sections/timetable',
     schedulingContext: true,
   },
   { key: 'finance', label: 'Finance', path: '/admin/finance' },
+  { key: 'mass_email', label: 'Mass Email', path: '/admin/mass-email' },
+  { key: 'settings', label: 'Setting', path: '/admin/settings', end: true, footer: true },
 ] as const
+
+export const ADMIN_MAIN_MODULES = ADMIN_MODULES.filter((module) => !module.footer)
+export const ADMIN_FOOTER_MODULES = ADMIN_MODULES.filter((module) => module.footer)
 
 const ALL_ADMIN_MODULE_KEYS: readonly AdminModuleKey[] = ADMIN_MODULES.map(
   (module) => module.key,
@@ -64,7 +73,7 @@ const ROLE_MODULE_ACCESS: Record<AdminRole, readonly AdminModuleKey[]> = {
   admin: ALL_ADMIN_MODULE_KEYS,
   teacher: ['courses', 'course_sections', 'scheduling_timetable'],
   clinical_teacher: ['clinical', 'finance'],
-  clinical_admin: ['students', 'clinical', 'finance'],
+  clinical_admin: ['students', 'clinical', 'finance', 'mass_email'],
 }
 
 export function getAllowedAdminModules(role: AdminRole): readonly AdminModuleKey[] {
@@ -78,4 +87,16 @@ export function hasAdminModuleAccess(role: AdminRole, module: AdminModuleKey): b
 export function getFirstAccessibleAdminPath(role: AdminRole): string {
   const firstModule = ADMIN_MODULES.find((module) => hasAdminModuleAccess(role, module.key))
   return firstModule?.path ?? '/admin/students'
+}
+
+export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  super_admin: 'Super administrator',
+  admin: 'Administrator',
+  teacher: 'Teacher',
+  clinical_teacher: 'Clinical teacher',
+  clinical_admin: 'Clinical administrator',
+}
+
+export function formatAdminRoleLabel(role: AdminRole): string {
+  return ADMIN_ROLE_LABELS[role] ?? role
 }

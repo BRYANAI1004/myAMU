@@ -23,12 +23,17 @@ type AdminLoginResult =
 type StoredAdminSession = {
   email: string
   role: AdminRole
+  username: string
+  displayName: string
 }
+
+export type AdminSessionUser = StoredAdminSession
 
 type AdminAuthContextValue = {
   isHydrated: boolean
   isAuthenticated: boolean
   role: AdminRole | null
+  user: AdminSessionUser | null
   login: (identifier: string, password: string) => Promise<AdminLoginResult>
   logout: () => Promise<void>
 }
@@ -36,7 +41,15 @@ type AdminAuthContextValue = {
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null)
 
 type MeResponse =
-  | { ok: true; user: { email: string; role: AdminRole } }
+  | {
+      ok: true
+      user: {
+        email: string
+        role: AdminRole
+        username?: string
+        displayName?: string
+      }
+    }
   | { ok: false }
 
 function parseMeResponse(data: unknown): MeResponse {
@@ -48,8 +61,38 @@ function parseMeResponse(data: unknown): MeResponse {
   const u = user as Record<string, unknown>
   const email = typeof u.email === 'string' ? u.email : ''
   const roleRaw = typeof u.role === 'string' ? u.role : ''
+  const username = typeof u.username === 'string' ? u.username : ''
+  const displayName =
+    typeof u.displayName === 'string' && u.displayName.trim() !== ''
+      ? u.displayName
+      : username.trim() !== ''
+        ? username
+        : email
   if (email.trim() === '' || !isAdminRole(roleRaw)) return { ok: false }
-  return { ok: true, user: { email, role: roleRaw } }
+  return {
+    ok: true,
+    user: { email, role: roleRaw, username, displayName },
+  }
+}
+
+function parseLoginUser(data: unknown): StoredAdminSession | null {
+  if (data == null || typeof data !== 'object') return null
+  const o = data as Record<string, unknown>
+  if (o.ok !== true) return null
+  const user = o.user
+  if (user == null || typeof user !== 'object') return null
+  const u = user as Record<string, unknown>
+  const email = typeof u.email === 'string' ? u.email : ''
+  const roleRaw = typeof u.role === 'string' ? u.role : ''
+  const username = typeof u.username === 'string' ? u.username : ''
+  const displayName =
+    typeof u.displayName === 'string' && u.displayName.trim() !== ''
+      ? u.displayName
+      : username.trim() !== ''
+        ? username
+        : email
+  if (email.trim() === '' || !isAdminRole(roleRaw)) return null
+  return { email, role: roleRaw, username, displayName }
 }
 
 async function postAdminLogout(): Promise<void> {
@@ -87,7 +130,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         } else {
           const parsed = parseMeResponse(data)
           if (parsed.ok === true) {
-            setSession({ email: parsed.user.email, role: parsed.user.role })
+            setSession({
+              email: parsed.user.email,
+              role: parsed.user.role,
+              username: parsed.user.username ?? '',
+              displayName: parsed.user.displayName ?? parsed.user.email,
+            })
             clearAdminAuthClientStorage()
           } else {
             setSession(null)
@@ -132,20 +180,15 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         if (res.ok && data != null && typeof data === 'object') {
           const o = data as Record<string, unknown>
           if (o.ok === true) {
-            const user = o.user
-            if (user != null && typeof user === 'object') {
-              const u = user as Record<string, unknown>
-              const email = typeof u.email === 'string' ? u.email : ''
-              const roleRaw = typeof u.role === 'string' ? u.role : ''
-              if (email.trim() !== '' && isAdminRole(roleRaw)) {
-                const accessToken =
-                  typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
-                if (accessToken !== '') {
-                  writeAdminAccessTokenToStorage(accessToken)
-                }
-                setSession({ email, role: roleRaw })
-                return { ok: true }
+            const sessionUser = parseLoginUser(data)
+            if (sessionUser != null) {
+              const accessToken =
+                typeof o.accessToken === 'string' ? o.accessToken.trim() : ''
+              if (accessToken !== '') {
+                writeAdminAccessTokenToStorage(accessToken)
               }
+              setSession(sessionUser)
+              return { ok: true }
             }
           }
         }
@@ -182,10 +225,11 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
       isHydrated,
       isAuthenticated,
       role: session?.role ?? null,
+      user: session,
       login,
       logout,
     }),
-    [isHydrated, isAuthenticated, login, logout, session?.role],
+    [isHydrated, isAuthenticated, login, logout, session],
   )
 
   return (

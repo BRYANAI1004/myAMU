@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   adminSchedulingQueryString,
@@ -290,7 +290,7 @@ function SectionGroup({
   )
 }
 
-type SectionFormModalProps = {
+type SectionFormPanelProps = {
   open: boolean
   editingId: number | null
   busy: boolean
@@ -299,6 +299,7 @@ type SectionFormModalProps = {
   courseTitleDraft: string
   courseCode: string
   academicTermId: string
+  selectedTermLabel: string
   fullCatalogPrerequisiteOptions: CourseCatalogItem[]
   courseCatalogById: Map<string, CourseCatalogItem>
   onClose: () => void
@@ -311,7 +312,7 @@ type SectionFormModalProps = {
   setInstructorLocked: (v: boolean) => void
 }
 
-function SectionFormModal({
+function SectionFormPanel({
   open,
   editingId,
   busy,
@@ -320,6 +321,7 @@ function SectionFormModal({
   courseTitleDraft,
   courseCode,
   academicTermId,
+  selectedTermLabel,
   fullCatalogPrerequisiteOptions,
   courseCatalogById,
   onClose,
@@ -330,44 +332,109 @@ function SectionFormModal({
   setCourseTitleDraft,
   setCourseTitleLocked,
   setInstructorLocked,
-}: SectionFormModalProps) {
+}: SectionFormPanelProps) {
+  const panelRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [open, editingId])
+
   if (!open) return null
 
   const isEdit = editingId != null
+  const hasContext =
+    courseCode.trim() !== '' && academicTermId.trim() !== ''
 
   return (
-    <div
-      className="admin-section-detail-backdrop"
-      role="presentation"
-      onMouseDown={(ev) => {
-        if (ev.target === ev.currentTarget && !busy) onClose()
-      }}
+    <section
+      ref={panelRef}
+      className="admin-course-section-form-panel portal-card"
+      aria-labelledby="course-section-form-title"
     >
-      <div
-        className="admin-section-detail-modal admin-section-detail-modal--course-section-form"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="course-section-form-title"
-      >
-        <h2 id="course-section-form-title" className="admin-section-detail-modal__title">
-          {isEdit ? `Edit section ${form.section_code}` : 'Add section'}
-        </h2>
-        <p className="admin-section-detail-modal__meta admin-course-section-form__meta">
-          {courseCode.trim() !== '' && academicTermId.trim() !== ''
-            ? `Creating for ${courseCode} in the selected term.`
-            : 'Select a term and course above first.'}
+      <header className="admin-course-section-form__header">
+        <div className="admin-course-section-form__header-main">
+          <h2
+            id="course-section-form-title"
+            className="admin-course-section-form__title"
+          >
+            {isEdit ? `Edit section ${form.section_code}` : 'Add section'}
+          </h2>
+          {hasContext ? (
+            <div className="admin-course-section-form__context">
+              <span className="admin-course-section-form__context-chip admin-course-section-form__context-chip--course">
+                {courseCode}
+              </span>
+              <span className="admin-course-section-form__context-chip">
+                {selectedTermLabel}
+              </span>
+            </div>
+          ) : (
+            <p className="admin-course-section-form__context-hint">
+              Select a term and course above first.
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          className="admin-course-section-form__close"
+          aria-label="Close"
+          disabled={busy}
+          onClick={onClose}
+        >
+          ×
+        </button>
+      </header>
+
+      {formMessage != null ? (
+        <p className="admin-course-section-form__error" role="alert">
+          {formMessage}
         </p>
+      ) : null}
 
-        {formMessage != null ? (
-          <p className="admin-course-section-form__error" role="alert">
-            {formMessage}
-          </p>
-        ) : null}
-
-        <div className="admin-course-section-form">
-          <section className="admin-course-section-form__section">
-            <h3 className="admin-course-section-form__section-title">Section details</h3>
-            <div className="admin-course-section-form__row admin-course-section-form__row--3">
+      <div className="admin-course-section-form__grid">
+            <section className="admin-course-section-form__panel">
+              <h3 className="admin-course-section-form__panel-title">
+                Section details
+              </h3>
+              <div className="admin-course-section-form__panel-body">
+              <div className="admin-course-section-form__field">
+                <span className="admin-course-section-form__field-label">
+                  Schedule track
+                </span>
+                <div
+                  className="admin-course-section-form__track-toggle"
+                  role="group"
+                  aria-label="Schedule track"
+                >
+                  {(
+                    [
+                      ['EN', 'English', 'English timetable'],
+                      ['CN', 'Chinese', 'Chinese timetable'],
+                    ] as const
+                  ).map(([value, label, ariaLabel]) => {
+                    const active = form.schedule_track === value
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        className={`admin-course-section-form__track-option${active ? ' admin-course-section-form__track-option--active' : ''}${value === 'EN' ? ' admin-course-section-form__track-option--en' : ' admin-course-section-form__track-option--cn'}`}
+                        aria-pressed={active}
+                        aria-label={ariaLabel}
+                        disabled={busy}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            schedule_track: value,
+                          }))
+                        }
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
               <label className="admin-course-section-form__field">
                 <span>Section code</span>
                 <input
@@ -376,27 +443,10 @@ function SectionFormModal({
                   onChange={(e) =>
                     setForm((f) => ({ ...f, section_code: e.target.value }))
                   }
+                  placeholder="e.g. A"
                   autoComplete="off"
                   disabled={busy}
                 />
-              </label>
-              <label className="admin-course-section-form__field">
-                <span>Schedule track</span>
-                <select
-                  className="admin-input admin-course-section-form__input"
-                  value={form.schedule_track}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      schedule_track:
-                        e.target.value === 'CN' ? ('CN' as const) : ('EN' as const),
-                    }))
-                  }
-                  disabled={busy}
-                >
-                  <option value="EN">English timetable</option>
-                  <option value="CN">Chinese timetable</option>
-                </select>
               </label>
               <label className="admin-course-section-form__field">
                 <span>Delivery mode</span>
@@ -422,8 +472,6 @@ function SectionFormModal({
                     )}
                 </select>
               </label>
-            </div>
-            <div className="admin-course-section-form__row admin-course-section-form__row--2">
               <label className="admin-course-section-form__field">
                 <span>Course title</span>
                 <input
@@ -474,58 +522,80 @@ function SectionFormModal({
                     )}
                 </select>
               </label>
-            </div>
-          </section>
+              </div>
+            </section>
 
-          <section className="admin-course-section-form__section">
-            <h3 className="admin-course-section-form__section-title">Schedule</h3>
-            <div
-              className="admin-course-section-form__weekdays"
-              role="group"
-              aria-label="Weekdays"
-            >
-              {WEEKDAYS_FULL_ORDERED.map((d) => {
-                const active = form.weekdays.includes(d)
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    className={`admin-course-section-form__weekday${active ? ' admin-course-section-form__weekday--active' : ''}`}
-                    aria-pressed={active}
+            <section className="admin-course-section-form__panel">
+              <h3 className="admin-course-section-form__panel-title">Schedule</h3>
+              <div className="admin-course-section-form__panel-body">
+              <div className="admin-course-section-form__field">
+                <span className="admin-course-section-form__field-label">
+                  Days of the week
+                </span>
+                <div
+                  className="admin-course-section-form__weekdays"
+                  role="group"
+                  aria-label="Weekdays"
+                >
+                  {WEEKDAYS_FULL_ORDERED.map((d) => {
+                    const active = form.weekdays.includes(d)
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`admin-course-section-form__weekday${active ? ' admin-course-section-form__weekday--active' : ''}`}
+                        aria-pressed={active}
+                        aria-label={d}
+                        disabled={busy}
+                        onClick={() =>
+                          setForm((f) => ({
+                            ...f,
+                            weekdays: toggleWeekday(f.weekdays, d, !active),
+                          }))
+                        }
+                      >
+                        {WEEKDAY_SHORT[d]}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="admin-course-section-form__times">
+                <div className="admin-course-section-form__time-slot">
+                  <AdminTime12hFields
+                    idPrefix="section-start"
+                    label="Start time"
+                    layout="stacked"
+                    value={form.start_time}
+                    onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
                     disabled={busy}
-                    onClick={() =>
-                      setForm((f) => ({
-                        ...f,
-                        weekdays: toggleWeekday(f.weekdays, d, !active),
-                      }))
-                    }
-                  >
-                    {WEEKDAY_SHORT[d]}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="admin-course-section-form__row admin-course-section-form__row--2 admin-course-section-form__row--time">
-              <AdminTime12hFields
-                idPrefix="section-start"
-                label="Start time"
-                value={form.start_time}
-                onChange={(v) => setForm((f) => ({ ...f, start_time: v }))}
-                disabled={busy}
-              />
-              <AdminTime12hFields
-                idPrefix="section-end"
-                label="End time"
-                value={form.end_time}
-                onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
-                disabled={busy}
-              />
-            </div>
-          </section>
+                  />
+                </div>
+                <span
+                  className="admin-course-section-form__time-separator"
+                  aria-hidden="true"
+                >
+                  to
+                </span>
+                <div className="admin-course-section-form__time-slot">
+                  <AdminTime12hFields
+                    idPrefix="section-end"
+                    label="End time"
+                    layout="stacked"
+                    value={form.end_time}
+                    onChange={(v) => setForm((f) => ({ ...f, end_time: v }))}
+                    disabled={busy}
+                  />
+                </div>
+              </div>
+              </div>
+            </section>
 
-          <section className="admin-course-section-form__section">
-            <h3 className="admin-course-section-form__section-title">Location &amp; staff</h3>
-            <div className="admin-course-section-form__row admin-course-section-form__row--2">
+            <section className="admin-course-section-form__panel">
+              <h3 className="admin-course-section-form__panel-title">
+                Location &amp; staff
+              </h3>
+              <div className="admin-course-section-form__panel-body">
               <label className="admin-course-section-form__field">
                 <span>Room</span>
                 <input
@@ -534,6 +604,7 @@ function SectionFormModal({
                   onChange={(e) =>
                     setForm((f) => ({ ...f, room: e.target.value }))
                   }
+                  placeholder="Building / room"
                   disabled={busy}
                 />
               </label>
@@ -549,55 +620,56 @@ function SectionFormModal({
                   disabled={busy}
                 />
               </label>
-            </div>
-            <label className="admin-course-section-form__field">
-              <span>Notes</span>
-              <textarea
-                className="admin-input admin-textarea admin-course-section-form__textarea"
-                rows={2}
-                value={form.notes}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, notes: e.target.value }))
-                }
-                disabled={busy}
-              />
-            </label>
-          </section>
-        </div>
+              <label className="admin-course-section-form__field">
+                <span>Notes</span>
+                <textarea
+                  className="admin-input admin-textarea admin-course-section-form__textarea"
+                  rows={3}
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  placeholder="Optional scheduling notes…"
+                  disabled={busy}
+                />
+              </label>
+              </div>
+            </section>
+      </div>
 
-        <div className="admin-section-detail-modal__actions admin-course-section-form__actions">
+      <footer className="admin-course-section-form__footer">
           {isEdit ? (
             <button
               type="button"
               className="portal-btn portal-btn--admin-danger portal-btn--compact"
               disabled={busy}
-              style={{ marginRight: 'auto' }}
               onClick={() => void onDelete()}
             >
               Delete
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="portal-btn portal-btn--secondary portal-btn--compact"
-            disabled={busy}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="admin-academic-terms-page__save-btn portal-btn portal-btn--compact"
-            disabled={
-              busy || academicTermId.trim() === '' || courseCode.trim() === ''
-            }
-            onClick={() => void (isEdit ? onSubmitUpdate() : onSubmitCreate())}
-          >
-            {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create section'}
-          </button>
-        </div>
-      </div>
-    </div>
+          ) : (
+            <span aria-hidden="true" />
+          )}
+          <div className="admin-course-section-form__footer-actions">
+            <button
+              type="button"
+              className="portal-btn portal-btn--secondary portal-btn--compact"
+              disabled={busy}
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-academic-terms-page__save-btn portal-btn portal-btn--compact"
+              disabled={busy || !hasContext}
+              onClick={() => void (isEdit ? onSubmitUpdate() : onSubmitCreate())}
+            >
+              {busy ? 'Saving…' : isEdit ? 'Save changes' : 'Create section'}
+            </button>
+          </div>
+        </footer>
+    </section>
   )
 }
 
@@ -1411,6 +1483,30 @@ export function AdminCourseSectionsPage() {
         ) : null}
       </section>
 
+      {showSectionForm ? (
+        <SectionFormPanel
+          open={showSectionForm}
+          editingId={editingId}
+          busy={busy}
+          form={form}
+          formMessage={formMessage}
+          courseTitleDraft={courseTitleDraft}
+          courseCode={courseCode}
+          academicTermId={academicTermId}
+          selectedTermLabel={selectedTermLabel}
+          fullCatalogPrerequisiteOptions={fullCatalogPrerequisiteOptions}
+          courseCatalogById={courseCatalogById}
+          onClose={closeSectionForm}
+          onSubmitCreate={onCreate}
+          onSubmitUpdate={onUpdate}
+          onDelete={onDelete}
+          setForm={setForm}
+          setCourseTitleDraft={setCourseTitleDraft}
+          setCourseTitleLocked={setCourseTitleLocked}
+          setInstructorLocked={setInstructorLocked}
+        />
+      ) : null}
+
       {sectionsError != null ? (
         <p className="admin-course-sections-page__alert" role="alert">
           {sectionsError}
@@ -1488,27 +1584,6 @@ export function AdminCourseSectionsPage() {
           />
         </div>
       ) : null}
-
-      <SectionFormModal
-        open={showSectionForm}
-        editingId={editingId}
-        busy={busy}
-        form={form}
-        formMessage={formMessage}
-        courseTitleDraft={courseTitleDraft}
-        courseCode={courseCode}
-        academicTermId={academicTermId}
-        fullCatalogPrerequisiteOptions={fullCatalogPrerequisiteOptions}
-        courseCatalogById={courseCatalogById}
-        onClose={closeSectionForm}
-        onSubmitCreate={onCreate}
-        onSubmitUpdate={onUpdate}
-        onDelete={onDelete}
-        setForm={setForm}
-        setCourseTitleDraft={setCourseTitleDraft}
-        setCourseTitleLocked={setCourseTitleLocked}
-        setInstructorLocked={setInstructorLocked}
-      />
     </main>
   )
 }

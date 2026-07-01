@@ -40,13 +40,24 @@ export function ProfileField({
 export function ProfileReadonlyValue({
   children,
   muted,
+  id,
+  className,
 }: {
   children: ReactNode
   muted?: boolean
+  id?: string
+  className?: string
 }) {
   return (
     <span
-      className={`portal-profile-readonly${muted ? ' portal-profile-readonly--muted' : ''}`}
+      id={id}
+      className={[
+        'portal-profile-readonly',
+        muted ? 'portal-profile-readonly--muted' : '',
+        className ?? '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       {children}
     </span>

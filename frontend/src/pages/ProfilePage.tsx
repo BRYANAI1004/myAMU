@@ -710,9 +710,27 @@ export function ProfilePage() {
               <ProfileField
                 label={t('email')}
                 fullWidth
-                note="Contact email — saved with Edit profile. For sign-in, use Login email below."
+                note="Personal contact email — saved with Edit profile. For sign-in, use Login email below."
               >
-                {renderTextField('email', { type: 'email' })}
+                {isEditing ? (
+                  <input
+                    id="myaccount-contact-email"
+                    className="portal-profile-control myaccount-contact-email"
+                    type="email"
+                    autoComplete="email"
+                    value={editable.email}
+                    onChange={(e) => setEditableField('email', e.target.value)}
+                    disabled={saveLoading}
+                  />
+                ) : (
+                  <ProfileReadonlyValue
+                    muted={!profile.email?.trim()}
+                    id="myaccount-contact-email"
+                    className="myaccount-contact-email"
+                  >
+                    {dashText(profile.email ?? undefined, dash)}
+                  </ProfileReadonlyValue>
+                )}
               </ProfileField>
             </ProfileSection>
 

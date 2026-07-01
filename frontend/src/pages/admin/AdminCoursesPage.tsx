@@ -15,7 +15,7 @@ import { catalogGroupById } from './courses/catalogPrefixGroups'
 import { CoursesTabBar, type AdminCoursesTabId } from './courses/CoursesTabBar'
 import { OpenRegistrationCoursesTable } from './courses/OpenRegistrationCoursesTable'
 
-const CATALOG_PAGE_SIZE = 25
+const CATALOG_PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 300
 const DEFAULT_CATALOG_GROUP_ID = 'bs'
 
@@ -50,6 +50,7 @@ export function AdminCoursesPage() {
 
   const [openTermId, setOpenTermId] = useState('')
   const openTermAutoDone = useRef(false)
+  const catalogFetchGen = useRef(0)
 
   const [openSearch, setOpenSearch] = useState('')
   const [openRowsRaw, setOpenRowsRaw] = useState<OpenRegistrationCourseRow[] | null>(
@@ -105,6 +106,7 @@ export function AdminCoursesPage() {
   useEffect(() => {
     if (tab !== 'catalog') return
     const ac = new AbortController()
+    const gen = ++catalogFetchGen.current
     setCatalogLoading(true)
     setCatalogError(null)
     ;(async () => {
@@ -116,18 +118,18 @@ export function AdminCoursesPage() {
           limit: CATALOG_PAGE_SIZE,
           signal: ac.signal,
         })
-        if (ac.signal.aborted) return
+        if (gen !== catalogFetchGen.current) return
         setCatalogRows(result.rows)
         setCatalogTotal(result.total)
       } catch (e) {
-        if (ac.signal.aborted) return
+        if (gen !== catalogFetchGen.current) return
         setCatalogRows([])
         setCatalogTotal(0)
         setCatalogError(
           e instanceof Error ? e.message : 'Could not load course catalog.',
         )
       } finally {
-        if (!ac.signal.aborted) setCatalogLoading(false)
+        if (gen === catalogFetchGen.current) setCatalogLoading(false)
       }
     })()
     return () => ac.abort()

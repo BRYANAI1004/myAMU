@@ -65,7 +65,6 @@ export function AdminStudentCreatePage() {
   const [useCustomPassword, setUseCustomPassword] = useState(false)
   const [customPassword, setCustomPassword] = useState('')
   const [email, setEmail] = useState('')
-  const [amuEmail, setAmuEmail] = useState('')
   const [gender, setGender] = useState('')
   const [requirementsId, setRequirementsId] = useState('')
   const [highestDegree, setHighestDegree] = useState('')
@@ -204,7 +203,6 @@ export function AdminStudentCreatePage() {
         ? { initialPassword: customPassword.trim() }
         : {}),
       email: nullableTrim(email),
-      amuEmail: nullableTrim(amuEmail),
       gender: nullableTrim(gender),
       requirementsId: reqId,
       highestDegree: nullableTrim(highestDegree),
@@ -432,21 +430,6 @@ export function AdminStudentCreatePage() {
               style={{ width: '100%', maxWidth: '100%' }}
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
-            />
-          </div>
-
-          <div className="portal-stack" style={{ gap: '0.35rem' }}>
-            <label htmlFor="admin-create-amu-email" className="portal-card-note" style={{ margin: 0 }}>
-              AMU email
-            </label>
-            <input
-              id="admin-create-amu-email"
-              type="email"
-              className="admin-input"
-              style={{ width: '100%', maxWidth: '100%' }}
-              value={amuEmail}
-              onChange={(ev) => setAmuEmail(ev.target.value)}
-              placeholder="Optional — assign later"
             />
           </div>
 

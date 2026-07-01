@@ -264,7 +264,7 @@ export function AdminSchedulingTimetablePage() {
     <main className="admin-page">
       <div className="admin-page__toolbar">
         <h1 className="admin-page__title admin-page__title--inline">
-          Scheduling Timetable
+          Timetable
         </h1>
         <div className="admin-page__toolbar-actions admin-page__toolbar-actions--wrap">
           <Link

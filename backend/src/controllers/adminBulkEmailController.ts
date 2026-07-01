@@ -1,10 +1,13 @@
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
+import { pool } from "../lib/db.js";
+import { findAdminUserByIdentifier } from "../repositories/adminUserRepository.js";
 import {
   listSmtpProfilesPublic,
   sendEmail,
   type SendEmailResult,
 } from "../services/emailService.js";
+import { recordAdminEmailLog } from "../services/adminEmailLogService.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUBJECT_MAX = 200;
@@ -165,6 +168,17 @@ export async function postAdminBulkEmail(
   const { recipients, subject, body, replyTo, recipientField, profileId } =
     parsed.value;
 
+  const adminAccountEmail = req.adminUser?.email?.trim().toLowerCase() ?? "";
+  const adminRow =
+    adminAccountEmail !== ""
+      ? await findAdminUserByIdentifier(pool, adminAccountEmail)
+      : null;
+  const profiles = listSmtpProfilesPublic();
+  const fromAddress =
+    profileId != null
+      ? profiles.find((p) => p.id === profileId)?.fromAddress ?? ""
+      : profiles[0]?.fromAddress ?? "";
+
   let result: SendEmailResult;
   try {
     result = await sendEmail({
@@ -179,8 +193,45 @@ export async function postAdminBulkEmail(
     console.error("[admin/email/bulk] send failed", e);
     const message =
       e instanceof Error ? e.message : "Mail provider rejected the message.";
+    if (adminAccountEmail !== "") {
+      await recordAdminEmailLog({
+        kind: "bulk_email",
+        sentByAdminEmail: adminAccountEmail,
+        sentByDisplayName:
+          adminRow?.display_name?.trim() || adminRow?.username?.trim() || null,
+        fromAddress,
+        subject,
+        recipientCount: recipients.length,
+        deliveryMode: recipientField,
+        delivered: false,
+        messageId: null,
+        smtpProfileId: profileId,
+        attachmentCount: 0,
+        attachmentNames: [],
+        note: message,
+      });
+    }
     res.status(502).json({ error: `Email send failed: ${message}` });
     return;
+  }
+
+  if (adminAccountEmail !== "") {
+    await recordAdminEmailLog({
+      kind: "bulk_email",
+      sentByAdminEmail: adminAccountEmail,
+      sentByDisplayName:
+        adminRow?.display_name?.trim() || adminRow?.username?.trim() || null,
+      fromAddress,
+      subject,
+      recipientCount: recipients.length,
+      deliveryMode: recipientField,
+      delivered: result.delivered,
+      messageId: result.messageId,
+      smtpProfileId: result.profileId,
+      attachmentCount: 0,
+      attachmentNames: [],
+      note: result.note ?? null,
+    });
   }
 
   res.json({

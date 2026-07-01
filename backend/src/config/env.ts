@@ -280,6 +280,9 @@ export const env = {
       optional("SUPABASE_ANON_KEY") ??
       optional("SUPABASE_PUBLISHABLE_KEY"),
     storageBucket: optional("SUPABASE_STORAGE_BUCKET") ?? "student-photos",
+    /** Private bucket for admin mass-email log attachments (PDFs, etc.). */
+    emailLogsStorageBucket:
+      optional("ADMIN_EMAIL_LOGS_STORAGE_BUCKET") ?? "admin-email-logs",
   },
   smtp: {
     /** Available SMTP sender profiles (one or more). Empty list = log-only fallback. */

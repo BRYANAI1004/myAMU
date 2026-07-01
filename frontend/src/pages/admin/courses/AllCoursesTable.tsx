@@ -129,10 +129,19 @@ function CatalogGroupNav({
   )
 }
 
-function groupHeading(group: CatalogPrefixGroup, total: number): string {
+function groupHeading(
+  group: CatalogPrefixGroup,
+  total: number,
+  prefixCounts: CourseCatalogPrefixCounts | null,
+  loading: boolean,
+): string {
   const codes =
     group.prefixes.length > 1 ? group.prefixes.join(', ') : group.codeLabel
-  return `${codes} · ${group.title} · ${total} ${total === 1 ? 'course' : 'courses'}`
+  const displayTotal =
+    loading && total === 0 && prefixCounts
+      ? countForCatalogGroup(group, prefixCounts.byPrefix)
+      : total
+  return `${codes} · ${group.title} · ${displayTotal} ${displayTotal === 1 ? 'course' : 'courses'}`
 }
 
 export function AllCoursesTable({
@@ -238,7 +247,7 @@ export function AllCoursesTable({
             <div className="admin-course-catalog-main">
               <header className="admin-course-catalog-panel__section-head">
                 <h2 className="admin-course-catalog-panel__section-title">
-                  {groupHeading(activeGroup, total)}
+                  {groupHeading(activeGroup, total, prefixCounts, loading)}
                 </h2>
                 <p className="admin-course-catalog-panel__range" aria-live="polite">
                   {loading && rows.length === 0

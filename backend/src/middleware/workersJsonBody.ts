@@ -1,5 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
 
+/** Keep in sync with `JSON_BODY_LIMIT` in app.ts. */
+const MAX_JSON_BODY_BYTES = 100 * 1024 * 1024;
+
 /**
  * Minimal JSON body parser for Cloudflare Workers.
  * Avoids express.json() → body-parser → iconv-lite, which fails on Workers.
@@ -22,7 +25,16 @@ export function workersJsonBodyParser(
   }
 
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
   req.on("data", (chunk: Buffer) => {
+    totalBytes += chunk.length;
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      res.status(413).json({
+        error: "Request too large. Try fewer or smaller attachments.",
+      });
+      req.destroy();
+      return;
+    }
     chunks.push(chunk);
   });
   req.on("error", (err: Error) => {

@@ -64,9 +64,25 @@ const COLUMN_SPECS: ColumnSpec[] = [
 const ORDER_BY_CANDIDATES = ["code"] as const;
 
 let columnsCache: Set<string> | null = null;
+/** Avoid parallel catalog reads each bootstrapping portal_courses (summary + list fire together). */
+let portalCoursesBootstrapPromise: ReturnType<
+  typeof ensurePortalCoursesForLegacyCatalog
+> | null = null;
 
 function invalidateCoursesColumnCache(): void {
   columnsCache = null;
+}
+
+async function ensurePortalCoursesBootstrappedOnce(): Promise<void> {
+  if (!portalCoursesBootstrapPromise) {
+    portalCoursesBootstrapPromise = ensurePortalCoursesForLegacyCatalog().catch(
+      (e) => {
+        portalCoursesBootstrapPromise = null;
+        throw e;
+      },
+    );
+  }
+  await portalCoursesBootstrapPromise;
 }
 
 async function loadCoursesTableColumns(): Promise<Set<string>> {
@@ -139,7 +155,7 @@ async function buildCoursesSelectParts(
   const codePhysical = pickColumn(cols, ["code"]);
 
   if (codePhysical) {
-    await ensurePortalCoursesForLegacyCatalog();
+    await ensurePortalCoursesBootstrappedOnce();
   }
 
   for (const spec of COLUMN_SPECS) {
