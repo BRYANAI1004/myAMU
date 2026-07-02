@@ -4,6 +4,8 @@ import { useStudentPortalT } from '@/LanguageContext'
 import { BackToDashboardLink } from '../../components/BackToDashboardLink'
 import { CourseBinProvider } from './CourseBinContext'
 import { RegistrationNav } from './RegistrationNav'
+import { RegistrationWindowBanner } from './RegistrationWindowBanner'
+import { RegistrationWindowProvider } from './RegistrationWindowContext'
 import { useAccount } from '../../context/AccountContext'
 import { useStudentPortalTerm } from '../../context/StudentPortalTermContext'
 import { readRegistrationTermIdFromSearch } from './registrationTermSearch'
@@ -77,61 +79,64 @@ export function RegistrationLayout() {
   const courseBinStudentKey = currentStudentId?.trim() ?? ''
 
   return (
-    <CourseBinProvider
-      key={`${courseBinKey}:${courseBinStudentKey}`}
-      registrationTermId={selectedTermId}
-      studentId={courseBinStudentKey}
-    >
-      <div className="portal-registration-module">
-        <header className="portal-module-header portal-module-header--registration">
-          <BackToDashboardLink />
-          <div className="portal-module-header__title-row">
-            <h1 className="portal-page-title">{t('registrationModule')}</h1>
-            <div
-              className="portal-registration-layout-term portal-registration-layout-term--inline"
-              aria-labelledby="registration-layout-term-label"
-            >
-              {loadState === 'loading' ? (
-                <p
-                  className="portal-text-muted portal-registration-layout-term__status"
-                  role="status"
-                >
-                  {t('loadingTerms')}
-                </p>
-              ) : null}
-              {loadState === 'error' ? (
-                <p
-                  className="portal-text-muted portal-registration-layout-term__status"
-                  role="alert"
-                >
-                  {t('noAcademicTermsAvailable')}
-                </p>
-              ) : null}
-              {loadState === 'ready' ? (
-                <>
-                  <span
-                    id="registration-layout-term-label"
-                    className="portal-registration-layout-term__title"
+    <RegistrationWindowProvider registrationTermId={selectedTermId}>
+      <CourseBinProvider
+        key={`${courseBinKey}:${courseBinStudentKey}`}
+        registrationTermId={selectedTermId}
+        studentId={courseBinStudentKey}
+      >
+        <div className="portal-registration-module">
+          <header className="portal-module-header portal-module-header--registration">
+            <BackToDashboardLink />
+            <div className="portal-module-header__title-row">
+              <h1 className="portal-page-title">{t('registrationModule')}</h1>
+              <div
+                className="portal-registration-layout-term portal-registration-layout-term--inline"
+                aria-labelledby="registration-layout-term-label"
+              >
+                {loadState === 'loading' ? (
+                  <p
+                    className="portal-text-muted portal-registration-layout-term__status"
+                    role="status"
                   >
-                    {t('registrationCurrentTermLabel')}
-                  </span>
-                  <span
-                    id="registration-layout-term-value"
-                    className="portal-registration-layout-term__value"
+                    {t('loadingTerms')}
+                  </p>
+                ) : null}
+                {loadState === 'error' ? (
+                  <p
+                    className="portal-text-muted portal-registration-layout-term__status"
+                    role="alert"
                   >
-                    {termDisplay}
-                  </span>
-                </>
-              ) : null}
+                    {t('noAcademicTermsAvailable')}
+                  </p>
+                ) : null}
+                {loadState === 'ready' ? (
+                  <>
+                    <span
+                      id="registration-layout-term-label"
+                      className="portal-registration-layout-term__title"
+                    >
+                      {t('registrationCurrentTermLabel')}
+                    </span>
+                    <span
+                      id="registration-layout-term-value"
+                      className="portal-registration-layout-term__value"
+                    >
+                      {termDisplay}
+                    </span>
+                  </>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <RegistrationNav termLinkSearch={termLinkSearch} />
-        <div className="portal-registration-outlet">
-          <Outlet />
+          <RegistrationNav termLinkSearch={termLinkSearch} />
+          <RegistrationWindowBanner />
+          <div className="portal-registration-outlet">
+            <Outlet />
+          </div>
         </div>
-      </div>
-    </CourseBinProvider>
+      </CourseBinProvider>
+    </RegistrationWindowProvider>
   )
 }

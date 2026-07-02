@@ -101,6 +101,7 @@ export type RegistrationPlanSearchResultsPanelProps = {
   enrolledKeys: Set<string>
   addToCourseBin: (item: CourseBinItem) => void
   showToast: (message: string) => void
+  afterAddToCourseBin?: () => void
 }
 
 export function RegistrationPlanSearchResultsPanel({
@@ -111,6 +112,7 @@ export function RegistrationPlanSearchResultsPanel({
   enrolledKeys,
   addToCourseBin,
   showToast,
+  afterAddToCourseBin,
 }: RegistrationPlanSearchResultsPanelProps) {
   const t = useStudentPortalT()
   const [expandedPrefixes, setExpandedPrefixes] = useState<Set<string>>(() => new Set())
@@ -342,7 +344,8 @@ export function RegistrationPlanSearchResultsPanel({
                                                             className="portal-btn portal-btn--course-search-bin"
                                                             onClick={() => {
                                                               addToCourseBin(adminSectionToCourseBinItem(sec, cat))
-                                                              showToast(t('toastAddedToCourseBin'))
+                                                              if (afterAddToCourseBin) afterAddToCourseBin()
+                                                              else showToast(t('toastAddedToCourseBin'))
                                                             }}
                                                           >
                                                             {t('addToCourseBin')}

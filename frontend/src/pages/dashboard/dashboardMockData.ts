@@ -2,11 +2,12 @@
 
 export type DashboardService = {
   to: string
-  icon: 'registration' | 'finances' | 'feesStore' | 'academics' | 'documents' | 'account'
+  icon: 'registration' | 'myCourses' | 'finances' | 'feesStore' | 'academics' | 'documents' | 'account'
 }
 
 export const DASHBOARD_SERVICES: DashboardService[] = [
   { to: '/registration', icon: 'registration' },
+  { to: '/my-courses', icon: 'myCourses' },
   { to: '/finances', icon: 'finances' },
   { to: '/academics', icon: 'academics' },
   { to: '/documents', icon: 'documents' },

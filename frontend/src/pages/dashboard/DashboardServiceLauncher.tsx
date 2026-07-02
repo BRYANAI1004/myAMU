@@ -7,6 +7,7 @@ import { DashboardServiceIcon } from './DashboardServiceIcon'
 
 const SERVICE_TITLE_KEY: Record<DashboardService['icon'], StudentPortalKey> = {
   registration: 'registrationModule',
+  myCourses: 'myCoursesModule',
   finances: 'finances',
   feesStore: 'feesAndServices',
   academics: 'academics',

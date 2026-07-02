@@ -6,11 +6,13 @@ import {
   IconFeesStore,
   IconFinance,
   IconMyAccount,
+  IconMyCourses,
   IconRegistration,
 } from '../../components/icons/PortalModuleIcons'
 
 const SERVICE_ICON: Record<DashboardService['icon'], ComponentType<SVGProps<SVGSVGElement>>> = {
   registration: IconRegistration,
+  myCourses: IconMyCourses,
   finances: IconFinance,
   feesStore: IconFeesStore,
   academics: IconAcademics,

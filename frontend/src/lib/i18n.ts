@@ -1145,6 +1145,40 @@ export const STUDENT_PORTAL_EN = {
   registrationPlanColInfo: 'Info',
   registrationPlanInfoBadgeTitle: 'Course details are shown above; use course search for catalog information.',
   registrationPlanNavLabel: 'Plan & schedule',
+  registrationTabCourseList: 'Course list',
+  registrationTabTimetable: 'Timetable',
+  registrationTabBin: 'Bin',
+  registrationBinCountAria: '{n} sections in bin',
+  registrationCourseListLede:
+    'Courses and sections scheduled by the university for this term. Add a section to your bin, then checkout on the Bin tab.',
+  registrationCourseListAria: 'Courses offered this term',
+  registrationCourseListViewSections: 'View sections',
+  registrationCourseListHideSections: 'Hide sections',
+  registrationCourseListUnitsLabel: '{units} units',
+  registrationCourseListOneSection: '1 section',
+  registrationCourseListSectionCount: '{n} sections',
+  registrationTimetableLede:
+    'Weekly view of offered sections. Select a block to add it to your bin, then checkout on the Bin tab.',
+  registrationBinLede:
+    'Review planned sections, then checkout to register and update your tuition ledger. Registered courses appear in My Courses.',
+  registrationBinReviewNote:
+    'Remove sections you no longer want. When ready, use Checkout below to complete registration.',
+  registrationBinOptionsRemoveHint: 'Remove this section from your bin if you changed your mind.',
+  registrationBinCheckoutNote:
+    'Checkout registers all sections in your bin for this term, updates your student ledger, and adds them to My Courses.',
+  registrationCheckoutButton: 'Checkout',
+  registrationWindowClosedTitle: 'Registration closed',
+  registrationWindowClosedDetail:
+    'The registration period for {term} ended on {date}. You can no longer add courses or complete checkout.',
+  registrationWindowNotOpenTitle: 'Registration not yet open',
+  registrationWindowNotOpenDetail:
+    'Registration for {term} opens on {date}.',
+  registrationWindowClosedShort: 'Registration closed',
+  registrationWindowClosedCheckout:
+    'Registration for this term has closed. Checkout is no longer available.',
+  registrationCheckoutSuccess:
+    'Registration complete. {n} section(s) added to your schedule and My Courses. Your tuition ledger has been updated.',
+  registrationAddedToBinToast: 'Added to bin — review on the Bin tab.',
   registrationPlanEnrollmentNote:
     'Use Change: Enroll registers this section for the term (same as checkout) so it appears on your record and tuition ledger. Remove from planner only removes it from this plan, not from registration.',
   registrationPlanHomeTitle: 'Plan & schedule',
@@ -2639,6 +2673,39 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   registrationPlanColInfo: '資訊',
   registrationPlanInfoBadgeTitle: '課程說明見上方；完整資料請至課程目錄搜尋。',
   registrationPlanNavLabel: '排課與規劃',
+  registrationTabCourseList: '課程列表',
+  registrationTabTimetable: '課表',
+  registrationTabBin: '課程暫存',
+  registrationBinCountAria: '暫存中有 {n} 個班級',
+  registrationCourseListLede:
+    '本學期校方已排定之課程與班級。加入課程暫存後，請至「課程暫存」分頁結帳完成選課。',
+  registrationCourseListAria: '本學期開課課程',
+  registrationCourseListViewSections: '查看班級',
+  registrationCourseListHideSections: '收合班級',
+  registrationCourseListUnitsLabel: '{units} 學分',
+  registrationCourseListOneSection: '1 個班級',
+  registrationCourseListSectionCount: '{n} 個班級',
+  registrationTimetableLede:
+    '以每週課表檢視開課班級。點選時段加入暫存，再至「課程暫存」分頁結帳。',
+  registrationBinLede:
+    '確認暫存中的班級後結帳，即完成選課並更新帳單；已選課程會顯示於「我的課程」。',
+  registrationBinReviewNote:
+    '可移除不需要的班級。確認無誤後，請使用下方結帳完成選課。',
+  registrationBinOptionsRemoveHint: '若改變主意，可從暫存移除此班級。',
+  registrationBinCheckoutNote:
+    '結帳會為本學期暫存中的所有班級完成註冊、更新學費帳務，並加入「我的課程」。',
+  registrationCheckoutButton: '結帳',
+  registrationWindowClosedTitle: '選課已截止',
+  registrationWindowClosedDetail:
+    '{term} 的選課已於 {date} 截止，無法再加入課程或結帳。',
+  registrationWindowNotOpenTitle: '選課尚未開放',
+  registrationWindowNotOpenDetail: '{term} 的選課將於 {date} 開放。',
+  registrationWindowClosedShort: '選課已截止',
+  registrationWindowClosedCheckout:
+    '本學期選課已截止，無法再結帳或加入暫存。',
+  registrationCheckoutSuccess:
+    '選課完成。已新增 {n} 個班級至課表與「我的課程」，帳務已更新。',
+  registrationAddedToBinToast: '已加入暫存 — 請至「課程暫存」分頁確認。',
   registrationPlanEnrollmentNote:
     '請使用「變更」：「註冊／選課」會正式登錄此班（與結帳頁註冊相同），並計入本學期帳務／學費。「從課程規劃移除」僅從此規劃移除，不影響已登錄選課。',
   registrationPlanHomeTitle: '排課與規劃',

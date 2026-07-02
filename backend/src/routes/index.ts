@@ -145,6 +145,7 @@ import { postAdminMassEmail } from "../controllers/adminMassEmailController.js";
 import { getAdminEmailLogs, getAdminEmailLogAttachmentUrl } from "../controllers/adminEmailLogController.js";
 import {
   getStudentEnrolledSections,
+  getStudentRegistrationSections,
   postStudentEnroll,
   postStudentWithdraw,
 } from "../controllers/studentEnrollmentController.js";
@@ -275,6 +276,10 @@ studentPortalRouter.get(
   "/enrolled-sections",
   requireStudentAuthMatchQuery("studentId"),
   getStudentEnrolledSections,
+);
+studentPortalRouter.get(
+  "/registration-sections",
+  getStudentRegistrationSections,
 );
 studentPortalRouter.get(
   "/clinical-progress",

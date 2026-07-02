@@ -4,10 +4,14 @@ import { removeAdminPortalEnrollment } from "../services/adminEnrollmentService.
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
 import type { CourseSectionDetail } from "../repositories/courseSectionRepository.js";
 import { listStudentEnrolledSectionsForTerm } from "../repositories/studentEnrollmentRepository.js";
-import { InvalidAcademicTermError } from "../services/courseSectionService.js";
+import {
+  InvalidAcademicTermError,
+  listAllCourseSectionsByAcademicTermId,
+} from "../services/courseSectionService.js";
 import {
   enrollStudentForAcademicTerm,
   RegistrationLockedOverdueBalanceError,
+  RegistrationWindowClosedError,
   type EnrollSectionInput,
   type MissingPrerequisiteDetail,
 } from "../services/studentEnrollmentService.js";
@@ -121,6 +125,10 @@ export async function postStudentEnroll(
     }
     res.json({ success: true, insertedCount: result.insertedCount });
   } catch (e) {
+    if (e instanceof RegistrationWindowClosedError) {
+      res.status(400).json({ error: e.message, code: e.status });
+      return;
+    }
     if (e instanceof RegistrationLockedOverdueBalanceError) {
       res.status(400).json({ error: e.message });
       return;
@@ -270,6 +278,59 @@ export async function postStudentWithdraw(
     console.error("[student/withdraw] failed:", e);
     const body: { error: string; message?: string } = {
       error: "Withdrawal could not be completed. Please try again.",
+    };
+    if (env.nodeEnv === "development") body.message = devMessage(e);
+    res.status(500).json(body);
+  }
+}
+
+/**
+ * GET /api/student/registration-sections?academic_term_id=
+ * All admin-scheduled sections for a term (student registration browse / timetable).
+ */
+export async function getStudentRegistrationSections(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const academicTermId = parseQueryString(req, "academic_term_id");
+    if (!academicTermId) {
+      res.status(400).json({
+        error: "Query parameter academic_term_id is required.",
+      });
+      return;
+    }
+    const termRow = await getAcademicTermById(academicTermId);
+    if (!termRow) {
+      res.status(404).json({
+        error:
+          "The selected academic term is not valid or no longer exists. Choose another term.",
+        code: "UNKNOWN_ACADEMIC_TERM",
+        academic_term_id: academicTermId,
+      });
+      return;
+    }
+    const sections = await listAllCourseSectionsByAcademicTermId(academicTermId);
+    if (sections === null) {
+      res.status(404).json({
+        error:
+          "The selected academic term is not valid or no longer exists. Choose another term.",
+        code: "UNKNOWN_ACADEMIC_TERM",
+        academic_term_id: academicTermId,
+      });
+      return;
+    }
+    const sanitized = sections.map((row) => {
+      const { enrolled_students: _omit, ...rest } = row as CourseSectionDetail & {
+        enrolled_students?: unknown;
+      };
+      return rest;
+    });
+    res.json(sanitized);
+  } catch (e) {
+    console.error("[student/registration-sections] failed:", e);
+    const body: { error: string; message?: string } = {
+      error: "Failed to load registration sections",
     };
     if (env.nodeEnv === "development") body.message = devMessage(e);
     res.status(500).json(body);

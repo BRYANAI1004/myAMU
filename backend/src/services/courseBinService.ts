@@ -4,7 +4,14 @@ import {
   listCourseBinByStudentAndTerm,
   upsertCourseBinItem,
 } from "../repositories/courseBinRepository.js";
+import { getAcademicTermById } from "../repositories/academicTermRepository.js";
+import {
+  assertRegistrationWindowOpen,
+  RegistrationWindowClosedError,
+} from "../lib/registrationWindow.js";
 import type { CourseBinApiItem, CourseBinUpsertInput } from "../types/courseBin.js";
+
+export { RegistrationWindowClosedError };
 
 function normalizeStudentId(raw: string): string {
   return raw.trim();
@@ -31,6 +38,9 @@ export async function addOrUpdateCourseBinItem(
 ): Promise<{ studentId: string; item: CourseBinApiItem } | null> {
   const studentId = normalizeStudentId(studentIdRaw);
   if (studentId === "" || input.academic_term_id.trim() === "") return null;
+  const term = await getAcademicTermById(input.academic_term_id.trim());
+  if (!term) return null;
+  assertRegistrationWindowOpen(term);
   const item = await upsertCourseBinItem(studentId, input);
   return { studentId, item };
 }

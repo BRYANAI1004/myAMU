@@ -5,6 +5,7 @@ import {
   addOrUpdateCourseBinItem,
   clearCourseBinForStudentTerm,
   getCourseBinForStudentTerm,
+  RegistrationWindowClosedError,
   removeCourseBinItem,
 } from "../services/courseBinService.js";
 import type { CourseBinScheduleTrack, CourseBinUpsertInput } from "../types/courseBin.js";
@@ -96,7 +97,13 @@ function parseUpsertBody(body: unknown): CourseBinUpsertInput | null {
   };
 }
 
-function courseBinErrorResponse(e: unknown): { status: number; body: { error: string; message?: string } } {
+function courseBinErrorResponse(e: unknown): { status: number; body: { error: string; code?: string; message?: string } } {
+  if (e instanceof RegistrationWindowClosedError) {
+    return {
+      status: 400,
+      body: { error: e.message, code: e.status },
+    };
+  }
   if (isMissingTable(e)) {
     return {
       status: 503,

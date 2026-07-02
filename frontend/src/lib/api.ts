@@ -6825,6 +6825,20 @@ export async function fetchStudentEnrolledSections(
   return parseStudentEnrolledSectionsResponse(data)
 }
 
+/** GET /api/student/registration-sections — all admin-scheduled sections for a term. */
+export async function fetchStudentRegistrationSections(
+  academicTermId: string,
+  options?: { signal?: AbortSignal },
+): Promise<AdminCourseSection[]> {
+  const qs = new URLSearchParams()
+  qs.set('academic_term_id', academicTermId.trim())
+  const data = (await fetchApiJson(
+    `/api/student/registration-sections?${qs.toString()}`,
+    { signal: options?.signal },
+  )) as unknown
+  return parseAdminCourseSectionList(data)
+}
+
 /** POST /api/student/withdraw — soft-withdraws one portal enrollment for the term (`course_sections.id`). */
 export async function postStudentWithdraw(
   body: {

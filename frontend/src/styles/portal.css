@@ -2573,6 +2573,99 @@ select.portal-profile-input {
   margin: 0 0 1rem;
 }
 
+.portal-my-courses-timetable .admin-scheduling-timetable-card .admin-timetable-wrap {
+  margin-top: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.portal-my-courses-timetable .admin-scheduling-timetable-card__head {
+  justify-content: flex-end;
+  padding: 0.75rem 1rem 0.875rem;
+}
+
+.portal-my-courses-timetable .admin-scheduling-timetable-card__body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.portal-my-courses-timetable .admin-scheduling-timetable-card__body .portal-text-muted {
+  padding: 0.5rem 0;
+}
+
+.portal-registration-window-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  margin: 0.5rem 0 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--portal-border-subtle);
+  border-left: 4px solid var(--portal-accent);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface);
+  box-shadow: var(--portal-shadow);
+}
+
+.portal-registration-window-banner--closed {
+  border-left-color: var(--portal-accent);
+  background: linear-gradient(90deg, var(--portal-accent-soft) 0%, var(--portal-surface) 18%);
+}
+
+.portal-registration-window-banner--not_yet_open {
+  border-left-color: #c9a227;
+  background: linear-gradient(90deg, #fff9e8 0%, var(--portal-surface) 18%);
+}
+
+.portal-registration-window-banner__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: var(--portal-accent);
+  background: rgba(140, 29, 44, 0.08);
+}
+
+.portal-registration-window-banner--not_yet_open .portal-registration-window-banner__icon {
+  color: #9a7b1a;
+  background: rgba(201, 162, 39, 0.12);
+}
+
+.portal-registration-window-banner__content {
+  min-width: 0;
+  padding-top: 0.125rem;
+}
+
+.portal-registration-window-banner__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--portal-text);
+}
+
+.portal-registration-window-banner__detail {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--portal-text-muted);
+}
+
+.portal-registration-window-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+}
+
 /* Registration module: compact term selector above tab nav */
 .portal-registration-layout-term {
   margin: 0 0 1rem;
@@ -2634,6 +2727,31 @@ select.portal-profile-input {
   font-size: 0.8125rem;
   line-height: 1.4;
   max-width: 36rem;
+}
+
+/* Registration timetable — align with admin scheduling card + admin-timetable-v2 blocks */
+.portal-registration-timetable-page {
+  position: relative;
+}
+
+.portal-registration-timetable-page .admin-scheduling-timetable-card .admin-timetable-wrap {
+  margin-top: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.portal-registration-timetable-page .admin-scheduling-timetable-card__head {
+  justify-content: flex-end;
+  padding: 0.75rem 1rem 0.875rem;
+}
+
+.portal-registration-timetable-page .admin-scheduling-timetable-card__body {
+  padding: 0.75rem 1rem 1rem;
+}
+
+.portal-registration-timetable-page .admin-scheduling-timetable-card__body .portal-text-muted {
+  padding: 0.5rem 0;
 }
 
 /* Registration: student offered timetable → CourseBin */
@@ -7127,6 +7245,198 @@ table.portal-academics-transcript-sheet__table.portal-academics-portal-grades-ta
 
 .portal-plan-search-results {
   margin-top: 1rem;
+}
+
+/* Registration course list — flat expandable rows */
+.portal-registration-course-list {
+  list-style: none;
+  margin: 0.625rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.portal-registration-course-list-empty {
+  margin-top: 0.625rem;
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  color: var(--portal-text-muted);
+  border: 1px dashed var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+}
+
+.portal-registration-course-list__item {
+  border: 1px solid var(--portal-border-subtle);
+  border-radius: var(--portal-radius);
+  background: var(--portal-surface);
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.portal-registration-course-list__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.portal-registration-course-list__header:hover {
+  background: #fafbfc;
+}
+
+.portal-registration-course-list__header:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--portal-accent), inset 0 0 0 4px var(--amu-red-ring);
+}
+
+.portal-registration-course-list__header--open {
+  border-bottom: 1px solid var(--portal-border-subtle);
+  background: #f8f9fb;
+}
+
+.portal-registration-course-list__header-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.625rem;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.portal-registration-course-list__code {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #6e1622;
+}
+
+.portal-registration-course-list__titles {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.5rem;
+  min-width: 0;
+}
+
+.portal-registration-course-list__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--portal-text);
+}
+
+.portal-registration-course-list__title-alt {
+  font-size: 0.8125rem;
+  color: var(--portal-text-muted);
+}
+
+.portal-registration-course-list__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.35rem;
+  font-size: 0.75rem;
+  color: var(--portal-text-muted);
+}
+
+.portal-registration-course-list__toggle {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6e1622;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.portal-registration-course-list__panel {
+  padding: 0.625rem 0.875rem 0.75rem;
+  background: #fff;
+}
+
+.portal-registration-course-list__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  gap: 0.5rem 0.875rem;
+  margin: 0 0 0.625rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: calc(var(--portal-radius) - 2px);
+  background: #f8f9fb;
+}
+
+.portal-registration-course-list__details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.portal-registration-course-list__details dt {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6e1622;
+}
+
+.portal-registration-course-list__details dd {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--portal-text);
+}
+
+.portal-registration-course-list__sections-table {
+  font-size: 0.8125rem;
+}
+
+.portal-registration-course-list__sections-table th,
+.portal-registration-course-list__sections-table td {
+  vertical-align: middle;
+  padding: 0.4rem 0.5rem;
+}
+
+.portal-registration-course-list__action-cell {
+  white-space: nowrap;
+}
+
+.portal-registration-course-list__action-cell .portal-btn--compact {
+  min-height: 1.75rem;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.75rem;
+}
+
+.portal-registration-course-list__status {
+  display: inline-block;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.portal-registration-course-list__status--enrolled {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.portal-registration-course-list__status--bin {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.portal-registration-course-list__status--closed {
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
 }
 
 .portal-plan-search-results--empty {
@@ -16045,6 +16355,21 @@ select.admin-student-edit-control {
   .portal-registration-nav .portal-tab-group--registration-sub .portal-tab {
     min-height: 2.5rem;
     white-space: nowrap;
+  }
+
+  .portal-registration-nav-bin-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-inline-size: 1.25rem;
+    margin-inline-start: 0.35rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: var(--portal-brand-red, #7a1f2b);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.4;
   }
 
   .portal-registration-section-nav .portal-section-tab-group {

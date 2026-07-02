@@ -71,10 +71,6 @@ type WeekTimetableCacheEntry = {
   loadFailed: boolean
 }
 
-function scheduleTermOptionValue(term: string, year: number): string {
-  return `${term.trim()}|${year}`
-}
-
 function DashboardWeekTimetableMobileList({
   model,
   gcalHrefByPattern,
@@ -247,7 +243,6 @@ export function DashboardCoursesWidget() {
   const weekdayLong = (day: WeekdayKey) => timetableWeekdayLong(locale, day)
   const weekdayShort = (day: WeekdayKey) => timetableWeekdayShort(locale, day)
   const [gcalModalOpen, setGcalModalOpen] = useState(false)
-  const [calendarWeekTerm, setCalendarWeekTerm] = useState<CalendarWeekTermKey | null>(null)
   const [weekTermRows, setWeekTermRows] = useState<ScheduleRow[] | null>(null)
   const [weekFetchLoading, setWeekFetchLoading] = useState(false)
   const [weekFetchError, setWeekFetchError] = useState(false)
@@ -270,7 +265,8 @@ export function DashboardCoursesWidget() {
   const [portalEnrollmentRefreshTick, setPortalEnrollmentRefreshTick] = useState(0)
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
-  const { activeTerm, loading: portalTermLoading } = useStudentPortalTerm()
+  const { portalDefaultTerm, defaultTermId, loading: portalTermLoading } =
+    useStudentPortalTerm()
 
   useEffect(() => {
     function onPortalEnrollmentChanged() {
@@ -284,7 +280,6 @@ export function DashboardCoursesWidget() {
   }, [])
 
   useEffect(() => {
-    setCalendarWeekTerm(null)
     setWeekTermRows(null)
     setWeekFetchLoading(false)
     setWeekFetchError(false)
@@ -407,18 +402,19 @@ export function DashboardCoursesWidget() {
   }, [schedulePayloadStudent.term, schedulePayloadStudent.year])
 
   const portalDefaultWeekTerm = useMemo((): CalendarWeekTermKey | null => {
-    if (portalTermLoading || activeTerm == null) return null
-    return { term: activeTerm.term_name, year: activeTerm.year }
-  }, [activeTerm, portalTermLoading])
+    if (portalTermLoading || portalDefaultTerm == null) return null
+    return { term: portalDefaultTerm.term_name, year: portalDefaultTerm.year }
+  }, [portalDefaultTerm, portalTermLoading])
 
-  const resolvedWeekTerm =
-    calendarWeekTerm ?? portalDefaultWeekTerm ?? defaultTermFromAccount
+  const resolvedWeekTerm = portalDefaultWeekTerm ?? defaultTermFromAccount
 
   useEffect(() => {
     setGcalModalOpen(false)
   }, [resolvedWeekTerm?.term, resolvedWeekTerm?.year])
 
   const resolvedAcademicTermId = useMemo((): string | null => {
+    const fromPortal = defaultTermId.trim()
+    if (fromPortal) return fromPortal
     if (!resolvedWeekTerm) return null
     const fromOpt = weekTermSelectOptionsResolved.find((x) =>
       termKeysEqual(x, resolvedWeekTerm),
@@ -430,7 +426,7 @@ export function DashboardCoursesWidget() {
       resolvedWeekTerm.term,
       resolvedWeekTerm.year,
     )
-  }, [resolvedWeekTerm, weekTermSelectOptionsResolved, academicTerms])
+  }, [defaultTermId, resolvedWeekTerm, weekTermSelectOptionsResolved, academicTerms])
 
   const useAccountPayloadForWeek = Boolean(
     resolvedWeekTerm &&
@@ -637,6 +633,16 @@ export function DashboardCoursesWidget() {
         : (weekTermRows ?? [])
 
   const resolvedTermDateBounds = useMemo((): { start: string | null; end: string | null } => {
+    const portalStart = portalDefaultTerm?.start_date?.trim() || null
+    const portalEnd = portalDefaultTerm?.end_date?.trim() || null
+    if (
+      portalStart &&
+      portalEnd &&
+      /^\d{4}-\d{2}-\d{2}$/.test(portalStart) &&
+      /^\d{4}-\d{2}-\d{2}$/.test(portalEnd)
+    ) {
+      return { start: portalStart, end: portalEnd }
+    }
     if (resolvedWeekTerm == null) return { start: null, end: null }
     const opt = weekTermSelectOptionsResolved.find((x) => termKeysEqual(x, resolvedWeekTerm))
     const s = opt?.start_date?.trim() || null
@@ -645,7 +651,7 @@ export function DashboardCoursesWidget() {
       return { start: s, end: e }
     }
     return { start: null, end: null }
-  }, [resolvedWeekTerm, weekTermSelectOptionsResolved])
+  }, [portalDefaultTerm, resolvedWeekTerm, weekTermSelectOptionsResolved])
 
   const gcalExport = useMemo(() => {
     if (resolvedWeekTerm == null) {
@@ -674,12 +680,13 @@ export function DashboardCoursesWidget() {
     gcalExport.batchItems.length === 0
 
   const weekTermDisplayLabel =
-    resolvedWeekTerm != null
+    portalDefaultTerm?.term_label?.trim() ||
+    (resolvedWeekTerm != null
       ? weekTermSelectOptionsResolved
           .find((x) => termKeysEqual(x, resolvedWeekTerm))
           ?.label?.trim() ||
         currentTermLabel({ term: resolvedWeekTerm.term, year: resolvedWeekTerm.year })
-      : ''
+      : '')
 
   const weekGridSourceRows =
     resolvedWeekTerm == null ? [] : weekScheduleLoading ? [] : effectiveWeekRows
@@ -712,14 +719,6 @@ export function DashboardCoursesWidget() {
     account.activePortalEnrollmentCountForBrowseTerm,
   ])
 
-  const selectValue =
-    resolvedWeekTerm != null
-      ? scheduleTermOptionValue(resolvedWeekTerm.term, resolvedWeekTerm.year)
-      : ''
-
-  const showWeekTermSelect =
-    !isLoadingAccount && weekTermSelectOptions.length > 0
-
   return (
     <section className="portal-dashboard-courses" aria-labelledby="portal-dashboard-courses-heading">
       <header className="portal-dashboard-courses-head portal-dashboard-card-panel-head">
@@ -728,38 +727,6 @@ export function DashboardCoursesWidget() {
         </h2>
         {!isLoadingAccount ? (
           <div className="portal-dashboard-courses-head-actions">
-            {showWeekTermSelect ? (
-              <div className="portal-dashboard-courses-head-term">
-                <label htmlFor="portal-dashboard-courses-week-term-select" className="visually-hidden">
-                  {t('termForWeekView')}
-                </label>
-                <select
-                  id="portal-dashboard-courses-week-term-select"
-                  className="portal-account-ledger__select portal-dashboard-courses-head-term-select"
-                  value={selectValue}
-                  aria-label={t('academicTermForWeekTimetable')}
-                  onChange={(e) => {
-                    const raw = e.target.value
-                    const pipe = raw.indexOf('|')
-                    if (pipe < 0) return
-                    const term = raw.slice(0, pipe).trim()
-                    const year = Number(raw.slice(pipe + 1))
-                    if (!term || !Number.isFinite(year)) return
-                    setCalendarWeekTerm({ term, year })
-                  }}
-                >
-                  {weekTermSelectOptionsResolved.map((opt) => (
-                    <option
-                      key={scheduleTermOptionValue(opt.term, opt.year)}
-                      value={scheduleTermOptionValue(opt.term, opt.year)}
-                    >
-                      {opt.label?.trim() ||
-                        currentTermLabel({ term: opt.term, year: opt.year })}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : null}
             <button
               type="button"
               className="portal-dashboard-gcal-add-all"

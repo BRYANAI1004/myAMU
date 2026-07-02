@@ -15,6 +15,7 @@ import {
   saveCourseBinItemToServer,
   syncLocalCourseBinToServer,
 } from './courseBinSync'
+import { useRegistrationWindow } from './RegistrationWindowContext'
 
 const STORAGE_KEY_PREFIX = 'portal.registration.courseBin:v1:'
 
@@ -192,6 +193,7 @@ export function CourseBinProvider({
   registrationTermId,
   studentId,
 }: CourseBinProviderProps) {
+  const { isOpen: registrationWindowOpen } = useRegistrationWindow()
   const term = registrationTermId.trim()
   const sid = studentId.trim()
   const [items, setItems] = useState<CourseBinItem[]>(() =>
@@ -257,6 +259,8 @@ export function CourseBinProvider({
 
   const addToCourseBin = useCallback(
     (item: CourseBinItem) => {
+      if (!registrationWindowOpen) return
+
       const normalizedItem = normalizeCourseBinItem(item)
       const code = normalizedItem.course_code.trim()
       if (code === '') return
@@ -308,7 +312,7 @@ export function CourseBinProvider({
         }
       })()
     },
-    [persistCache, sid, term],
+    [persistCache, registrationWindowOpen, sid, term],
   )
 
   const removeFromCourseBin = useCallback(

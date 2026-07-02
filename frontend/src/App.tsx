@@ -32,9 +32,9 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { PaymentPlanPage } from './pages/PaymentPlanPage'
 import { PortalLayout } from './components/PortalLayout'
 import { RegistrationLayout } from './pages/registration/RegistrationLayout'
-import { CourseBinCheckoutPage } from './pages/registration/CourseBinCheckoutPage'
-import { OfferedTimetablePage } from './pages/registration/OfferedTimetablePage'
-import { CourseSearchPage } from './pages/registration/CourseSearchPage'
+import { RegistrationBinPage } from './pages/registration/RegistrationBinPage'
+import { RegistrationCourseListPage } from './pages/registration/RegistrationCourseListPage'
+import { RegistrationTimetablePage } from './pages/registration/RegistrationTimetablePage'
 import { FinancesLayout } from './pages/finances/FinancesLayout'
 import { FinancesOverviewPage } from './pages/finances/FinancesOverviewPage'
 import { FinancesPaymentPage } from './pages/finances/FinancesPaymentPage'
@@ -117,16 +117,26 @@ function RegistrationIndexRedirect() {
   const qs = params.toString()
   return (
     <Navigate
-      to={{ pathname: 'offered-timetable', search: qs ? `?${qs}` : '' }}
+      to={{ pathname: 'course-list', search: qs ? `?${qs}` : '' }}
       replace
     />
   )
 }
 
-/** Legacy `/registration/course-bin` and `/registration/add-drop` → Plan & schedule. */
+/** Legacy `/registration/course-bin`, checkout, and add-drop → Bin tab. */
 function RegistrationCourseBinLegacyRedirect() {
   const { search } = useLocation()
-  return <Navigate to={{ pathname: '../offered-timetable', search }} replace />
+  return <Navigate to={{ pathname: '../bin', search }} replace />
+}
+
+function RegistrationLegacyPlanRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '../timetable', search }} replace />
+}
+
+function RegistrationLegacySearchRedirect() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '../course-list', search }} replace />
 }
 
 function RegistrationClinicalLegacyRedirect() {
@@ -210,13 +220,16 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/registration" element={<RegistrationLayout />}>
               <Route index element={<RegistrationIndexRedirect />} />
-              <Route path="search" element={<Navigate to="../course-search" replace />} />
-              <Route path="course-search" element={<CourseSearchPage />} />
+              <Route path="course-list" element={<RegistrationCourseListPage />} />
+              <Route path="timetable" element={<RegistrationTimetablePage />} />
+              <Route path="bin" element={<RegistrationBinPage />} />
+              <Route path="search" element={<RegistrationLegacySearchRedirect />} />
+              <Route path="course-search" element={<RegistrationLegacySearchRedirect />} />
               <Route path="course-bin" element={<RegistrationCourseBinLegacyRedirect />} />
-              <Route path="checkout" element={<CourseBinCheckoutPage />} />
+              <Route path="checkout" element={<RegistrationCourseBinLegacyRedirect />} />
               <Route path="add-drop" element={<RegistrationCourseBinLegacyRedirect />} />
               <Route path="schedule" element={<Navigate to="/dashboard" replace />} />
-              <Route path="offered-timetable" element={<OfferedTimetablePage />} />
+              <Route path="offered-timetable" element={<RegistrationLegacyPlanRedirect />} />
             </Route>
             <Route path="/my-courses" element={<MyCoursesLayout />}>
               <Route index element={<MyCoursesPage />} />

@@ -60,6 +60,8 @@ export type ClassPlanPanelProps = {
     scheduleTrack?: 'EN' | 'CN',
   ) => void
   showToast: (message: string) => void
+  /** Bin tab: review only — checkout happens via page-level button. */
+  checkoutMode?: boolean
 }
 
 export function ClassPlanPanel({
@@ -67,6 +69,7 @@ export function ClassPlanPanel({
   enrolledKeys,
   removeFromCourseBin,
   showToast,
+  checkoutMode = false,
 }: ClassPlanPanelProps) {
   const t = useStudentPortalT()
   const registrationTermId = useRegistrationTermSearchParam()
@@ -288,7 +291,7 @@ export function ClassPlanPanel({
             className="portal-text-muted portal-registration-class-plan__enrollment-note"
             style={{ marginTop: '0.75rem' }}
           >
-            {t('registrationPlanEnrollmentNote')}
+            {checkoutMode ? t('registrationBinReviewNote') : t('registrationPlanEnrollmentNote')}
           </p>
         </>
       )}
@@ -328,7 +331,9 @@ export function ClassPlanPanel({
               <p className="portal-class-plan-options-modal__enroll-hint">
                 {optionsEnrolled
                   ? t('offeredModalAlreadyEnrolledNote')
-                  : t('registrationPlanOptionsModalEnrollLead')}
+                  : checkoutMode
+                    ? t('registrationBinOptionsRemoveHint')
+                    : t('registrationPlanOptionsModalEnrollLead')}
               </p>
             </div>
             <div className="portal-class-plan-options-modal__footer">
@@ -348,20 +353,22 @@ export function ClassPlanPanel({
                 >
                   {t('registrationPlanOptionsModalRemoveFromPlanner')}
                 </button>
-                <button
-                  type="button"
-                  className="portal-btn portal-btn--primary portal-btn--compact"
-                  disabled={
-                    enrollBusy ||
-                    optionsEnrolled ||
-                    termMissing ||
-                    !isAuthenticated ||
-                    !currentStudentId?.trim()
-                  }
-                  onClick={() => void onEnrollThisSection()}
-                >
-                  {enrollBusy ? t('registeringEllipsis') : t('enroll')}
-                </button>
+                {!checkoutMode ? (
+                  <button
+                    type="button"
+                    className="portal-btn portal-btn--primary portal-btn--compact"
+                    disabled={
+                      enrollBusy ||
+                      optionsEnrolled ||
+                      termMissing ||
+                      !isAuthenticated ||
+                      !currentStudentId?.trim()
+                    }
+                    onClick={() => void onEnrollThisSection()}
+                  >
+                    {enrollBusy ? t('registeringEllipsis') : t('enroll')}
+                  </button>
+                ) : null}
               </div>
               <button type="button" className="portal-btn portal-btn--secondary portal-btn--compact" onClick={closeOptions}>
                 {t('cancel')}

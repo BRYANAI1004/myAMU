@@ -14,7 +14,13 @@ import {
 import { InvalidAcademicTermError } from "./courseSectionService.js";
 import { getStudentQuarterBalance } from "./studentLedgerService.js";
 import { isPastSchoolLocalDueDate } from "../lib/schoolLocalDate.js";
+import {
+  assertRegistrationWindowOpen,
+  RegistrationWindowClosedError,
+} from "../lib/registrationWindow.js";
 import { emitEnrollmentChanged } from "./realtimeEventBus.js";
+
+export { RegistrationWindowClosedError };
 
 export type { EnrollSectionInput };
 
@@ -147,6 +153,8 @@ export async function enrollStudentForAcademicTerm(
 > {
   const row = await getAcademicTermById(academicTermId.trim());
   if (!row) throw new InvalidAcademicTermError();
+
+  assertRegistrationWindowOpen(row);
 
   if (row.lock_registration_if_overdue === true) {
     const due = row.payment_due_date?.trim() ?? "";
