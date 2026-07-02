@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import {
   adminSchedulingQueryString,
   applyAdminSchedulingToSearchParams,
@@ -8,7 +9,6 @@ import { AdminTime12hFields } from '../../components/admin/AdminTime12hFields'
 import {
   createAdminCourseSection,
   deleteAdminCourseSection,
-  downloadAdminFeedbackCsv,
   downloadAdminRegisteredStudentsCsv,
   fetchAcademicTerms,
   fetchAdminCourseSectionCourseMeta,
@@ -99,11 +99,9 @@ type SectionCardProps = {
   prereqCode: string
   busy: boolean
   csvExportSectionId: number | null
-  feedbackExportSectionId: number | null
   onEdit: (row: AdminCourseSection) => void
   onViewRoster: (row: AdminCourseSection) => void
   onExportCsv: (row: AdminCourseSection) => void
-  onExportFeedback: (row: AdminCourseSection) => void
   onDeleteRow: (row: AdminCourseSection) => void
 }
 
@@ -113,11 +111,9 @@ function SectionCard({
   prereqCode,
   busy,
   csvExportSectionId,
-  feedbackExportSectionId,
   onEdit,
   onViewRoster,
   onExportCsv,
-  onExportFeedback,
   onDeleteRow,
 }: SectionCardProps) {
   const scheduleLine = [
@@ -196,18 +192,10 @@ function SectionCard({
         <button
           type="button"
           className="admin-course-section-card__action"
-          disabled={busy || feedbackExportSectionId != null}
+          disabled={busy || csvExportSectionId != null}
           onClick={() => onExportCsv(row)}
         >
           {csvExportSectionId === row.id ? 'Exporting…' : 'Students CSV'}
-        </button>
-        <button
-          type="button"
-          className="admin-course-section-card__action"
-          disabled={busy || csvExportSectionId != null}
-          onClick={() => onExportFeedback(row)}
-        >
-          {feedbackExportSectionId === row.id ? 'Exporting…' : 'Feedback CSV'}
         </button>
         <button
           type="button"
@@ -231,11 +219,9 @@ type SectionGroupProps = {
   resolvePrerequisiteCode: (row: AdminCourseSection) => string
   busy: boolean
   csvExportSectionId: number | null
-  feedbackExportSectionId: number | null
   onEdit: (row: AdminCourseSection) => void
   onViewRoster: (row: AdminCourseSection) => void
   onExportCsv: (row: AdminCourseSection) => void
-  onExportFeedback: (row: AdminCourseSection) => void
   onDeleteRow: (row: AdminCourseSection) => void
 }
 
@@ -248,11 +234,9 @@ function SectionGroup({
   resolvePrerequisiteCode,
   busy,
   csvExportSectionId,
-  feedbackExportSectionId,
   onEdit,
   onViewRoster,
   onExportCsv,
-  onExportFeedback,
   onDeleteRow,
 }: SectionGroupProps) {
   return (
@@ -276,11 +260,9 @@ function SectionGroup({
               prereqCode={resolvePrerequisiteCode(row)}
               busy={busy}
               csvExportSectionId={csvExportSectionId}
-              feedbackExportSectionId={feedbackExportSectionId}
               onEdit={onEdit}
               onViewRoster={onViewRoster}
               onExportCsv={onExportCsv}
-              onExportFeedback={onExportFeedback}
               onDeleteRow={onDeleteRow}
             />
           ))}
@@ -676,6 +658,12 @@ function SectionFormPanel({
 export function AdminCourseSectionsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
+  const {
+    activeTermId,
+    setActiveTermId,
+    resolveTermId,
+    loading: portalTermLoading,
+  } = useAdminPortalTerm()
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
   const [courses, setCourses] = useState<CourseCatalogItem[] | null>(null)
   const [academicTermId, setAcademicTermId] = useState('')
@@ -690,9 +678,6 @@ export function AdminCourseSectionsPage() {
   const [csvExportSectionId, setCsvExportSectionId] = useState<number | null>(
     null,
   )
-  const [feedbackExportSectionId, setFeedbackExportSectionId] = useState<
-    number | null
-  >(null)
   const [csvExportError, setCsvExportError] = useState<string | null>(null)
   const [formMessage, setFormMessage] = useState<string | null>(null)
   const [showSectionForm, setShowSectionForm] = useState(false)
@@ -736,6 +721,7 @@ export function AdminCourseSectionsPage() {
   }, [])
 
   useEffect(() => {
+    if (portalTermLoading) return
     const ac = new AbortController()
     ;(async () => {
       const [termOutcome, courseOutcome] = await Promise.allSettled([
@@ -783,11 +769,8 @@ export function AdminCourseSectionsPage() {
       const urlQ = sp.get('q') ?? ''
 
       const nextTerm =
-        urlTerm && t.some((x) => x.id === urlTerm)
-          ? urlTerm
-          : t.length > 0
-            ? t[0].id
-            : ''
+        activeTermId ||
+        resolveTermId(urlTerm && t.some((x) => x.id === urlTerm) ? urlTerm : '')
       const nextCourse =
         urlCourse && c.some((x) => x.code === urlCourse)
           ? urlCourse
@@ -810,7 +793,30 @@ export function AdminCourseSectionsPage() {
       )
     })()
     return () => ac.abort()
-  }, [setSearchParams])
+  }, [setSearchParams, activeTermId, resolveTermId, portalTermLoading])
+
+  useEffect(() => {
+    if (portalTermLoading || terms == null || activeTermId === '') return
+    if (activeTermId === academicTermId.trim()) return
+    setAcademicTermId(activeTermId)
+    setSearchParams(
+      (prev) =>
+        applyAdminSchedulingToSearchParams(prev, {
+          term: activeTermId,
+          course: courseCode,
+          q: courseSearch,
+        }),
+      { replace: true },
+    )
+  }, [
+    activeTermId,
+    portalTermLoading,
+    terms,
+    academicTermId,
+    courseCode,
+    courseSearch,
+    setSearchParams,
+  ])
 
   useEffect(() => {
     const tid = academicTermId.trim()
@@ -1048,6 +1054,7 @@ export function AdminCourseSectionsPage() {
 
     if (termChanged) {
       setAcademicTermId(termOk)
+      setActiveTermId(termOk)
     }
     if (courseChanged) {
       setCourseCode(courseOk)
@@ -1307,22 +1314,6 @@ export function AdminCourseSectionsPage() {
     }
   }
 
-  const onExportFeedbackForSection = useCallback((row: AdminCourseSection) => {
-    setCsvExportError(null)
-    setFeedbackExportSectionId(row.id)
-    void (async () => {
-      try {
-        await downloadAdminFeedbackCsv(row.id)
-      } catch (e) {
-        setCsvExportError(
-          e instanceof Error ? e.message : 'CSV export failed.',
-        )
-      } finally {
-        setFeedbackExportSectionId(null)
-      }
-    })()
-  }, [])
-
   const selectedTermLabel = useMemo(() => {
     const term = terms?.find((t) => t.id === academicTermId.trim())
     return term?.term_label ?? academicTermId
@@ -1393,6 +1384,7 @@ export function AdminCourseSectionsPage() {
               onChange={(e) => {
                 const v = e.target.value
                 setAcademicTermId(v)
+                setActiveTermId(v)
                 pushSchedulingContext({
                   term: v,
                   course: courseCode,
@@ -1559,11 +1551,9 @@ export function AdminCourseSectionsPage() {
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
-            feedbackExportSectionId={feedbackExportSectionId}
             onEdit={beginEdit}
             onViewRoster={openRosterForSection}
             onExportCsv={onExportCsvForSection}
-            onExportFeedback={onExportFeedbackForSection}
             onDeleteRow={onDeleteRow}
           />
           <SectionGroup
@@ -1575,11 +1565,9 @@ export function AdminCourseSectionsPage() {
             resolvePrerequisiteCode={resolvePrerequisiteCode}
             busy={busy}
             csvExportSectionId={csvExportSectionId}
-            feedbackExportSectionId={feedbackExportSectionId}
             onEdit={beginEdit}
             onViewRoster={openRosterForSection}
             onExportCsv={onExportCsvForSection}
-            onExportFeedback={onExportFeedbackForSection}
             onDeleteRow={onDeleteRow}
           />
         </div>

@@ -13,11 +13,10 @@ export type AIAssistantPageContext =
 /** Derive assistant page context from the current route (no query string). */
 export function deriveAIAssistantPageContext(pathname: string): AIAssistantPageContext {
   const p = pathname.split('?')[0].toLowerCase()
-  if (p.startsWith('/registration/clinical')) return 'clinical'
+  if (p.startsWith('/clinical')) return 'clinical'
   if (p.startsWith('/registration')) return 'registration'
   if (p.startsWith('/finances')) return 'finances'
   if (p.startsWith('/academics')) return 'academics'
-  if (p.startsWith('/clinical')) return 'clinical'
   if (p.startsWith('/documents')) return 'documents'
   if (p.startsWith('/profile') || p.startsWith('/my-account')) return 'account'
   return 'general'

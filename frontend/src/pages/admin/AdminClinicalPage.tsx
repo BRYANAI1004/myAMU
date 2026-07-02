@@ -22,6 +22,7 @@ import {
 } from '../../lib/api'
 import { formatMoney } from '../../lib/formatMoney'
 import { useAdminAuth } from '../../context/AdminAuthContext'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import { clinicalOfferedSlotsToLayoutRows } from '../../lib/clinicalTimetableAdapter'
 import { formatTimeHmsForDisplay } from '../../lib/formatScheduleTime'
@@ -172,21 +173,6 @@ function academicTermDisplayLabel(
   return t ? `${t.term_label} (${t.year} · ${t.term_name})` : '—'
 }
 
-function pickLatestAcademicTermId(terms: AcademicTerm[]): string {
-  if (terms.length === 0) return ''
-  const latest = terms.reduce((best, term) => {
-    if (term.sequence_no !== best.sequence_no) {
-      return term.sequence_no > best.sequence_no ? term : best
-    }
-    if (term.year !== best.year) return term.year > best.year ? term : best
-    if (term.quarter_index !== best.quarter_index) {
-      return term.quarter_index > best.quarter_index ? term : best
-    }
-    return term.id.localeCompare(best.id) > 0 ? term : best
-  }, terms[0]!)
-  return latest.id
-}
-
 const ADMIN_CLINICAL_GRID = STUDENT_REGISTRATION_TIMETABLE_GRID
 const ADMIN_CLINICAL_WEEKDAYS: readonly WeekdayFull[] = WEEKDAYS_FULL_ORDERED.slice(0, 5)
 
@@ -201,6 +187,8 @@ function timeFromDbForTimeInput(raw: string | null | undefined): string {
 
 export function AdminClinicalPage() {
   useAdminAuth()
+  const { activeTermId, setActiveTermId, loading: portalTermLoading } =
+    useAdminPortalTerm()
   const [tab, setTab] = useState<AdminClinicalTabId>('roster')
 
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
@@ -269,12 +257,6 @@ export function AdminClinicalPage() {
         const list = await fetchAcademicTerms({ signal: ac.signal })
         if (ac.signal.aborted) return
         setTerms(list)
-        setSlotsTermId((prev) => {
-          const current = prev.trim()
-          if (current !== '' && list.some((t) => t.id === current)) return prev
-          // Default to newest term so Clinical opens with data instead of a blank "Select term" state.
-          return pickLatestAcademicTermId(list)
-        })
       } catch {
         if (ac.signal.aborted) return
         setTerms([])
@@ -282,6 +264,11 @@ export function AdminClinicalPage() {
     })()
     return () => ac.abort()
   }, [])
+
+  useEffect(() => {
+    if (portalTermLoading || activeTermId === '') return
+    setSlotsTermId(activeTermId)
+  }, [portalTermLoading, activeTermId])
 
   useEffect(() => {
     if (tab !== 'roster') return
@@ -556,7 +543,11 @@ export function AdminClinicalPage() {
               id="admin-clinical-term-filter"
               className="admin-input"
               value={slotsTermId}
-              onChange={(e) => setSlotsTermId(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value
+                setSlotsTermId(v)
+                setActiveTermId(v)
+              }}
             >
               <option value="">Select term…</option>
               {(terms ?? []).map((t) => (

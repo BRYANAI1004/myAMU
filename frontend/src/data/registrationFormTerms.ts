@@ -40,3 +40,55 @@ export function buildRegistrationYearOptions(transcriptYears: number[]): number[
   }
   return Array.from(set).sort((a, b) => b - a)
 }
+
+export function registrationTermKey(
+  quarter: RegistrationQuarter,
+  year: number,
+): string {
+  return `${quarter}\t${year}`
+}
+
+export function parseRegistrationTermKey(
+  key: string,
+): { quarter: RegistrationQuarter; year: number } | null {
+  const parts = key.split('\t')
+  const quarter = normalizeQuarterLabel(parts[0] ?? '')
+  const year = Number(parts[1])
+  if (!quarter || !Number.isFinite(year)) return null
+  return { quarter, year: Math.trunc(year) }
+}
+
+export type RegistrationTermOption = {
+  key: string
+  quarter: RegistrationQuarter
+  year: number
+  label: string
+}
+
+export function buildRegistrationTermOptions(
+  transcriptYears: number[],
+): RegistrationTermOption[] {
+  const years = buildRegistrationYearOptions(transcriptYears)
+  const out: RegistrationTermOption[] = []
+  for (const year of years) {
+    for (const quarter of REGISTRATION_QUARTERS) {
+      out.push({
+        key: registrationTermKey(quarter, year),
+        quarter,
+        year,
+        label: `${quarter} ${year}`,
+      })
+    }
+  }
+  return out
+}
+
+export function ensureRegistrationTermOption(
+  options: RegistrationTermOption[],
+  quarter: RegistrationQuarter,
+  year: number,
+): RegistrationTermOption[] {
+  const key = registrationTermKey(quarter, year)
+  if (options.some((option) => option.key === key)) return options
+  return [{ key, quarter, year, label: `${quarter} ${year}` }, ...options]
+}

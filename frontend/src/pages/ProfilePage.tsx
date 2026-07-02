@@ -6,6 +6,7 @@ import {
   ProfileSection,
 } from '../components/ProfileFieldGrid'
 import { StudentLoginEmailPanel } from '../components/StudentLoginEmailPanel'
+import { StudentDigitalIdCard } from '../components/StudentDigitalIdCard'
 import { useAccount } from '../context/AccountContext'
 import { useStudentPortalT } from '../LanguageContext'
 import {
@@ -219,6 +220,7 @@ export function ProfilePage() {
   const [photoError, setPhotoError] = useState<string | null>(null)
   const [photoSuccess, setPhotoSuccess] = useState<string | null>(null)
   const [photoReloadKey, setPhotoReloadKey] = useState(0)
+  const [showDigitalId, setShowDigitalId] = useState(false)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -591,18 +593,33 @@ export function ProfilePage() {
                   <p className="portal-profile-hero__note">Selected: {photoFilename}</p>
                 ) : null}
                 {photoSuccess ? (
-                  <p className="portal-profile-hero__note portal-profile-hero__note--success" role="status">
+                  <p
+                    className="portal-profile-hero__note portal-profile-hero__note--success"
+                    role="status"
+                  >
                     {photoSuccess}
                   </p>
                 ) : null}
                 {photoError ? (
-                  <p className="portal-profile-hero__note portal-profile-hero__note--error" role="alert">
+                  <p
+                    className="portal-profile-hero__note portal-profile-hero__note--error"
+                    role="alert"
+                  >
                     {normalizedPhotoError}
                   </p>
                 ) : null}
               </div>
             </div>
             <div className="portal-profile-hero__actions">
+              <button
+                type="button"
+                className="portal-btn portal-btn--secondary"
+                aria-expanded={showDigitalId}
+                aria-controls="portal-digital-id-panel"
+                onClick={() => setShowDigitalId((open) => !open)}
+              >
+                {showDigitalId ? t('digitalIdHide') : t('digitalIdShow')}
+              </button>
               {isEditing ? (
                 <>
                   <button
@@ -633,6 +650,26 @@ export function ProfilePage() {
               )}
             </div>
           </header>
+
+          {showDigitalId ? (
+            <div id="portal-digital-id-panel">
+              <StudentDigitalIdCard
+                fullName={dashText(profile.fullName, dash)}
+                studentId={dashText(profile.studentId, dash)}
+                program={profile.program}
+                track={profile.track}
+                photoUrl={photoUrl}
+                photoPreviewUrl={photoPreviewUrl}
+                photoInitials={profileInitials(profile.fullName)}
+                hasSavedPhoto={hasSavedPhoto}
+                hasPhotoDisplay={hasPhotoDisplay}
+                onPhotoError={() => {
+                  setPhotoUrl(null)
+                  setPhotoReloadKey((k) => k + 1)
+                }}
+              />
+            </div>
+          ) : null}
 
           {saveSuccess ? (
             <p className="portal-profile-banner portal-profile-banner--success" role="status">

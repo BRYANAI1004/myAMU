@@ -14,7 +14,6 @@ type DocsBootstrapState =
   | {
       phase: 'ready'
       academicTermId: string
-      termLabel: string
       requirements: StudentDocumentRequirement[]
     }
 
@@ -86,7 +85,6 @@ export function DocumentsHomePage() {
         setDocs({
           phase: 'ready',
           academicTermId: payload.academicTermId,
-          termLabel: term.term_label,
           requirements: payload.requirements,
         })
       } catch (e) {
@@ -129,9 +127,6 @@ export function DocumentsHomePage() {
 
   return (
     <main className="portal-page portal-documents-home">
-      <p className="portal-inline-note portal-inline-note--flush" data-docs-build-marker>
-        {t('documentsBuildMarker')}
-      </p>
       {!isAuthenticated ? (
         <p className="portal-page-lede">{t('signInToViewDocuments')}</p>
       ) : null}
@@ -143,12 +138,6 @@ export function DocumentsHomePage() {
         >
           <p className="portal-profile-state__detail">{docs.message}</p>
         </div>
-      ) : null}
-
-      {isAuthenticated && docs.phase === 'ready' ? (
-        <p className="portal-inline-note portal-inline-note--flush">
-          {t('documentsRequirementsForTerm').replace('{term}', docs.termLabel)}
-        </p>
       ) : null}
 
       {showTabs ? <DocumentsTabs active={tab} onChange={setTab} /> : null}

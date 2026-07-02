@@ -1,20 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
-import {
-  fetchCurrentAcademicTerm,
-  fetchPostedCurrentAcademicTerm,
-  fetchRecentAcademicTerms,
-  type AcademicTerm,
-} from '../../lib/api'
-import {
-  mergeTermOptions,
-  pickDefaultRegistrationTermId,
-  REGISTRATION_TERMS_LOAD_ERROR,
-} from './registrationTermSearch'
+import { useStudentPortalTerm } from '../../context/StudentPortalTermContext'
+
+function registrationTermDisplayLabel(
+  term: { term_label?: string | null; term_name: string; year: number } | null,
+): string {
+  if (term == null) return ''
+  const label = term.term_label?.trim() ?? ''
+  if (label !== '') return label
+  return `${term.term_name} ${term.year}`.trim()
+}
 
 export function RegistrationHomePage() {
   const t = useStudentPortalT()
+  const { portalDefaultTerm, defaultTermId, loading: portalTermLoading } =
+    useStudentPortalTerm()
+
   const actions = useMemo(
     () =>
       [
@@ -31,7 +33,7 @@ export function RegistrationHomePage() {
           appendTermQuery: true as const,
         },
         {
-          to: '/dashboard' as const,
+          to: '/my-courses' as const,
           titleKey: 'regActionMyTimetableTitle' as const,
           descKey: 'regActionMyTimetableDesc' as const,
           appendTermQuery: false as const,
@@ -52,77 +54,20 @@ export function RegistrationHomePage() {
     [],
   )
 
-  const [recentTerms, setRecentTerms] = useState<AcademicTerm[]>([])
-  const [postedTerm, setPostedTerm] = useState<AcademicTerm | null>(null)
-  const [registrationOpenTerm, setRegistrationOpenTerm] = useState<AcademicTerm | null>(null)
-  const [selectedId, setSelectedId] = useState<string>('')
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  const options = useMemo(
-    () => mergeTermOptions(recentTerms, postedTerm, registrationOpenTerm),
-    [recentTerms, postedTerm, registrationOpenTerm],
+  const selectedId = defaultTermId.trim()
+  const termDisplay = useMemo(
+    () => registrationTermDisplayLabel(portalDefaultTerm),
+    [portalDefaultTerm],
   )
 
-  useEffect(() => {
-    const ac = new AbortController()
-    setLoadState('loading')
-    setLoadError(null)
-    void (async () => {
-      const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
-      const postedP = fetchPostedCurrentAcademicTerm({ signal: ac.signal })
-      const openP = fetchCurrentAcademicTerm({ signal: ac.signal })
-      const [recentR, postedR, openR] = await Promise.allSettled([recentP, postedP, openP])
-      if (ac.signal.aborted) return
-
-      let recent: AcademicTerm[] = []
-      let posted: AcademicTerm | null = null
-      let open: AcademicTerm | null = null
-      let anyRejected = false
-
-      if (recentR.status === 'fulfilled') {
-        recent = recentR.value
-      } else {
-        anyRejected = true
-        console.error('[registration/home] recent terms failed', recentR.reason)
-      }
-      if (postedR.status === 'fulfilled') {
-        posted = postedR.value
-      } else {
-        anyRejected = true
-        console.error('[registration/home] posted current term failed', postedR.reason)
-      }
-      if (openR.status === 'fulfilled') {
-        open = openR.value
-      } else {
-        anyRejected = true
-        console.error('[registration/home] registration_open current term failed', openR.reason)
-      }
-
-      setRecentTerms(recent)
-      setPostedTerm(posted)
-      setRegistrationOpenTerm(open)
-      const merged = mergeTermOptions(recent, posted, open)
-      setSelectedId(pickDefaultRegistrationTermId(merged, posted, open))
-
-      const haveAnyTerm = merged.length > 0
-      if (!haveAnyTerm && anyRejected) {
-        setLoadState('error')
-        setLoadError(REGISTRATION_TERMS_LOAD_ERROR)
-      } else {
-        setLoadState('ready')
-      }
-    })()
-    return () => ac.abort()
-  }, [])
+  const loadState = portalTermLoading
+    ? 'loading'
+    : selectedId !== ''
+      ? 'ready'
+      : 'error'
 
   const termQuery =
-    selectedId.trim() !== '' ? `?term=${encodeURIComponent(selectedId.trim())}` : ''
-
-  const termsErrorDisplay =
-    loadError === REGISTRATION_TERMS_LOAD_ERROR
-      ? t('registrationTermsLoadError')
-      : (loadError ?? t('registrationCouldNotLoadTerms'))
+    selectedId !== '' ? `?term=${encodeURIComponent(selectedId)}` : ''
 
   return (
     <main className="portal-page portal-stack">
@@ -131,7 +76,7 @@ export function RegistrationHomePage() {
         aria-labelledby="registration-term-heading"
       >
         <h2 id="registration-term-heading" className="portal-module-panel-heading">
-          {t('registrationSelectTermHeading')}
+          {t('registrationCurrentTermLabel')}
         </h2>
         {loadState === 'loading' ? (
           <p className="portal-text-muted portal-registration-term-status" role="status">
@@ -140,37 +85,11 @@ export function RegistrationHomePage() {
         ) : null}
         {loadState === 'error' ? (
           <p className="portal-text-muted portal-registration-term-status" role="alert">
-            {termsErrorDisplay}
-          </p>
-        ) : null}
-        {loadState === 'ready' && options.length === 0 ? (
-          <p className="portal-text-muted portal-registration-term-status" role="status">
             {t('registrationNoTermsAvailable')}
           </p>
         ) : null}
-        {loadState === 'ready' && options.length > 0 ? (
-          <>
-            <div className="portal-registration-term-field">
-              <label htmlFor="registration-term-select" className="portal-registration-term-label">
-                {t('registrationTermFieldLabel')}
-              </label>
-              <select
-                id="registration-term-select"
-                className="portal-account-ledger__select portal-registration-term-select"
-                value={selectedId}
-                onChange={(e) => setSelectedId(e.target.value)}
-              >
-                {options.map((termOpt) => (
-                  <option key={termOpt.id} value={termOpt.id}>
-                    {termOpt.term_label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="portal-text-muted portal-registration-term-hint">
-              {t('registrationRecentTermsHint')}
-            </p>
-          </>
+        {loadState === 'ready' ? (
+          <p className="portal-registration-term-display">{termDisplay}</p>
         ) : null}
       </section>
 

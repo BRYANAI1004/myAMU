@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import {
   createAdminStudentLoa,
   fetchAcademicTerms,
@@ -15,7 +16,6 @@ import {
   fetchAdminStudentDetail,
   fetchAdminStudentPhotoUrl,
   fetchAdminStudentDocuments,
-  fetchCurrentAcademicTerm,
   fetchStudentProgramProgress,
   resetAdminStudentDocumentRequirement,
   resetAllAdminStudentDocuments,
@@ -94,26 +94,22 @@ function academicTermsForAdminDocPicker(terms: AcademicTerm[]): AcademicTerm[] {
   })
 }
 
-/**
- * Default academic term for admin documents: latest registration label match, else registration-open
- * current term, else most recent visible (or all terms if none visible).
- */
 function pickDefaultDocumentsAcademicTermId(
   terms: AcademicTerm[],
   latestRegistrationTermLabel: string | null,
-  currentRegistrationOpen: AcademicTerm | null,
+  portalDefaultTerm: AcademicTerm | null,
 ): string | null {
   if (terms.length === 0) return null
   const pickerList = academicTermsForAdminDocPicker(terms)
+  if (portalDefaultTerm) {
+    const match = terms.find((t) => t.id === portalDefaultTerm.id)
+    if (match) return match.id
+  }
   const label = latestRegistrationTermLabel?.trim()
   if (label) {
     const match =
       terms.find((t) => t.term_label === label) ??
       pickerList.find((t) => t.term_label === label)
-    if (match) return match.id
-  }
-  if (currentRegistrationOpen) {
-    const match = terms.find((t) => t.id === currentRegistrationOpen.id)
     if (match) return match.id
   }
   return pickerList[0]?.id ?? null
@@ -188,6 +184,7 @@ export function AdminStudentDetailPage() {
   const { studentId: studentIdParam } = useParams<{ studentId: string }>()
   const studentId = studentIdParam ?? ''
   const t = useStudentPortalT()
+  const { portalDefaultTerm } = useAdminPortalTerm()
 
   const [detail, setDetail] = useState<AdminStudentDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -214,8 +211,6 @@ export function AdminStudentDetailPage() {
   const [docTerms, setDocTerms] = useState<AcademicTerm[] | null>(null)
   const [docTermsLoading, setDocTermsLoading] = useState(false)
   const [docTermsError, setDocTermsError] = useState<string | null>(null)
-  const [docCurrentRegistrationTerm, setDocCurrentRegistrationTerm] =
-    useState<AcademicTerm | null>(null)
   /** When set, Documents tab uses this academic term id instead of the default. */
   const [documentsTermOverride, setDocumentsTermOverride] = useState<
     string | null
@@ -264,7 +259,6 @@ export function AdminStudentDetailPage() {
     setDocTerms(null)
     setDocTermsLoading(false)
     setDocTermsError(null)
-    setDocCurrentRegistrationTerm(null)
     setDocumentsTermOverride(null)
     setDocumentsData(null)
     setDocumentsLoading(false)
@@ -474,9 +468,9 @@ export function AdminStudentDetailPage() {
     return pickDefaultDocumentsAcademicTermId(
       docTerms,
       detail?.latestRegistrationTerm ?? null,
-      docCurrentRegistrationTerm,
+      portalDefaultTerm,
     )
-  }, [docTerms, detail?.latestRegistrationTerm, docCurrentRegistrationTerm])
+  }, [docTerms, detail?.latestRegistrationTerm, portalDefaultTerm])
 
   const effectiveDocumentsTermId = useMemo(() => {
     if (documentsTermOverride) {
@@ -499,17 +493,12 @@ export function AdminStudentDetailPage() {
     setDocTermsError(null)
     ;(async () => {
       try {
-        const [terms, current] = await Promise.all([
-          fetchAcademicTerms({ signal: ac.signal }),
-          fetchCurrentAcademicTerm({ signal: ac.signal }),
-        ])
+        const terms = await fetchAcademicTerms({ signal: ac.signal })
         if (ac.signal.aborted) return
         setDocTerms(terms)
-        setDocCurrentRegistrationTerm(current)
       } catch (e) {
         if (ac.signal.aborted) return
         setDocTerms(null)
-        setDocCurrentRegistrationTerm(null)
         setDocTermsError(
           e instanceof Error ? e.message : 'Could not load academic terms.',
         )

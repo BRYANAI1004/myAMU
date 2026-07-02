@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParams'
-import { AdminCourseFeedbackModal } from '../../components/admin/AdminCourseFeedbackModal'
 import {
   deleteAdminPortalEnrollment,
   downloadAdminRegisteredStudentsCsv,
@@ -81,9 +80,6 @@ export function AdminCourseSectionRosterPage() {
   const [busyGradeId, setBusyGradeId] = useState<string | null>(null)
   const [gradeDraft, setGradeDraft] = useState<Record<string, string>>({})
   const [reloadNonce, setReloadNonce] = useState(0)
-  const [feedbackStudentId, setFeedbackStudentId] = useState<string | null>(
-    null,
-  )
   const [resolvedExportSectionId, setResolvedExportSectionId] = useState<
     number | null
   >(null)
@@ -102,17 +98,6 @@ export function AdminCourseSectionRosterPage() {
   }, [terms, termId])
 
   const missingContext = termId === '' || courseCode === ''
-
-  const rosterTermYear = useMemo(() => {
-    if (termId === '') return null
-    return terms?.find((x) => x.id === termId)?.year ?? null
-  }, [terms, termId])
-
-  /** Same `term` string as `portal_enrollments.term` / student feedback (not academic term row id). */
-  const rosterTermName = useMemo(() => {
-    if (termId === '') return null
-    return terms?.find((x) => x.id === termId)?.term_name ?? null
-  }, [terms, termId])
 
   const sectionIdParamParsed = useMemo(() => {
     if (sectionIdFromUrl === '') return null
@@ -324,18 +309,6 @@ export function AdminCourseSectionRosterPage() {
 
   return (
     <main className="admin-page admin-course-section-roster">
-      {feedbackStudentId != null &&
-      !missingContext &&
-      rosterTermYear != null &&
-      rosterTermName != null ? (
-        <AdminCourseFeedbackModal
-          studentId={feedbackStudentId}
-          courseCode={courseCode}
-          term={rosterTermName}
-          year={rosterTermYear}
-          onClose={() => setFeedbackStudentId(null)}
-        />
-      ) : null}
       <div className="admin-course-section-roster__top">
         <Link
           to={backTo}
@@ -584,31 +557,16 @@ export function AdminCourseSectionRosterPage() {
                           )}
                         </td>
                         <td>
-                          <div className="admin-course-section-roster__row-actions">
-                            <button
-                              type="button"
-                              className="portal-btn portal-btn--secondary portal-btn--compact"
-                              disabled={
-                                busyId != null ||
-                                busyGradeId != null ||
-                                rosterTermYear == null ||
-                                rosterTermName == null
-                              }
-                              onClick={() => setFeedbackStudentId(s.studentId)}
-                            >
-                              View Feedback
-                            </button>
-                            <button
-                              type="button"
-                              className="portal-btn portal-btn--secondary portal-btn--compact"
-                              disabled={busyId != null || withdrawn}
-                              onClick={() => void onRemove(s.studentId)}
-                            >
-                              {busyId === s.studentId
-                                ? 'Removing…'
-                                : 'Remove registration'}
-                            </button>
-                          </div>
+                          <button
+                            type="button"
+                            className="portal-btn portal-btn--secondary portal-btn--compact"
+                            disabled={busyId != null || withdrawn}
+                            onClick={() => void onRemove(s.studentId)}
+                          >
+                            {busyId === s.studentId
+                              ? 'Removing…'
+                              : 'Remove registration'}
+                          </button>
                         </td>
                       </tr>
                     )

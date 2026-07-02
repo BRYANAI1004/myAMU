@@ -24,6 +24,7 @@ export type AdminModuleKey =
   | 'academic_terms'
   | 'course_sections'
   | 'scheduling_timetable'
+  | 'feedback'
   | 'finance'
   | 'mass_email'
   | 'settings'
@@ -56,6 +57,7 @@ export const ADMIN_MODULES: readonly AdminModuleDefinition[] = [
     path: '/admin/course-sections/timetable',
     schedulingContext: true,
   },
+  { key: 'feedback', label: 'Feedback', path: '/admin/feedback' },
   { key: 'finance', label: 'Finance', path: '/admin/finance' },
   { key: 'mass_email', label: 'Mass Email', path: '/admin/mass-email' },
   { key: 'settings', label: 'Setting', path: '/admin/settings', end: true, footer: true },
@@ -71,7 +73,7 @@ const ALL_ADMIN_MODULE_KEYS: readonly AdminModuleKey[] = ADMIN_MODULES.map(
 const ROLE_MODULE_ACCESS: Record<AdminRole, readonly AdminModuleKey[]> = {
   super_admin: ALL_ADMIN_MODULE_KEYS,
   admin: ALL_ADMIN_MODULE_KEYS,
-  teacher: ['courses', 'course_sections', 'scheduling_timetable'],
+  teacher: ['courses', 'course_sections', 'scheduling_timetable', 'feedback'],
   clinical_teacher: ['clinical', 'finance'],
   clinical_admin: ['students', 'clinical', 'finance', 'mass_email'],
 }

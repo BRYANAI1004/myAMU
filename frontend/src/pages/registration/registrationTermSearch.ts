@@ -30,15 +30,14 @@ export function mergeTermOptions(
 }
 
 /**
- * URL term wins if it exists in options; else prefer the dashboard-posted term (`is_posted_to_dashboard`);
- * else the API `registration_open` current row; else the first `registration_open` visible term;
- * else the latest by `sequence_no` (options pre-sorted).
+ * URL term wins if it exists in options; else the registrar portal-default term
+ * (`is_posted_to_dashboard` / current-posted API); else the first option.
  */
 export function resolveSelectedRegistrationTermId(
   urlTerm: string | null,
   options: AcademicTerm[],
   postedCurrent: AcademicTerm | null,
-  registrationOpenCurrent: AcademicTerm | null,
+  _registrationOpenCurrent?: AcademicTerm | null,
 ): string {
   const url = urlTerm?.trim() ?? ''
   if (url !== '' && options.some((t) => t.id === url)) {
@@ -47,14 +46,6 @@ export function resolveSelectedRegistrationTermId(
   if (postedCurrent != null && options.some((t) => t.id === postedCurrent.id)) {
     return postedCurrent.id
   }
-  if (
-    registrationOpenCurrent != null &&
-    options.some((t) => t.id === registrationOpenCurrent.id)
-  ) {
-    return registrationOpenCurrent.id
-  }
-  const open = options.find((t) => t.status === 'registration_open')
-  if (open) return open.id
   return options[0]?.id ?? ''
 }
 

@@ -13,6 +13,7 @@ import {
 } from '../../lib/api'
 import { currentTermLabel } from '../../lib/academicCourseRecordsDisplay'
 import { ProgramProgressPanel } from '../../components/academics/ProgramProgressPanel'
+import { portalPillTabClass } from '../../lib/portalPillTabClass'
 import { CourseFeedbackCell } from '../../components/academics/CourseFeedbackCell'
 import { CourseFeedbackModal } from '../../components/academics/CourseFeedbackModal'
 import {
@@ -398,9 +399,7 @@ export function AcademicsPortalPage() {
             type="button"
             role="tab"
             aria-selected={tab === 'history'}
-            className={['portal-tab', tab === 'history' ? 'portal-tab--active' : '']
-              .filter(Boolean)
-              .join(' ')}
+            className={portalPillTabClass(tab === 'history')}
             onClick={() => setTab('history')}
           >
             {t('tabRegistrationHistory')}
@@ -409,9 +408,7 @@ export function AcademicsPortalPage() {
             type="button"
             role="tab"
             aria-selected={tab === 'transcript'}
-            className={['portal-tab', tab === 'transcript' ? 'portal-tab--active' : '']
-              .filter(Boolean)
-              .join(' ')}
+            className={portalPillTabClass(tab === 'transcript')}
             onClick={() => setTab('transcript')}
           >
             {t('transcriptHeading')}

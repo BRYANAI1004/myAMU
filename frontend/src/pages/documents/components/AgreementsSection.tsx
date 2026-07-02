@@ -23,7 +23,7 @@ export function AgreementsSection({
   const t = useStudentPortalT()
   const { account } = useAccount()
   const [profileName, setProfileName] = useState<string | null>(null)
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
   const [agreed, setAgreed] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -168,7 +168,7 @@ export function AgreementsSection({
                     </label>
                     <button
                       type="button"
-                      className="portal-btn portal-btn--primary portal-documents-agreement-body__submit"
+                      className="portal-btn portal-btn--secondary portal-documents-agreement-body__submit"
                       disabled={!agreed || submitting}
                       onClick={() => {
                         void handleSubmit()

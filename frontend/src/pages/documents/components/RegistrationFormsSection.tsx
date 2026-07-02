@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStudentPortalT } from '@/LanguageContext'
+import { useStudentPortalTerm } from '@/context/StudentPortalTermContext'
 import { useAccount } from '../../../context/AccountContext'
 import {
-  buildRegistrationYearOptions,
+  buildRegistrationTermOptions,
   defaultQuarterFromDate,
+  ensureRegistrationTermOption,
   normalizeQuarterLabel,
-  type RegistrationQuarter,
+  parseRegistrationTermKey,
+  registrationTermKey,
 } from '../../../data/registrationFormTerms'
 import {
   buildTranscriptTermOptions,
@@ -29,6 +32,7 @@ import { RegistrationFormPreview } from './RegistrationFormPreview'
 
 export function RegistrationFormsSection() {
   const t = useStudentPortalT()
+  const { portalDefaultTerm, loading: portalTermLoading } = useStudentPortalTerm()
   const { currentStudentId, account } = useAccount()
   const id = currentStudentId?.trim() ?? ''
 
@@ -38,13 +42,23 @@ export function RegistrationFormsSection() {
   const [loadNote, setLoadNote] = useState<string | null>(null)
   const [coreReady, setCoreReady] = useState(false)
 
-  const years = useMemo(() => {
-    const ys = (preview?.transcript ?? []).map((r) => r.year).filter((y) => Number.isFinite(y))
-    return buildRegistrationYearOptions(ys)
-  }, [preview])
+  const [termKey, setTermKey] = useState(() =>
+    registrationTermKey(defaultQuarterFromDate(), new Date().getFullYear()),
+  )
 
-  const [year, setYear] = useState(() => new Date().getFullYear())
-  const [quarter, setQuarter] = useState<RegistrationQuarter>(defaultQuarterFromDate())
+  const termOptions = useMemo(() => {
+    const ys = (preview?.transcript ?? []).map((r) => r.year).filter((y) => Number.isFinite(y))
+    const options = buildRegistrationTermOptions(ys)
+    const selected = parseRegistrationTermKey(termKey)
+    if (selected) {
+      return ensureRegistrationTermOption(options, selected.quarter, selected.year)
+    }
+    return options
+  }, [preview, termKey])
+
+  const selectedTerm = parseRegistrationTermKey(termKey)
+  const year = selectedTerm?.year ?? new Date().getFullYear()
+  const quarter = selectedTerm?.quarter ?? defaultQuarterFromDate()
 
   const [model, setModel] = useState<RegistrationFormViewModel | null>(null)
   const [generating, setGenerating] = useState(false)
@@ -113,7 +127,18 @@ export function RegistrationFormsSection() {
   }, [id, t])
 
   useEffect(() => {
-    if (!preview || defaultsAppliedRef.current) return
+    if (defaultsAppliedRef.current || portalTermLoading) return
+
+    if (portalDefaultTerm) {
+      const q = normalizeQuarterLabel(portalDefaultTerm.term_name)
+      if (q && Number.isFinite(portalDefaultTerm.year)) {
+        setTermKey(registrationTermKey(q, Math.trunc(portalDefaultTerm.year)))
+        defaultsAppliedRef.current = true
+        return
+      }
+    }
+
+    if (!preview) return
     const opts = buildTranscriptTermOptions(preview.transcript)
     const key = defaultTermKeyFromPreview(opts)
     if (key) {
@@ -122,8 +147,7 @@ export function RegistrationFormsSection() {
       const y = Number(parts[1])
       const q = normalizeQuarterLabel(term)
       if (Number.isFinite(y) && q) {
-        setYear(Math.trunc(y))
-        setQuarter(q)
+        setTermKey(registrationTermKey(q, Math.trunc(y)))
         defaultsAppliedRef.current = true
         return
       }
@@ -132,12 +156,11 @@ export function RegistrationFormsSection() {
     if (st?.year && Number.isFinite(st.year)) {
       const q = normalizeQuarterLabel(st.term)
       if (q) {
-        setYear(Math.trunc(st.year))
-        setQuarter(q)
+        setTermKey(registrationTermKey(q, Math.trunc(st.year)))
         defaultsAppliedRef.current = true
       }
     }
-  }, [preview, account.student])
+  }, [portalDefaultTerm, portalTermLoading, preview, account.student])
 
   const runGenerate = useCallback(async () => {
     if (!id) return
@@ -177,11 +200,11 @@ export function RegistrationFormsSection() {
   ])
 
   useEffect(() => {
-    if (!id || !coreReady) return
+    if (!id || !coreReady || portalTermLoading || !defaultsAppliedRef.current) return
     if (autoGenRef.current) return
     autoGenRef.current = true
     void runGenerate()
-  }, [id, coreReady, runGenerate])
+  }, [id, coreReady, portalTermLoading, runGenerate])
 
   if (!id) {
     return (
@@ -200,11 +223,9 @@ export function RegistrationFormsSection() {
         </p>
       ) : null}
       <RegistrationFormFilters
-        years={years}
-        year={year}
-        quarter={quarter}
-        onYearChange={setYear}
-        onQuarterChange={setQuarter}
+        terms={termOptions}
+        termKey={termKey}
+        onTermChange={setTermKey}
         onGenerate={() => {
           void runGenerate()
         }}

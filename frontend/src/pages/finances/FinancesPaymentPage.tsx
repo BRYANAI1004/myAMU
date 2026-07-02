@@ -3,6 +3,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '@/context/AccountContext'
+import { useStudentPortalTerm } from '@/context/StudentPortalTermContext'
 import { PaymentCardForm } from '@/components/finance/PaymentCardForm'
 import { PaymentSummaryCard, type PaymentBreakdownLine } from '@/components/finance/PaymentSummaryCard'
 import { portalTermLabel } from '@/lib/accountDisplay'
@@ -87,6 +88,8 @@ export function FinancesPaymentPage() {
     return ids.length > 0 ? ids : undefined
   }, [searchParams])
   const { account, currentStudentId, authToken, isAuthenticated } = useAccount()
+  const { resolveAccountingQuarter, loading: portalTermLoading } =
+    useStudentPortalTerm()
   const [term, setTerm] = useState(() => searchParams.get('term')?.trim() ?? '')
   const [year, setYear] = useState(() => Number(searchParams.get('year') ?? NaN))
   const [termLabel, setTermLabel] = useState(() => searchParams.get('label')?.trim() ?? '')
@@ -232,6 +235,7 @@ export function FinancesPaymentPage() {
       navigate('/finances/overview', { replace: true })
       return
     }
+    if (portalTermLoading) return
 
     const ac = new AbortController()
     setLoading(true)
@@ -245,13 +249,15 @@ export function FinancesPaymentPage() {
         if (nextTerm === '' || !Number.isFinite(nextYear) || nextYear <= 0) {
           const quartersRes = await fetchAccountingQuarters(studentId, { signal: ac.signal })
           if (ac.signal.aborted) return
-          const newest = quartersRes.quarters[0]
-          if (newest == null) {
+          const defaultQuarter =
+            resolveAccountingQuarter(quartersRes.quarters) ??
+            quartersRes.quarters[0]
+          if (defaultQuarter == null) {
             throw new Error(t('noPayableTermFound'))
           }
-          nextTerm = newest.term
-          nextYear = newest.year
-          nextLabel = newest.label
+          nextTerm = defaultQuarter.term
+          nextYear = defaultQuarter.year
+          nextLabel = defaultQuarter.label
           setTerm(nextTerm)
           setYear(nextYear)
           setTermLabel(nextLabel)
@@ -282,7 +288,7 @@ export function FinancesPaymentPage() {
     })()
 
     return () => ac.abort()
-  }, [authToken, isAuthenticated, navigate, studentId, term, termLabel, year, t])
+  }, [authToken, isAuthenticated, navigate, studentId, term, termLabel, year, t, portalTermLoading, resolveAccountingQuarter])
 
   useEffect(() => {
     let mounted = true

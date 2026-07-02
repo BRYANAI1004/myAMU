@@ -7055,6 +7055,7 @@ export type AdminCourseSectionEnrollmentRow = {
   name: string | null
   status: string
   grade: string | null
+  feedbackSubmitted?: boolean
 }
 
 function parseAdminCourseSectionEnrollmentList(
@@ -7072,6 +7073,7 @@ function parseAdminCourseSectionEnrollmentList(
     const nameRaw = r.name
     const statusRaw = r.status
     const gradeRaw = r.grade
+    const feedbackSubmittedRaw = r.feedbackSubmitted ?? r.feedback_submitted
     out.push({
       studentId: sid.trim(),
       name:
@@ -7086,6 +7088,8 @@ function parseAdminCourseSectionEnrollmentList(
         gradeRaw == null || String(gradeRaw).trim() === ''
           ? null
           : String(gradeRaw).trim(),
+      feedbackSubmitted:
+        feedbackSubmittedRaw === true || feedbackSubmittedRaw === 1,
     })
   }
   return out

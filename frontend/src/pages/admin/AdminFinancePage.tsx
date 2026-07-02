@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import { AdminFinanceQuarterPanel } from '../../components/admin/AdminFinanceQuarterPanel'
 import { AdminFinanceStudentDrawer } from '../../components/admin/AdminFinanceStudentDrawer'
 import {
@@ -55,6 +56,8 @@ function formatSummaryDueDate(iso: string | null): string {
 }
 
 export function AdminFinancePage() {
+  const { resolveFinanceQuarterIndex, loading: portalTermLoading } =
+    useAdminPortalTerm()
   const [pageTab, setPageTab] = useState<PageTab>('students')
   const [q, setQ] = useState('')
   const [debouncedQ, setDebouncedQ] = useState('')
@@ -95,12 +98,13 @@ export function AdminFinancePage() {
   useEffect(() => {
     const ac = new AbortController()
     setQuartersErr(null)
+    if (portalTermLoading) return () => ac.abort()
     ;(async () => {
       try {
         const list = await fetchGlobalFinanceQuarters({ signal: ac.signal })
         if (ac.signal.aborted) return
         setQuarters(list)
-        setQi(0)
+        setQi(resolveFinanceQuarterIndex(list))
       } catch (e) {
         if (!ac.signal.aborted) {
           setQuarters([])
@@ -111,7 +115,7 @@ export function AdminFinancePage() {
       }
     })()
     return () => ac.abort()
-  }, [])
+  }, [portalTermLoading, resolveFinanceQuarterIndex])
 
   const safeQi = Math.min(qi, Math.max(0, quarters.length - 1))
   const selectedQuarter = quarters[safeQi] ?? null

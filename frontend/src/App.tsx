@@ -24,6 +24,7 @@ import { AdminFinancePage } from './pages/admin/AdminFinancePage'
 import { AdminAcademicTermsPage } from './pages/admin/AdminAcademicTermsPage'
 import { AdminSettingsPage } from './pages/admin/AdminSettingsPage'
 import { AdminMassEmailPage } from './pages/admin/AdminMassEmailPage'
+import { AdminFeedbackPage } from './pages/admin/AdminFeedbackPage'
 import { LoginPage } from './pages/LoginPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ForgotStudentIdPage } from './pages/ForgotStudentIdPage'
@@ -47,13 +48,15 @@ import { TranscriptPage } from './pages/academics/TranscriptPage'
 import { GpaPage } from './pages/academics/GpaPage'
 import { AcademicProgressPage } from './pages/academics/AcademicProgressPage'
 import { EnrollmentVerificationPage } from './pages/academics/EnrollmentVerificationPage'
-import { ClinicalModuleShell } from './pages/clinical/ClinicalModuleShell'
+import { ClinicalLayout } from './pages/clinical/ClinicalLayout'
 import { ClinicalSchedulePage } from './pages/clinical/ClinicalSchedulePage'
 import { ClinicalAddDropPage } from './pages/clinical/ClinicalAddDropPage'
 import { ClinicalProgressPage } from './pages/clinical/ClinicalProgressPage'
 import { ClinicalExamRegistrationPage } from './pages/clinical/ClinicalExamRegistrationPage'
 import { DocumentsLayout } from './pages/documents/DocumentsLayout'
 import { DocumentsHomePage } from './pages/documents/DocumentsHomePage'
+import { MyCoursesLayout } from './pages/myCourses/MyCoursesLayout'
+import { MyCoursesPage } from './pages/myCourses/MyCoursesPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { DashboardPage } from './pages/DashboardPage'
 import {
@@ -110,11 +113,14 @@ function AdminIndexRedirect() {
 function RegistrationIndexRedirect() {
   const { search } = useLocation()
   const params = new URLSearchParams(search)
-  if (params.get('section') === 'clinical') {
-    const qs = params.toString()
-    return <Navigate to={`clinical/schedule${qs ? `?${qs}` : ''}`} replace />
-  }
-  return <Navigate to={{ pathname: 'offered-timetable', search }} replace />
+  params.delete('section')
+  const qs = params.toString()
+  return (
+    <Navigate
+      to={{ pathname: 'offered-timetable', search: qs ? `?${qs}` : '' }}
+      replace
+    />
+  )
 }
 
 /** Legacy `/registration/course-bin` and `/registration/add-drop` → Plan & schedule. */
@@ -123,13 +129,10 @@ function RegistrationCourseBinLegacyRedirect() {
   return <Navigate to={{ pathname: '../offered-timetable', search }} replace />
 }
 
-function ClinicalStudentLegacyRedirect() {
+function RegistrationClinicalLegacyRedirect() {
   const { pathname, search } = useLocation()
-  const tail = pathname.replace(/^\/clinical\/?/, '').trim() || 'schedule'
-  const next = new URLSearchParams(search)
-  next.set('section', 'clinical')
-  const qs = next.toString()
-  return <Navigate to={`/registration/clinical/${tail}${qs ? `?${qs}` : ''}`} replace />
+  const tail = pathname.replace(/^\/registration\/clinical\/?/, '').trim() || 'schedule'
+  return <Navigate to={`/clinical/${tail}${search}`} replace />
 }
 
 /** Student portal + login only; admin routes stay outside so student account APIs never run on `/admin`. */
@@ -182,6 +185,9 @@ export default function App() {
               element={<AdminSchedulingTimetablePage />}
             />
           </Route>
+          <Route element={<RequireAdminModule module="feedback" />}>
+            <Route path="feedback" element={<AdminFeedbackPage />} />
+          </Route>
           <Route element={<RequireAdminModule module="finance" />}>
             <Route path="finance" element={<AdminFinancePage />} />
           </Route>
@@ -211,19 +217,22 @@ export default function App() {
               <Route path="add-drop" element={<RegistrationCourseBinLegacyRedirect />} />
               <Route path="schedule" element={<Navigate to="/dashboard" replace />} />
               <Route path="offered-timetable" element={<OfferedTimetablePage />} />
-              <Route path="clinical" element={<ClinicalModuleShell />}>
-                <Route index element={<Navigate to="schedule" replace />} />
-                <Route path="schedule" element={<ClinicalSchedulePage />} />
-                <Route path="my-schedule" element={<ClinicalAddDropPage />} />
-                <Route path="progress" element={<ClinicalProgressPage />} />
-                <Route path="exam-registration" element={<ClinicalExamRegistrationPage />} />
-                <Route path="offered-timetable" element={<Navigate to="../schedule" replace />} />
-                <Route path="add-drop" element={<Navigate to="../my-schedule" replace />} />
-                <Route path="exam-practice" element={<Navigate to="../schedule" replace />} />
-                <Route path="evaluation" element={<Navigate to="../schedule" replace />} />
-                <Route path="required-hours" element={<Navigate to="../schedule" replace />} />
-                <Route path="compliance" element={<Navigate to="../schedule" replace />} />
-              </Route>
+            </Route>
+            <Route path="/my-courses" element={<MyCoursesLayout />}>
+              <Route index element={<MyCoursesPage />} />
+            </Route>
+            <Route path="/clinical" element={<ClinicalLayout />}>
+              <Route index element={<Navigate to="schedule" replace />} />
+              <Route path="schedule" element={<ClinicalSchedulePage />} />
+              <Route path="my-schedule" element={<ClinicalAddDropPage />} />
+              <Route path="progress" element={<ClinicalProgressPage />} />
+              <Route path="exam-registration" element={<ClinicalExamRegistrationPage />} />
+              <Route path="offered-timetable" element={<Navigate to="../schedule" replace />} />
+              <Route path="add-drop" element={<Navigate to="../my-schedule" replace />} />
+              <Route path="exam-practice" element={<Navigate to="../schedule" replace />} />
+              <Route path="evaluation" element={<Navigate to="../schedule" replace />} />
+              <Route path="required-hours" element={<Navigate to="../schedule" replace />} />
+              <Route path="compliance" element={<Navigate to="../schedule" replace />} />
             </Route>
             <Route path="/finances" element={<FinancesLayout />}>
               <Route index element={<Navigate to="overview" replace />} />
@@ -245,7 +254,7 @@ export default function App() {
               <Route path="progress" element={<AcademicProgressPage />} />
               <Route path="enrollment-verification" element={<EnrollmentVerificationPage />} />
             </Route>
-            <Route path="/clinical/*" element={<ClinicalStudentLegacyRedirect />} />
+            <Route path="/registration/clinical/*" element={<RegistrationClinicalLegacyRedirect />} />
             <Route path="/documents" element={<DocumentsLayout />}>
               <Route index element={<DocumentsHomePage />} />
               <Route path="policies" element={<Navigate to="/documents" replace />} />

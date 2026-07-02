@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import { fetchAccountingQuarters } from '@/lib/api'
 import { useAccount } from '@/context/AccountContext'
+import { useStudentPortalTerm } from '@/context/StudentPortalTermContext'
 
 /** Legacy route — store checkout now flows through AMUbill overview. */
 export function FinancesStoreCheckoutPage() {
@@ -10,6 +11,8 @@ export function FinancesStoreCheckoutPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { currentStudentId, isAuthenticated } = useAccount()
+  const { resolveAccountingQuarter, loading: portalTermLoading } =
+    useStudentPortalTerm()
   const studentId = currentStudentId?.trim() ?? ''
 
   useEffect(() => {
@@ -17,6 +20,7 @@ export function FinancesStoreCheckoutPage() {
       navigate('/finances/overview', { replace: true })
       return
     }
+    if (portalTermLoading) return
 
     const termFromQuery = searchParams.get('term')?.trim() ?? ''
     const yearFromQuery = Number(searchParams.get('year') ?? NaN)
@@ -36,15 +40,16 @@ export function FinancesStoreCheckoutPage() {
 
     void fetchAccountingQuarters(studentId)
       .then((res) => {
-        const newest = res.quarters[0]
-        if (newest == null) {
+        const defaultQuarter =
+          resolveAccountingQuarter(res.quarters) ?? res.quarters[0]
+        if (defaultQuarter == null) {
           navigate('/finances/overview', { replace: true })
           return
         }
         const params = new URLSearchParams()
-        params.set('term', newest.term)
-        params.set('year', String(newest.year))
-        if (newest.label.trim() !== '') params.set('label', newest.label)
+        params.set('term', defaultQuarter.term)
+        params.set('year', String(defaultQuarter.year))
+        if (defaultQuarter.label.trim() !== '') params.set('label', defaultQuarter.label)
         navigate(`/finances/overview?${params.toString()}`, {
           replace: true,
           state: { financePaymentRefresh: true },
@@ -53,7 +58,14 @@ export function FinancesStoreCheckoutPage() {
       .catch(() => {
         navigate('/finances/overview', { replace: true })
       })
-  }, [isAuthenticated, navigate, searchParams, studentId])
+  }, [
+    isAuthenticated,
+    navigate,
+    searchParams,
+    studentId,
+    portalTermLoading,
+    resolveAccountingQuarter,
+  ])
 
   return (
     <main className="portal-page">

@@ -4,12 +4,12 @@ import {
   fetchAdminCourseCatalog,
   fetchAdminCourseCatalogSummary,
   fetchAdminCoursesOpenForRegistration,
-  fetchCurrentAcademicTerm,
   type AcademicTerm,
   type CourseCatalogItem,
   type CourseCatalogPrefixCounts,
   type OpenRegistrationCourseRow,
 } from '../../lib/api'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import { AllCoursesTable } from './courses/AllCoursesTable'
 import { catalogGroupById } from './courses/catalogPrefixGroups'
 import { CoursesTabBar, type AdminCoursesTabId } from './courses/CoursesTabBar'
@@ -29,6 +29,8 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 }
 
 export function AdminCoursesPage() {
+  const { activeTermId, setActiveTermId, loading: portalTermLoading } =
+    useAdminPortalTerm()
   const [tab, setTab] = useState<AdminCoursesTabId>('catalog')
 
   const [catalogRows, setCatalogRows] = useState<CourseCatalogItem[]>([])
@@ -49,7 +51,6 @@ export function AdminCoursesPage() {
   const [termsError, setTermsError] = useState<string | null>(null)
 
   const [openTermId, setOpenTermId] = useState('')
-  const openTermAutoDone = useRef(false)
   const catalogFetchGen = useRef(0)
 
   const [openSearch, setOpenSearch] = useState('')
@@ -146,25 +147,16 @@ export function AdminCoursesPage() {
   }, [debouncedCatalogSearch, catalogGroupId])
 
   useEffect(() => {
-    if (!terms?.length || openTermAutoDone.current) return
-    const ac = new AbortController()
-    ;(async () => {
-      try {
-        const cur = await fetchCurrentAcademicTerm({ signal: ac.signal })
-        if (ac.signal.aborted) return
-        if (cur && terms.some((x) => x.id === cur.id)) {
-          setOpenTermId(cur.id)
-        } else {
-          setOpenTermId(terms[0].id)
-        }
-      } catch {
-        if (!ac.signal.aborted) setOpenTermId(terms[0].id)
-      } finally {
-        if (!ac.signal.aborted) openTermAutoDone.current = true
-      }
-    })()
-    return () => ac.abort()
-  }, [terms])
+    if (!terms?.length || portalTermLoading || activeTermId === '') return
+    if (terms.some((x) => x.id === activeTermId)) {
+      setOpenTermId(activeTermId)
+    }
+  }, [terms, activeTermId, portalTermLoading])
+
+  const onOpenTermIdChange = (id: string) => {
+    setOpenTermId(id)
+    setActiveTermId(id)
+  }
 
   useEffect(() => {
     if (tab !== 'open' || !openTermId) return
@@ -255,7 +247,7 @@ export function AdminCoursesPage() {
         <OpenRegistrationCoursesTable
           terms={terms}
           termId={openTermId}
-          onTermIdChange={setOpenTermId}
+          onTermIdChange={onOpenTermIdChange}
           termsLoading={termsLoading}
           termsError={termsError}
           search={openSearch}

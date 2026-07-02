@@ -9,6 +9,7 @@ import {
   type AcademicTermName,
   type AcademicTermStatus,
 } from '../../lib/api'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 
 const TERM_NAMES: AcademicTermName[] = ['Winter', 'Spring', 'Summer', 'Fall']
 const STATUSES: AcademicTermStatus[] = [
@@ -348,6 +349,7 @@ function defaultAddForm(nextSequence: number): TermForm {
 }
 
 export function AdminAcademicTermsPage() {
+  const { refreshPortalDefault } = useAdminPortalTerm()
   const [rows, setRows] = useState<AcademicTerm[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -496,6 +498,7 @@ export function AdminAcademicTermsPage() {
     setPostingId(termId)
     try {
       await postAcademicTermToDashboard(termId)
+      refreshPortalDefault()
       setReloadKey((k) => k + 1)
     } catch (e) {
       setPostError(e instanceof Error ? e.message : 'Could not post term.')

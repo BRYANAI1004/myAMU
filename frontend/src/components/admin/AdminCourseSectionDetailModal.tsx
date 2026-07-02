@@ -1,12 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   downloadAdminRegisteredStudentsCsv,
-  fetchAdminSectionRoster,
   type AdminCourseSection,
-  type AdminSectionRosterItem,
 } from '../../lib/api'
-import { subscribeEnrollmentChanged, type EnrollmentChangedEvent } from '../../lib/realtime'
 import { adminSchedulingQueryString } from '../../lib/adminSchedulingSearchParams'
 import {
   getPreferredCourseTitle,
@@ -23,8 +20,6 @@ type Props = {
   section: AdminCourseSection | null
   /** Catalog names for `section.course_code`, when available */
   courseCatalog?: CourseTitleFields | null
-  /** e.g. timetable column day, for context */
-  dayColumnLabel?: string | null
   /** Resolved catalog label for selected term, if available */
   termCatalogLabel?: string | null
   /** Current timetable term filter — enables deep link to edit on Course Sections */
@@ -34,11 +29,25 @@ type Props = {
   onClose: () => void
 }
 
-function row(dt: string, dd: string) {
+function DetailItem({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string
+  value: string
+  wide?: boolean
+}) {
   return (
-    <div>
-      <dt>{dt}</dt>
-      <dd>{dd}</dd>
+    <div
+      className={
+        wide
+          ? 'admin-course-section-detail__item admin-course-section-detail__item--wide'
+          : 'admin-course-section-detail__item'
+      }
+    >
+      <span className="admin-course-section-detail__label">{label}</span>
+      <span className="admin-course-section-detail__value">{value}</span>
     </div>
   )
 }
@@ -46,7 +55,6 @@ function row(dt: string, dd: string) {
 export function AdminCourseSectionDetailModal({
   section,
   courseCatalog = null,
-  dayColumnLabel,
   termCatalogLabel,
   academicTermId,
   returnSearch = '',
@@ -54,58 +62,11 @@ export function AdminCourseSectionDetailModal({
 }: Props) {
   const [csvExporting, setCsvExporting] = useState(false)
   const [csvExportError, setCsvExportError] = useState<string | null>(null)
-  const [rosterLoading, setRosterLoading] = useState(false)
-  const [rosterError, setRosterError] = useState<string | null>(null)
-  const [rosterRows, setRosterRows] = useState<AdminSectionRosterItem[]>([])
-
-  const loadRoster = useCallback(
-    async (sectionId: number, signal?: AbortSignal) => {
-      setRosterLoading(true)
-      setRosterError(null)
-      try {
-        const rows = await fetchAdminSectionRoster(sectionId, { signal })
-        if (signal?.aborted) return
-        setRosterRows(rows)
-      } catch (e) {
-        if (signal?.aborted) return
-        setRosterRows([])
-        setRosterError(
-          e instanceof Error ? e.message : 'Failed to load section roster.',
-        )
-      } finally {
-        if (!signal?.aborted) setRosterLoading(false)
-      }
-    },
-    [],
-  )
 
   useEffect(() => {
     setCsvExportError(null)
     setCsvExporting(false)
   }, [section?.id])
-
-  useEffect(() => {
-    if (section == null) {
-      setRosterRows([])
-      setRosterError(null)
-      setRosterLoading(false)
-      return
-    }
-    const ac = new AbortController()
-    void loadRoster(section.id, ac.signal)
-    return () => ac.abort()
-  }, [section?.id, loadRoster])
-
-  useEffect(() => {
-    if (section == null) return
-    const currentSectionId = section.id
-    const handleEnrollmentChanged = (event: EnrollmentChangedEvent) => {
-      if (event.type !== 'enrollment.changed') return
-      if (event.sectionId !== currentSectionId) return
-      void loadRoster(currentSectionId)
-    }
-    return subscribeEnrollmentChanged(handleEnrollmentChanged)
-  }, [section?.id, loadRoster])
 
   if (section == null) return null
 
@@ -142,6 +103,14 @@ export function AdminCourseSectionDetailModal({
     return query === '' ? null : `?${query}`
   })()
 
+  const scheduleTime = formatTimeRangeHmsForDisplay(
+    section.start_time,
+    section.end_time,
+  )
+  const deliveryLabel = formatDeliveryModeForDisplay(section.delivery_mode)
+  const trackLabel = scheduleTrackDetailLabel(section.schedule_track)
+  const weekdayLabel = formatWeekdaysLongFromStored(section.weekday)
+
   return (
     <div
       className="admin-section-detail-backdrop"
@@ -151,89 +120,76 @@ export function AdminCourseSectionDetailModal({
       }}
     >
       <div
-        className="admin-section-detail-modal"
+        className="admin-section-detail-modal admin-section-detail-modal--course-section"
         role="dialog"
         aria-modal="true"
         aria-labelledby="admin-section-detail-title"
       >
-        <h2 id="admin-section-detail-title" className="admin-section-detail-modal__title">
-          {section.course_code} · {section.section_code}
-        </h2>
-        {dayColumnLabel != null && dayColumnLabel !== '' && (
-          <p className="admin-section-detail-modal__meta">
-            Column: {dayColumnLabel}
-          </p>
-        )}
-        <dl className="admin-section-detail-modal__dl">
-          {row('Course code', section.course_code)}
-          {row('Course title', courseTitlePrimary)}
-          {courseTitleAlternate !== ''
-            ? row('Alternate title', courseTitleAlternate)
-            : null}
-          {row('Prerequisite', prerequisiteDisplay ?? '—')}
-          {row('Timetable track', scheduleTrackDetailLabel(section.schedule_track))}
-          {row('Section code', section.section_code)}
-          {row('Academic term', termLine)}
-          {row('Weekdays', formatWeekdaysLongFromStored(section.weekday))}
-          {row(
-            'Time',
-            formatTimeRangeHmsForDisplay(section.start_time, section.end_time),
-          )}
-          {row('Delivery mode', formatDeliveryModeForDisplay(section.delivery_mode))}
-          {row('Room', section.room?.trim() ? section.room : '—')}
-          {row('Instructor', section.instructor?.trim() ? section.instructor : '—')}
-          {row('Notes', section.notes?.trim() ? section.notes : '—')}
-        </dl>
-        {rosterError != null ? (
-          <p className="portal-card-note portal-profile-state--error" role="alert">
-            {rosterError}
-          </p>
-        ) : null}
-        {rosterLoading ? (
-          <p className="portal-text-muted" role="status" aria-live="polite">
-            Loading roster…
-          </p>
-        ) : rosterRows.length === 0 ? (
-          <p className="portal-text-muted">
-            No students are currently registered in this section.
-          </p>
-        ) : (
-          <div className="portal-table-wrap admin-table-wrap" style={{ marginTop: '0.75rem' }}>
-            <table className="portal-table">
-              <thead>
-                <tr>
-                  <th scope="col">Student ID</th>
-                  <th scope="col">Student name</th>
-                  <th scope="col">Enrollment status</th>
-                  <th scope="col">Program</th>
-                  <th scope="col">Email</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rosterRows.map((item) => (
-                  <tr key={item.studentId}>
-                    <td>
-                      <code className="admin-code">{item.studentId}</code>
-                    </td>
-                    <td>{item.studentName}</td>
-                    <td>{item.enrollmentStatus ?? '—'}</td>
-                    <td>{item.program ?? '—'}</td>
-                    <td>{item.email ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <header className="admin-course-section-detail__head">
+          <div className="admin-course-section-detail__head-text">
+            <p className="admin-course-section-detail__code">
+              {section.course_code} · {section.section_code}
+            </p>
+            <h2
+              id="admin-section-detail-title"
+              className="admin-course-section-detail__title"
+            >
+              {courseTitlePrimary}
+            </h2>
+            {courseTitleAlternate !== '' ? (
+              <p className="admin-course-section-detail__subtitle">
+                {courseTitleAlternate}
+              </p>
+            ) : null}
           </div>
-        )}
-        {csvExportError != null ? (
-          <p
-            className="portal-card-note portal-profile-state--error"
-            role="alert"
+          <button
+            type="button"
+            className="admin-course-section-detail__close"
+            aria-label="Close"
+            onClick={onClose}
           >
-            {csvExportError}
-          </p>
-        ) : null}
-        <div className="admin-section-detail-modal__actions">
+            ×
+          </button>
+        </header>
+
+        <div className="admin-course-section-detail__body">
+          <div className="admin-course-section-detail__chips">
+            <span className="admin-course-section-detail__chip">{termLine}</span>
+            <span className="admin-course-section-detail__chip">{deliveryLabel}</span>
+          </div>
+
+          <div className="admin-course-section-detail__grid">
+            <DetailItem label="Weekdays" value={weekdayLabel} />
+            <DetailItem label="Time" value={scheduleTime} />
+            <DetailItem
+              label="Room"
+              value={section.room?.trim() ? section.room : '—'}
+            />
+            <DetailItem
+              label="Instructor"
+              value={section.instructor?.trim() ? section.instructor : '—'}
+            />
+            <DetailItem
+              label="Prerequisite"
+              value={prerequisiteDisplay ?? '—'}
+            />
+            <DetailItem label="Timetable track" value={trackLabel} />
+            {section.notes?.trim() ? (
+              <DetailItem label="Notes" value={section.notes.trim()} wide />
+            ) : null}
+          </div>
+
+          {csvExportError != null ? (
+            <p
+              className="portal-card-note portal-profile-state--error admin-course-section-detail__error"
+              role="alert"
+            >
+              {csvExportError}
+            </p>
+          ) : null}
+        </div>
+
+        <footer className="admin-course-section-detail__foot">
           <button
             type="button"
             className="portal-btn portal-btn--secondary portal-btn--compact"
@@ -297,14 +253,7 @@ export function AdminCourseSectionDetailModal({
               Course Sections
             </button>
           )}
-          <button
-            type="button"
-            className="portal-btn portal-btn--primary portal-btn--compact"
-            onClick={onClose}
-          >
-            Close
-          </button>
-        </div>
+        </footer>
       </div>
     </div>
   )

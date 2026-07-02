@@ -1,7 +1,9 @@
 import type { Request, Response } from "express";
 import { env } from "../config/env.js";
 import { isUniqueViolation } from "../lib/dbErrors.js";
+import { pool } from "../lib/db.js";
 import { getAcademicTermById } from "../repositories/academicTermRepository.js";
+import { mapCourseFeedbackByStudentForCourseTermYear } from "../repositories/courseFeedbackRepository.js";
 import { listAdminEnrollmentRowsForSection } from "../repositories/studentEnrollmentRepository.js";
 import { buildFeedbackCsvForSection } from "../services/adminExportFeedbackCsvService.js";
 import { buildRegisteredStudentsCsvForSection } from "../services/adminExportRegisteredStudentsCsvService.js";
@@ -205,15 +207,26 @@ export async function getAdminCourseSectionEnrollments(
       academicTermId,
       courseSectionId != null ? { courseSectionId } : undefined,
     );
+    const filtered = rows.filter((r) => r.studentId !== "");
+    const termName = String(termRow.term_name ?? "").trim();
+    const year = Number(termRow.year);
+    const feedbackMap =
+      termName !== "" && Number.isFinite(year)
+        ? await mapCourseFeedbackByStudentForCourseTermYear(pool, {
+            courseCode,
+            term: termName,
+            year,
+            studentIds: filtered.map((r) => r.studentId),
+          })
+        : new Map<string, { student_id: string }>();
     res.json(
-      rows
-        .filter((r) => r.studentId !== "")
-        .map((r) => ({
-          studentId: r.studentId,
-          name: r.name,
-          status: r.status,
-          grade: r.grade,
-        })),
+      filtered.map((r) => ({
+        studentId: r.studentId,
+        name: r.name,
+        status: r.status,
+        grade: r.grade,
+        feedbackSubmitted: feedbackMap.has(r.studentId),
+      })),
     );
   } catch (e) {
     console.error("[admin/course-sections/enrollments] list failed:", e);

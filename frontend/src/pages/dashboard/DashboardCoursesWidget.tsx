@@ -6,9 +6,9 @@ import {
   type StudentPortalKey,
 } from '@/lib/i18n'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalTerm } from '../../context/StudentPortalTermContext'
 import {
   fetchAcademicTerms,
-  fetchCurrentAcademicTerm,
   fetchPostedCurrentAcademicTerm,
   fetchRecentAcademicTerms,
   fetchStudentEnrolledSections,
@@ -270,6 +270,7 @@ export function DashboardCoursesWidget() {
   const [portalEnrollmentRefreshTick, setPortalEnrollmentRefreshTick] = useState(0)
 
   const { account, fetchedAccount, loading, isAuthenticated, currentStudentId } = useAccount()
+  const { activeTerm, loading: portalTermLoading } = useStudentPortalTerm()
 
   useEffect(() => {
     function onPortalEnrollmentChanged() {
@@ -307,18 +308,15 @@ export function DashboardCoursesWidget() {
     void (async () => {
       const recentP = fetchRecentAcademicTerms(3, { signal: ac.signal })
       const postedP = fetchPostedCurrentAcademicTerm({ signal: ac.signal })
-      const openP = fetchCurrentAcademicTerm({ signal: ac.signal })
-      const [recentR, postedR, openR] = await Promise.allSettled([recentP, postedP, openP])
+      const [recentR, postedR] = await Promise.allSettled([recentP, postedP])
       if (ac.signal.aborted) return
 
       let recent: Awaited<ReturnType<typeof fetchRecentAcademicTerms>> = []
       let posted: Awaited<ReturnType<typeof fetchPostedCurrentAcademicTerm>> = null
-      let open: Awaited<ReturnType<typeof fetchCurrentAcademicTerm>> = null
       if (recentR.status === 'fulfilled') recent = recentR.value
       if (postedR.status === 'fulfilled') posted = postedR.value
-      if (openR.status === 'fulfilled') open = openR.value
 
-      const merged = mergeTermOptions(recent, posted, open)
+      const merged = mergeTermOptions(recent, posted)
       if (ac.signal.aborted) return
       setRegistrationMergedScheduleTerms(
         merged.map((t) => ({
@@ -408,7 +406,13 @@ export function DashboardCoursesWidget() {
     return { term, year }
   }, [schedulePayloadStudent.term, schedulePayloadStudent.year])
 
-  const resolvedWeekTerm = calendarWeekTerm ?? defaultTermFromAccount
+  const portalDefaultWeekTerm = useMemo((): CalendarWeekTermKey | null => {
+    if (portalTermLoading || activeTerm == null) return null
+    return { term: activeTerm.term_name, year: activeTerm.year }
+  }, [activeTerm, portalTermLoading])
+
+  const resolvedWeekTerm =
+    calendarWeekTerm ?? portalDefaultWeekTerm ?? defaultTermFromAccount
 
   useEffect(() => {
     setGcalModalOpen(false)

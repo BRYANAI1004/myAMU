@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useAdminPortalTerm } from '../../context/AdminPortalTermContext'
 import { TimetableWeekGrid } from '../../components/timetable/TimetableWeekGrid'
 import { applyAdminSchedulingToSearchParams } from '../../lib/adminSchedulingSearchParams'
 import { AdminCourseSectionDetailModal } from '../../components/admin/AdminCourseSectionDetailModal'
@@ -21,6 +22,10 @@ import {
   timetableBodyHeightPx,
 } from '../../lib/timetableBlockLayout'
 type TimetableLangTab = 'en' | 'cn'
+
+function weekdayShortLabel(day: string): string {
+  return day.length > 3 ? day.slice(0, 3) : day
+}
 
 function hourRowLabel(hour: number): string {
   return formatTimeHmsForDisplay(`${hour}:00:00`)
@@ -46,7 +51,7 @@ function AdminTimetableWeekGrid({
       placedWeekdays={placedByDay}
       hourRows={hourRows}
       bodyHeightPx={bodyHeightPx}
-      weekdayLabel={(d) => d}
+      weekdayLabel={(d) => weekdayShortLabel(d)}
       hourLabel={(h) => hourRowLabel(h)}
       renderBlock={(b, d) => {
         const sec = b.source
@@ -75,15 +80,15 @@ function AdminTimetableWeekGrid({
             }}
             onClick={() => onBlockClick(sec, d)}
           >
-            <span className="admin-timetable-v2__block-title">
+            <span className="admin-timetable-v2__block-code">
               {sec.course_code} {sec.section_code}
             </span>
             <span className="admin-timetable-v2__block-subtitle">{preferredTitle}</span>
             <span className="admin-timetable-v2__block-meta">
               {formatTimeHmsForDisplay(sec.start_time)} – {formatTimeHmsForDisplay(sec.end_time)}
-            </span>
-            <span className="admin-timetable-v2__block-meta">
-              {formatDeliveryModeForDisplay(sec.delivery_mode)}
+              {formatDeliveryModeForDisplay(sec.delivery_mode)
+                ? ` · ${formatDeliveryModeForDisplay(sec.delivery_mode)}`
+                : ''}
             </span>
           </button>
         )
@@ -94,6 +99,12 @@ function AdminTimetableWeekGrid({
 
 export function AdminSchedulingTimetablePage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const {
+    activeTermId,
+    setActiveTermId,
+    resolveTermId,
+    loading: portalTermLoading,
+  } = useAdminPortalTerm()
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
   const [academicTermId, setAcademicTermId] = useState('')
   const [sections, setSections] = useState<AdminCourseSection[] | null>(null)
@@ -110,6 +121,7 @@ export function AdminSchedulingTimetablePage() {
   const [langTab, setLangTab] = useState<TimetableLangTab>('en')
 
   useEffect(() => {
+    if (portalTermLoading) return
     const ac = new AbortController()
     ;(async () => {
       const [termOutcome, courseOutcome] = await Promise.allSettled([
@@ -140,11 +152,8 @@ export function AdminSchedulingTimetablePage() {
       const urlQ = sp.get('q') ?? ''
 
       const nextTerm =
-        urlTerm && t.some((x) => x.id === urlTerm)
-          ? urlTerm
-          : t.length > 0
-            ? t[0].id
-            : ''
+        activeTermId ||
+        resolveTermId(urlTerm && t.some((x) => x.id === urlTerm) ? urlTerm : '')
 
       setAcademicTermId(nextTerm)
 
@@ -165,7 +174,22 @@ export function AdminSchedulingTimetablePage() {
       )
     })()
     return () => ac.abort()
-  }, [setSearchParams])
+  }, [setSearchParams, activeTermId, resolveTermId, portalTermLoading])
+
+  useEffect(() => {
+    if (portalTermLoading || terms == null || activeTermId === '') return
+    if (activeTermId === academicTermId.trim()) return
+    setAcademicTermId(activeTermId)
+    setSearchParams(
+      (prev) =>
+        applyAdminSchedulingToSearchParams(prev, {
+          term: activeTermId,
+          course: prev.get('course')?.trim() ?? '',
+          q: prev.get('q') ?? '',
+        }),
+      { replace: true },
+    )
+  }, [activeTermId, portalTermLoading, terms, academicTermId, setSearchParams])
 
   useEffect(() => {
     if (terms == null || terms.length === 0) return
@@ -173,7 +197,8 @@ export function AdminSchedulingTimetablePage() {
     const termOk = t && terms.some((x) => x.id === t) ? t : null
     if (termOk == null) return
     setAcademicTermId((prev) => (termOk !== prev.trim() ? termOk : prev))
-  }, [searchParams, terms])
+    setActiveTermId(termOk)
+  }, [searchParams, terms, setActiveTermId])
 
   useEffect(() => {
     const tid = academicTermId.trim()
@@ -261,8 +286,8 @@ export function AdminSchedulingTimetablePage() {
   const timetableReturnSearch = searchParams.toString()
 
   return (
-    <main className="admin-page">
-      <div className="admin-page__toolbar">
+    <main className="admin-page admin-scheduling-timetable-page">
+      <div className="admin-page__toolbar admin-scheduling-timetable-page__toolbar">
         <h1 className="admin-page__title admin-page__title--inline">
           Timetable
         </h1>
@@ -284,6 +309,7 @@ export function AdminSchedulingTimetablePage() {
               onChange={(e) => {
                 const v = e.target.value
                 setAcademicTermId(v)
+                setActiveTermId(v)
                 setSearchParams(
                   (prev) =>
                     applyAdminSchedulingToSearchParams(
@@ -324,10 +350,10 @@ export function AdminSchedulingTimetablePage() {
       {loading && <p className="portal-text-muted">Loading timetable…</p>}
 
       {!loading && sections != null && error == null && (
-        <>
-          <div className="portal-timetable-lang-head">
+        <div className="admin-scheduling-timetable-card">
+          <div className="admin-scheduling-timetable-card__head">
             <div
-              className="portal-timetable-lang-tabs"
+              className="admin-finance-page-tabs admin-scheduling-timetable-tabs"
               role="tablist"
               aria-label="Timetable language"
             >
@@ -335,27 +361,28 @@ export function AdminSchedulingTimetablePage() {
                 type="button"
                 role="tab"
                 id="admin-sched-tt-tab-en"
-                className="portal-timetable-lang-tab"
+                className={`admin-finance-page-tab${langTab === 'en' ? ' admin-finance-page-tab--active' : ''}`}
                 aria-selected={langTab === 'en'}
                 aria-controls="admin-sched-tt-panel-en"
                 onClick={() => setLangTab('en')}
               >
-                English Timetable
+                English
               </button>
               <button
                 type="button"
                 role="tab"
                 id="admin-sched-tt-tab-cn"
-                className="portal-timetable-lang-tab"
+                className={`admin-finance-page-tab${langTab === 'cn' ? ' admin-finance-page-tab--active' : ''}`}
                 aria-selected={langTab === 'cn'}
                 aria-controls="admin-sched-tt-panel-cn"
                 onClick={() => setLangTab('cn')}
               >
-                Chinese Timetable
+                Chinese
               </button>
             </div>
           </div>
 
+          <div className="admin-scheduling-timetable-card__body">
           {langTab === 'en' ? (
             <div
               role="tabpanel"
@@ -413,7 +440,8 @@ export function AdminSchedulingTimetablePage() {
               )}
             </div>
           )}
-        </>
+          </div>
+        </div>
       )}
 
       {detail != null && (
@@ -423,7 +451,6 @@ export function AdminSchedulingTimetablePage() {
             catalogByCode.get(detail.section.course_code.trim().toUpperCase()) ??
             null
           }
-          dayColumnLabel={detail.dayLabel}
           termCatalogLabel={detailTermCatalogLabel}
           academicTermId={detail.academicTermId.trim() || null}
           returnSearch={timetableReturnSearch}

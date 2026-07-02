@@ -1,4 +1,5 @@
 import { useStudentPortalT } from '@/LanguageContext'
+import { portalPillTabClass } from '@/lib/portalPillTabClass'
 
 export type DocumentsTabId = 'registration' | 'quiz' | 'agreements'
 
@@ -29,12 +30,7 @@ export function DocumentsTabs({ active, onChange }: DocumentsTabsProps) {
             type="button"
             role="tab"
             aria-selected={active === id}
-            className={[
-              'portal-tab',
-              active === id ? 'portal-tab--active' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
+              className={portalPillTabClass(active === id)}
             onClick={() => onChange(id)}
           >
             {t(labelKey)}

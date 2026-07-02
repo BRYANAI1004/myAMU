@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLanguage, useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '@/context/AccountContext'
+import { useStudentPortalTerm } from '@/context/StudentPortalTermContext'
 import { IconFeesStore } from '@/components/icons/PortalModuleIcons'
 import {
   deleteStoreCartLineApi,
@@ -31,6 +32,8 @@ export function FinancesStorePage() {
   const t = useStudentPortalT()
   const navigate = useNavigate()
   const { currentStudentId, authToken, isAuthenticated } = useAccount()
+  const { resolveAccountingQuarter, loading: portalTermLoading } =
+    useStudentPortalTerm()
   const studentId = currentStudentId?.trim() ?? ''
   const token = authToken?.trim() || undefined
   const [catalog, setCatalog] = useState<StoreCatalogItem[]>([])
@@ -59,6 +62,8 @@ export function FinancesStorePage() {
   }, [isAuthenticated, navigate, studentId])
 
   useEffect(() => {
+    if (portalTermLoading) return
+
     const ac = new AbortController()
     setLoading(true)
     setError(null)
@@ -71,14 +76,16 @@ export function FinancesStorePage() {
         if (ac.signal.aborted) return
         setCatalog(catalogRes.items)
         setPage(0)
-        const newest = quartersRes.quarters[0]
-        if (newest == null) {
+        const defaultQuarter =
+          resolveAccountingQuarter(quartersRes.quarters) ??
+          quartersRes.quarters[0]
+        if (defaultQuarter == null) {
           throw new Error('No payable term found for your account.')
         }
-        setTerm(newest.term)
-        setYear(newest.year)
-        setTermLabel(newest.label)
-        const cartRes = await fetchStoreCart(newest.term, newest.year, {
+        setTerm(defaultQuarter.term)
+        setYear(defaultQuarter.year)
+        setTermLabel(defaultQuarter.label)
+        const cartRes = await fetchStoreCart(defaultQuarter.term, defaultQuarter.year, {
           signal: ac.signal,
           authToken: token,
         })
@@ -92,7 +99,7 @@ export function FinancesStorePage() {
       }
     })()
     return () => ac.abort()
-  }, [applyCartResponse, locale, studentId, token])
+  }, [applyCartResponse, locale, studentId, token, portalTermLoading, resolveAccountingQuarter])
 
   const totalPages = Math.max(1, Math.ceil(catalog.length / STORE_PAGE_SIZE))
   const safePage = Math.min(page, totalPages - 1)

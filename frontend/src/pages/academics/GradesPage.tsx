@@ -1,19 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalTerm } from '../../context/StudentPortalTermContext'
 import { useStudentPortalT } from '../../LanguageContext'
 import {
   fetchStudentAcademics,
   type StudentAcademicsResponse,
 } from '../../lib/api'
 import { courseRowDisplayTitle } from '../../lib/academicsTranscriptDisplay'
-
-function termYearKey(term: string, year: number): string {
-  return `${term}\t${year}`
-}
+import { termYearKey } from '../../lib/studentPortalDefaultTerm'
 
 export function GradesPage() {
   const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const { activeTerm, loading: portalTermLoading } = useStudentPortalTerm()
   const dash = t('dashEm')
 
   const [academics, setAcademics] = useState<StudentAcademicsResponse | null>(
@@ -26,11 +25,13 @@ export function GradesPage() {
 
   useEffect(() => {
     const id = currentStudentId?.trim()
-    if (!id) {
-      setAcademics(null)
-      setLoading(false)
-      setError(null)
-      setSelectedKey(null)
+    if (!id || portalTermLoading) {
+      if (!id) {
+        setAcademics(null)
+        setLoading(false)
+        setError(null)
+        setSelectedKey(null)
+      }
       return
     }
 
@@ -45,9 +46,19 @@ export function GradesPage() {
         const data = await fetchStudentAcademics(id, { signal: ac.signal })
         if (ac.signal.aborted) return
         setAcademics(data)
-        const ct = data.currentTerm
-        if (ct) {
-          setSelectedKey(termYearKey(ct.term, ct.year))
+        const portalKey =
+          activeTerm != null
+            ? termYearKey(activeTerm.term_name, activeTerm.year)
+            : null
+        if (
+          portalKey != null &&
+          data.availableTerms.some(
+            (termOpt) => termYearKey(termOpt.term, termOpt.year) === portalKey,
+          )
+        ) {
+          setSelectedKey(portalKey)
+        } else if (data.currentTerm) {
+          setSelectedKey(termYearKey(data.currentTerm.term, data.currentTerm.year))
         } else if (data.availableTerms.length > 0) {
           const a = data.availableTerms[0]
           setSelectedKey(termYearKey(a.term, a.year))
@@ -69,7 +80,7 @@ export function GradesPage() {
     })()
 
     return () => ac.abort()
-  }, [currentStudentId, reloadKey, t])
+  }, [currentStudentId, reloadKey, t, activeTerm, portalTermLoading])
 
   const id = currentStudentId?.trim()
   const showEmpty = !id

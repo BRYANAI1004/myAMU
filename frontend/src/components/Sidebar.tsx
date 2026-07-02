@@ -4,10 +4,12 @@ import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
 import {
   IconAcademics,
+  IconClinical,
   IconDocument,
   IconFeesStore,
   IconFinance,
   IconMyAccount,
+  IconMyCourses,
   IconRegistration,
 } from './icons/PortalModuleIcons'
 
@@ -24,6 +26,18 @@ function isMainNavActive(pathname: string, to: string): boolean {
   if (to === '/finances') {
     return pathname.startsWith('/finances') && !pathname.startsWith('/finances/store')
   }
+  if (to === '/clinical/schedule') {
+    return pathname.startsWith('/clinical')
+  }
+  if (to === '/registration') {
+    return (
+      pathname.startsWith('/registration') &&
+      !pathname.startsWith('/registration/clinical')
+    )
+  }
+  if (to === '/my-courses') {
+    return pathname.startsWith('/my-courses')
+  }
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
@@ -35,6 +49,8 @@ type NavItem = {
 
 const SERVICE_NAV_ITEMS: readonly NavItem[] = [
   { to: '/registration', labelKey: 'registrationModule', icon: IconRegistration },
+  { to: '/my-courses', labelKey: 'myCoursesModule', icon: IconMyCourses },
+  { to: '/clinical/schedule', labelKey: 'clinicalModule', icon: IconClinical },
   { to: '/finances', labelKey: 'finances', icon: IconFinance },
   { to: '/academics', labelKey: 'academics', icon: IconAcademics },
   { to: '/documents', labelKey: 'documents', icon: IconDocument },

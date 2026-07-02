@@ -235,6 +235,7 @@ export const STUDENT_PORTAL_EN = {
 
   // Registration
   selectTerm: 'Select Term',
+  registrationCurrentTermLabel: 'Current term',
   registrationLayoutTodayAria: "Today's date",
   loadingTerms: 'Loading terms…',
   couldNotLoadTerms: 'Could not load terms.',
@@ -249,6 +250,15 @@ export const STUDENT_PORTAL_EN = {
   offeredTimetable: 'Offered Timetable',
   addDrop: 'Add/Drop',
   myTimetable: 'My Timetable',
+  myCoursesModule: 'My Courses',
+  myCoursesTabRegistered: 'Registered courses',
+  myCoursesTabTimetable: 'Timetable',
+  myCoursesTabsAria: 'My courses sections',
+  myCoursesRegisteredCaption: 'Your registered courses for the current term',
+  myCoursesTimetableLede:
+    'Weekly timetable for your registered courses this term (Monday–Sunday).',
+  myCoursesSelectTermUnavailable: 'The current academic term is not available yet.',
+  myCoursesColSchedule: 'Schedule',
   navOverview: 'Overview',
   registrationRecentTermsHint: 'Recent terms shown here are published by the registrar.',
 
@@ -325,6 +335,22 @@ export const STUDENT_PORTAL_EN = {
   state: 'State',
   zip: 'Zip',
   email: 'Email',
+
+  digitalIdStudentLabel: 'Student',
+  digitalIdProgramLabel: 'Program of study',
+  digitalIdTermLabel: 'Term',
+  digitalIdStatusActive: 'Active',
+  digitalIdStatusEnrolling: 'Enrolling',
+  digitalIdStatusNotEnrolled: 'Not enrolled',
+  digitalIdAddPhoto: 'Add photo',
+  digitalIdChangePhoto: 'Change photo',
+  digitalIdPhotoUploading: 'Uploading…',
+  digitalIdAppleWallet: 'Add to Apple Wallet',
+  digitalIdGoogleWallet: 'Add to Google Wallet',
+  digitalIdWalletComingSoon: 'Coming soon.',
+  digitalIdAppleWalletSoon: 'Apple Wallet support is coming soon.',
+  digitalIdShow: 'Digital student ID',
+  digitalIdHide: 'Hide student ID',
 
   // Portal student bar
   accountUnavailable: 'Account unavailable',
@@ -673,9 +699,7 @@ export const STUDENT_PORTAL_EN = {
   clinicalStatusTentative: 'Tentative',
 
   // Documents home & tabs
-  documentsBuildMarker: 'Documents build marker: docs-debug-2026-04-07',
   signInToViewDocuments: 'Sign in to view documents and forms for your account.',
-  documentsRequirementsForTerm: 'Requirements for {term} (academic term).',
   loadingDocumentRequirements: 'Loading document requirements…',
   documentsQuizUnavailableUntilLoad:
     'Quiz and agreement actions are unavailable until document requirements load successfully.',
@@ -712,6 +736,7 @@ export const STUDENT_PORTAL_EN = {
   payTuition: 'Pay Tuition',
   payTuitionAndFees: 'Pay Tuition & Fees',
   payClinicFee: 'Pay Clinic Fee',
+  paymentHistoryTab: 'Payment History',
   ledgerSelectAll: 'Select all charges',
   ledgerSelectRowAria: 'Include in checkout',
   ledgerSelectedForPayment: 'Selected for payment',
@@ -993,9 +1018,9 @@ export const STUDENT_PORTAL_EN = {
   courseBinCheckoutLede:
     'Confirm sections from your CourseBin and save them to your schedule for this term. This writes to your official enrollment record for billing and registration.',
   selectAcademicTermInRegistrationBar:
-    'Select an academic term in the registration bar above.',
+    'The current registration term is not available. Please contact the registrar.',
   checkoutRegisterAfterSignIn: 'to register for classes.',
-  checkoutErrorSelectTerm: 'Select an academic term before registering.',
+  checkoutErrorSelectTerm: 'The current registration term is not available.',
   checkoutErrorSignIn: 'You must be signed in to register.',
   checkoutErrorAddSections:
     'Add at least one section with a valid section code to your CourseBin.',
@@ -1379,6 +1404,7 @@ export const STUDENT_PORTAL_EN = {
   documentsQuizSubmittedBadge: 'Submitted',
   documentsQuizGenerate: 'Generate',
   documentsRegFormGenerate: 'Generate',
+  documentsTerm: 'Term',
   documentsRegistrationYear: 'Registration Year',
   documentsQuarter: 'Quarter',
   documentsRegistrationFormPreviewAria: 'Registration form preview',
@@ -1766,6 +1792,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   clinicalBookingPaymentHoldExpired: '此臨床預約費用之付款期限已過。',
 
   selectTerm: '選擇學期',
+  registrationCurrentTermLabel: '目前學期',
   registrationLayoutTodayAria: '今日日期',
   loadingTerms: '正在載入學期…',
   couldNotLoadTerms: '無法載入學期。',
@@ -1779,6 +1806,14 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   offeredTimetable: '開課時間表',
   addDrop: '加退選',
   myTimetable: '我的課表',
+  myCoursesModule: '我的課程',
+  myCoursesTabRegistered: '已選課程',
+  myCoursesTabTimetable: '課表',
+  myCoursesTabsAria: '我的課程分頁',
+  myCoursesRegisteredCaption: '目前學期已註冊課程',
+  myCoursesTimetableLede: '本學期已選課程之每週課表（週一至週日）。',
+  myCoursesSelectTermUnavailable: '目前學期尚無法使用。',
+  myCoursesColSchedule: '上課時間',
   navOverview: '總覽',
   registrationRecentTermsHint: '此處顯示的近期學期由註冊組公布。',
 
@@ -1851,6 +1886,22 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   state: '州／省',
   zip: '郵遞區號',
   email: '電子郵件',
+
+  digitalIdStudentLabel: '學生',
+  digitalIdProgramLabel: '在讀項目',
+  digitalIdTermLabel: '學期',
+  digitalIdStatusActive: '在學中',
+  digitalIdStatusEnrolling: '註冊中',
+  digitalIdStatusNotEnrolled: '未註冊',
+  digitalIdAddPhoto: '新增照片',
+  digitalIdChangePhoto: '更換照片',
+  digitalIdPhotoUploading: '上傳中…',
+  digitalIdAppleWallet: '加入 Apple Wallet',
+  digitalIdGoogleWallet: '加入 Google Wallet',
+  digitalIdWalletComingSoon: '即將推出。',
+  digitalIdAppleWalletSoon: 'Apple Wallet 功能即將推出。',
+  digitalIdShow: '電子學生證',
+  digitalIdHide: '收起學生證',
 
   accountUnavailable: '無法取得帳戶',
   signedInStudentAria: '已登入學生',
@@ -2172,9 +2223,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   clinicalStatusConfirmed: '已確認',
   clinicalStatusTentative: '暫定',
 
-  documentsBuildMarker: '文件建置標記：docs-debug-2026-04-07',
   signInToViewDocuments: '請登入以檢視帳戶相關文件與表單。',
-  documentsRequirementsForTerm: '{term} 學期之文件需求（學年學期）。',
   loadingDocumentRequirements: '正在載入文件需求…',
   documentsQuizUnavailableUntilLoad: '文件需求載入成功前，無法使用測驗與同意書功能。',
   documentsTabRegistrationForms: '註冊表單',
@@ -2209,6 +2258,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   payTuition: '繳交學費',
   payTuitionAndFees: '繳交學費與費用',
   payClinicFee: '繳交門診費',
+  paymentHistoryTab: '繳費紀錄',
   ledgerSelectAll: '全選費用項目',
   ledgerSelectRowAria: '加入結帳',
   ledgerSelectedForPayment: '已選取待付',
@@ -2472,9 +2522,9 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   courseBinCheckoutHeading: '註冊確認',
   courseBinCheckoutLede:
     '確認課程暫存中的班級並儲存至本學期課表。此動作會寫入正式選課紀錄，供帳務與註冊使用。',
-  selectAcademicTermInRegistrationBar: '請先於上方註冊列選擇學年學期。',
+  selectAcademicTermInRegistrationBar: '目前註冊學期無法使用，請聯絡註冊組。',
   checkoutRegisterAfterSignIn: '以選課註冊。',
-  checkoutErrorSelectTerm: '註冊前請先選擇學年學期。',
+  checkoutErrorSelectTerm: '目前註冊學期無法使用。',
   checkoutErrorSignIn: '請先登入後再註冊。',
   checkoutErrorAddSections: '請至少將一個有效班級代碼加入課程暫存。',
   checkoutSuccessAlreadyEnrolled:
@@ -2830,6 +2880,7 @@ const STUDENT_PORTAL_ZH: Record<StudentPortalKey, string> = {
   documentsQuizSubmittedBadge: '已提交',
   documentsQuizGenerate: '產生',
   documentsRegFormGenerate: '產生',
+  documentsTerm: '學期',
   documentsRegistrationYear: '註冊年度',
   documentsQuarter: '學季',
   documentsRegistrationFormPreviewAria: '註冊表預覽',

@@ -1,15 +1,19 @@
 import { NavLink } from 'react-router-dom'
 import { useStudentPortalT } from '@/LanguageContext'
 import type { StudentPortalKey } from '@/lib/i18n'
-
-function linkClass(isActive: boolean) {
-  return ['portal-tab', isActive ? 'portal-tab--active' : ''].filter(Boolean).join(' ')
-}
+import { portalPillTabClass } from '@/lib/portalPillTabClass'
 
 const ITEMS: { to: string; labelKey: StudentPortalKey }[] = [
   { to: 'offered-timetable', labelKey: 'registrationPlanNavLabel' },
   { to: 'course-search', labelKey: 'courseSearchHeading' },
 ]
+
+function navTo(path: string, termLinkSearch: string) {
+  const search = termLinkSearch.startsWith('?')
+    ? termLinkSearch.slice(1)
+    : termLinkSearch
+  return search !== '' ? { pathname: path, search } : path
+}
 
 export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) {
   const t = useStudentPortalT()
@@ -19,8 +23,9 @@ export function RegistrationNav({ termLinkSearch }: { termLinkSearch: string }) 
         {ITEMS.map((item) => (
           <li key={item.to}>
             <NavLink
-              to={`${item.to}${termLinkSearch}`}
-              className={({ isActive }) => linkClass(isActive)}
+              end
+              to={navTo(item.to, termLinkSearch)}
+              className={({ isActive }) => portalPillTabClass(isActive)}
             >
               {t(item.labelKey)}
             </NavLink>

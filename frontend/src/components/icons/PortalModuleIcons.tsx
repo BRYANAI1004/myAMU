@@ -78,6 +78,18 @@ export function IconMyAccount(props: IconProps) {
   )
 }
 
+export function IconMyCourses(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" {...iconAttrs(props)}>
+      <path d="M0 0h24v24H0z" fill="none" />
+      <path
+        fill="currentColor"
+        d="M4 5a3 3 0 0 1 3 -3h10a3 3 0 0 1 3 3v14a1 1 0 0 1 -1 1h-14a1 1 0 0 1 -1 -1zm4 0v2h8v-2zm-1 4h10v8h-10zm2 10h6v2h-6z"
+      />
+    </svg>
+  )
+}
+
 /** Fees & services store — from `public/shopping-cart.svg` (Tabler filled). */
 export function IconFeesStore(props: IconProps) {
   return (

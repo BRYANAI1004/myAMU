@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { AIAssistantLauncher } from './ai/AIAssistantLauncher'
 import { AIAssistantProvider } from './ai/AIAssistantProvider'
+import { StudentPortalTermProvider } from '../context/StudentPortalTermContext'
 import { deriveAIAssistantPageContext } from '../data/aiMockReplies'
 import { PortalShell } from './PortalShell'
 
@@ -20,18 +21,20 @@ export function PortalLayout() {
   const assistantPageContext = deriveAIAssistantPageContext(pathname)
 
   return (
-    <AIAssistantProvider pageContext={assistantPageContext}>
-      <PortalShell
-        showStudentBar={showStudentBar}
-        showSidebar={showSidebar}
-        showPortalBanner={showPortalBanner}
-        dashboardHome={isDashboard}
-        internalModuleLayout={!isDashboard}
-        sidebarNavVariant="internal"
-      >
-        <Outlet />
-      </PortalShell>
-      <AIAssistantLauncher />
-    </AIAssistantProvider>
+    <StudentPortalTermProvider>
+      <AIAssistantProvider pageContext={assistantPageContext}>
+        <PortalShell
+          showStudentBar={showStudentBar}
+          showSidebar={showSidebar}
+          showPortalBanner={showPortalBanner}
+          dashboardHome={isDashboard}
+          internalModuleLayout={!isDashboard}
+          sidebarNavVariant="internal"
+        >
+          <Outlet />
+        </PortalShell>
+        <AIAssistantLauncher />
+      </AIAssistantProvider>
+    </StudentPortalTermProvider>
   )
 }

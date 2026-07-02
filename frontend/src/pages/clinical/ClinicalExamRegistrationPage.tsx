@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStudentPortalT } from '@/LanguageContext'
 import { useAccount } from '../../context/AccountContext'
+import { useStudentPortalTerm } from '../../context/StudentPortalTermContext'
 import {
   ApiError,
   fetchAcademicTerms,
@@ -23,6 +24,7 @@ function formatDateTimeDisplay(iso: string): string {
 export function ClinicalExamRegistrationPage() {
   const t = useStudentPortalT()
   const { currentStudentId } = useAccount()
+  const { defaultTermId, loading: portalTermLoading } = useStudentPortalTerm()
   const sid = currentStudentId?.trim() ?? ''
 
   const [terms, setTerms] = useState<AcademicTerm[] | null>(null)
@@ -56,13 +58,22 @@ export function ClinicalExamRegistrationPage() {
   }, [sid, t])
 
   useEffect(() => {
+    if (portalTermLoading) return
+
     let cancelled = false
     void (async () => {
       try {
         const list = await fetchAcademicTerms()
         if (!cancelled) {
           setTerms(list)
-          setSelectedTermId((prev) => (prev !== '' ? prev : list[0]?.id ?? ''))
+          setSelectedTermId((prev) => {
+            if (prev !== '' && list.some((t) => t.id === prev)) return prev
+            const preferred =
+              defaultTermId !== '' && list.some((t) => t.id === defaultTermId)
+                ? defaultTermId
+                : (list[0]?.id ?? '')
+            return preferred
+          })
         }
       } catch (e) {
         if (!cancelled) {
@@ -74,7 +85,7 @@ export function ClinicalExamRegistrationPage() {
     return () => {
       cancelled = true
     }
-  }, [t])
+  }, [t, portalTermLoading, defaultTermId])
 
   useEffect(() => {
     void loadList()
